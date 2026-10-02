@@ -1,5 +1,6 @@
 """VectorStore: thin ChromaDB wrapper using cosine distance."""
 
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,10 +42,17 @@ class VectorStore:
         self.collection_name = collection_name
         self._client = client
         self._collection: Any | None = None
+        # Opening a PersistentClient is not thread-safe: the startup index build and the first chat
+        # request would race ("Could not connect to tenant default_tenant").
+        self._open_lock = threading.Lock()
 
     @property
     def collection(self) -> Any:
-        if self._collection is None:
+        if self._collection is not None:
+            return self._collection
+        with self._open_lock:
+            if self._collection is not None:
+                return self._collection
             if self._client is None:
                 import chromadb
 

@@ -40,3 +40,13 @@ def test_committed_corpus_is_the_full_ipc() -> None:
     chunks = load_chunks(REPO_ROOT / "data" / "corpus" / "ipc_chunks.jsonl")
     sections = {c.section for c in chunks}
     assert len(chunks) == 685 and {"302", "304A", "304B", "379", "498A"} <= sections
+
+
+def test_concurrent_first_open_of_a_persistent_store(tmp_path: Path) -> None:
+    """The startup index build and the first chat request open the store at the same time."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    store = VectorStore(tmp_path / "chroma", "concurrent_open")
+    with ThreadPoolExecutor(8) as pool:
+        counts = list(pool.map(lambda _: store.count(), range(16)))
+    assert counts == [0] * 16

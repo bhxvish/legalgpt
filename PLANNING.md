@@ -3,7 +3,8 @@
 Domain-adapted, retrieval-augmented legal question-answering for **Indian criminal law (IPC)**.
 
 - **Online core:** React 19 + Tailwind chat UI, FastAPI backend, ChromaDB retrieval over
-  hierarchically-chunked legal text, Llama-3-8B via Groq, strict source-grounded prompting.
+  hierarchically-chunked legal text, a hosted LLM via Groq (planned Llama-3-8B; gpt-oss-120b since
+  Groq retired Llama-3, see Phase 1), strict source-grounded prompting.
 - **Offline research pipeline:** manual rhetorical-role annotation → InLegalBERT-assisted
   labelling → LoRA fine-tuning of an open LLM on the resulting corpus.
 - **New runtime services:** explainability (confidence, citation validation, sentence
@@ -92,7 +93,7 @@ legalgpt/
 - [x] **Phase 4** — Module 3: LoRA fine-tuning pipeline
 - [x] **Phase 5** — Module 4: Explainability
 - [x] **Phase 6** — Module 5: Neuro-symbolic verification
-- [ ] **Phase 7** — Integration, testing & deployment
+- [x] **Phase 7** — Integration, testing & deployment
 
 ## Conventions (every phase)
 
@@ -329,38 +330,103 @@ legalgpt/
   extractor classed an "accidental fire from his country-made pistol" as accidental rather than
   negligent — a legal judgment worth a human look.
 
+### Phase 7 (integration, testing & deployment)
+
+- **One chat request, whole chain:** `POST /api/chat` takes `model` (`groq` | `adapter`, listed by
+  `GET /api/models`) and `verify_section`. Order of events: `meta`, `sources`, `token`*,
+  `explanation` (every legal response, refusals included), then `verification` only when asked.
+  Verification failures (no SWI-Prolog, extraction error, rate limit) arrive as
+  `{"error": ...}` in that event and never turn a delivered answer into an error.
+- **Base-vs-tuned toggle, not a restart:** both LLMClients are built at startup (the adapter
+  only if one exists under `LORA_DIR`; it loads lazily on first use). `LLM_BACKEND` now only picks
+  the default. Verified in the browser: the same question answered by `openai/gpt-oss-120b`, then
+  by `Qwen/Qwen2.5-1.5B-Instruct+lora:v0.2-20261002-203807`, each tagged with its model.
+- **Fact extraction always uses Groq,** whichever model answers: it needs valid JSON for all 19
+  predicates, which the 1.5B adapter does not produce reliably.
+- **Clean-checkout index:** the IPC PDF is git-ignored and India Code was unreachable from here, so
+  the parsed chunks are committed (`data/corpus/ipc_chunks.jsonl`, 685 chunks, 0.6 MB; bare-act text
+  is public domain under Copyright Act s.52(1)(q)) and byte-identical to a fresh parse of the PDF.
+  On startup the backend embeds them into an empty collection (~45 s on CPU) — no manual ingest step.
+- **Docker:** named volumes for ChromaDB, AnnotationStore, raw judgments and the Hugging Face cache;
+  `data/corpus` and `data/models` are read-only bind mounts. **No Prolog sidecar** (deviation from
+  the plan's "optional"): pyswip embeds SWI-Prolog in-process, the backend image already installs
+  `swi-prolog-nox`, and a sidecar would need a network protocol around the engine for no benefit.
+  Source bind mounts and `--reload` were dropped: the images are self-contained, development uses
+  the local venv.
+- **Race found by the demo:** the startup index check and the first chat request opened ChromaDB's
+  PersistentClient at the same moment ("Could not connect to tenant default_tenant"; the first demo
+  question failed). `VectorStore` now opens it under a lock; a test with 8 threads fails without it.
+- **`docker compose up` from a clean clone: not yet verified.** Docker Desktop's WSL engine hung
+  during the first image build (API 500, then no pipe after a restart) — a host problem, not a
+  compose error. To re-test: `wsl --shutdown`, start Docker Desktop, then clone and
+  `docker compose up --build`.
+- **Rate limits found by the demo:** Groq's free tier allows 8k tokens/minute; one answer plus the
+  two extraction runs can exceed it, and the second demo question's verification failed with 429.
+  GroqClient now retries up to 5 times honouring `retry-after`.
+- **Tests:** `test_integration_e2e.py` runs the real parser, retriever, prompt builder, explanation
+  layer and verification service over real IPC text with stub embedder/LLMs (and the real
+  PrologEngine when SWI-Prolog is installed, a Python stand-in otherwise); `LEGALGPT_LIVE_E2E=1`
+  runs the same chain through `create_app()` with Groq, MiniLM, the real index and SWI-Prolog.
+  CI (`.github/workflows/ci.yml`): `pytest -m "not integration"` + frontend build. There is no git
+  remote, so the workflow has not run on GitHub; the same pytest command was run inside the
+  Linux backend image instead.
+
 ## Known limitations
 
-_Collected as they are found; consolidated in Phase 7._
+**Scope**
+- IPC only. The IPC was replaced by the Bharatiya Nyaya Sanhita on 1 July 2024; offences committed
+  after that date fall under the BNS, which is not indexed (one seed case, case04, already cites it).
+- Retrieval is over the bare act only: no judgments, no CrPC/Evidence Act, so procedure, bail and
+  sentencing practice are out of reach.
+- Not legal advice. The UI and the demo say so; the evidence-match band is not answer correctness.
 
-- **Verification coverage:** 7 sections only (by design). s.337/338 do not exclude cases where the
-  victim died (they then also "fit" a fatal accident alongside s.304A); s.323 ignores the s.334
-  grave-provocation case; exceptions and general defences (Chapter IV) are not encoded.
-- **Verification depends on extraction:** the verdict is only as good as the extracted facts; the
-  quote check proves a quote exists, not that it supports the value (case01's first run used the
-  father's hearsay "negligence of the accused" as evidence of driving).
+**Retrieval**
+- **Fact-pattern questions:** the 0.55 floor was calibrated on short questions. Narratives pull
+  generic chunks (§1/§2, state-amendment boilerplate) above the floor, so an off-scope narrative can
+  reach the model with irrelevant sources; and the relevant punishment section can be missed — in the
+  demo, the bicycle-theft narrative retrieved §378's illustrations and §381 but not §379, and the
+  answer (correctly) said the punishment was not in its sources. Needs a fact-pattern calibration set
+  and down-weighting of definitional / state-amendment chunks.
+- MiniLM is a general-purpose embedder; no legal-domain embedding model or re-ranker was evaluated.
 
-- **Fact-pattern retrieval** (also seen in Phase 5): "The accused drove a lorry rashly and hit a
-  scooter…" scored 0.54 and was refused; short questions about the same offence retrieve §279/§337
-  fine.
+**Answers and explanation**
+- Attribution catches off-topic or unsupported sentences, not subtle legal errors: a sentence about
+  a neighbouring offence (§304 vs §304A) scores like a supported one.
+- `citation_accuracy` (Phase 4) measures grounding, not relevance or correctness.
 
-- **Retrieval floor vs long fact patterns:** questions written as fact narratives pull generic
-  chunks (IPC §1/§2, state-amendment boilerplate) at 0.6–0.7 similarity, above the 0.55 floor,
-  because the Phase 1 calibration set only had short questions. A CrPC appeal therefore reaches the
-  model with irrelevant IPC sources instead of being refused. Needs a fact-pattern calibration set
-  and probably down-weighting of definitional / state-amendment chunks.
-- **Tuned model quality:** see Phase 4 — copies sources and over-refuses; not a drop-in
-  replacement for the hosted model.
+**Tuned model**
+- Trained on 124 examples from 26 cases: it cites in the required format but copies sources and
+  over-refuses (Phase 4). Not a drop-in replacement for the hosted model. In the CPU Docker image it
+  runs unquantized — about a minute per answer.
 
-- **Seed corpus (v0.1):** 31 cases, single annotation pass. No double annotation yet, so
-  inter-annotator agreement (Cohen's kappa) on real data is **unmeasured**; the guideline is not yet
-  validated the way the LLD intends. The seed never uses **None**: headers and boilerplate were
-  forced into the five roles, so new UI annotations that use None will differ in distribution.
-- **Label skew:** Facts 38%, Precedent 23%, Ruling 21%, Argument 10%, Law Applied 9% — Phase 3 should
-  report per-class metrics, not only accuracy. Precedent-heavy cases (case01, case08, case31) partly
-  consist of long quotations from earlier judgments.
-- **Sheet gaps:** case18 and case21 skip 2 and 5 sentence ids, so their rebuilt text is missing
-  those sentences. Court and decision year are unknown/approximate for imported cases (the sheet
-  has no cover page; year comes from the title).
-- **Codes:** one seed case (case04) also cites the BNS/BNSS, which replaced the IPC in July 2024;
-  the corpus and Prolog scope remain IPC-only.
+**Verification**
+- 7 sections (by design). s.337/338 do not exclude cases where the victim died; s.323 ignores the
+  s.334 grave-provocation case; exceptions and general defences (Chapter IV) are not encoded.
+- The verdict is only as good as the extracted facts; the quote check proves a quote exists, not
+  that it supports the value (case01's first run used the father's hearsay as evidence of driving).
+  Extraction is legal judgement in disguise (case07: "accidental fire" classed as not negligent).
+- Each verification costs two hosted-model calls; on the Groq free tier several in a row hit the
+  per-minute token limit (retried, but slow).
+
+**Dataset and annotation**
+- 31 seed cases plus 1 BERT-assisted case (3 more queued for the team); single annotation pass, so inter-annotator agreement on real data
+  is **unmeasured** and the guideline is not validated the way the LLD intends. The 79
+  `bert_assisted` labels were reviewed by Claude, not the team.
+- Label skew: Facts 38%, Precedent 23%, Ruling 21%, Argument 10%, Law Applied 9%. Classifier
+  macro-F1 0.664 ± 0.031 (5-fold, case-grouped) on this small set.
+- case18 and case21 skip 2 and 5 sentence ids in the team sheet; court and year are approximate for
+  imported cases.
+
+**Deployment**
+- Local development/demo only: no authentication, rate limiting, HTTPS or multi-user isolation;
+  the annotation store is a single append-only file.
+- First `docker compose up` downloads MiniLM and embeds the corpus (~1–2 min); answers need
+  internet access to Groq.
+
+**Future work (not implemented)**
+- **ZKML proofs of inference** — out of scope: proving a transformer forward pass in zero knowledge
+  is still orders of magnitude too slow and memory-hungry for a 1.5B+ model on this hardware, and it
+  would prove *which* model ran, not that the legal answer is right.
+- BNS/BNSS corpus and IPC↔BNS section mapping; judgments as a second retrieval source.
+- Double annotation with measured kappa; human-written answer targets for LoRA training.
+- More Prolog sections, exceptions and Chapter IV defences.
