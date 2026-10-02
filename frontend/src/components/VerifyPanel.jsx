@@ -40,6 +40,86 @@ function Pill({ status, section }) {
   return <span className={`rounded px-2 py-0.5 text-xs font-semibold ring-1 ${s.cls}`}>{section ? `s.${section} · ` : ''}{s.label}</span>
 }
 
+/** Status badge, element-by-element breakdown with evidence quotes, other fitting sections. */
+export function VerificationResultView({ result: r, className = "space-y-4 rounded-xl bg-white p-4 ring-1 ring-slate-200" }) {
+  return (
+      <section className={className} data-testid="verify-result">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className={`rounded-lg px-3 py-1 text-sm font-bold ring-1 ${STATUS[r.status].cls}`} data-testid="verify-status">
+            {STATUS[r.status].label}
+          </span>
+          <p className="text-sm text-slate-700">
+            {STATUS[r.status].text(r.cited_section)} <span className="text-slate-500">({r.title})</span>
+          </p>
+        </div>
+  
+        <table className="w-full text-left text-sm">
+          <thead className="text-xs text-slate-500">
+            <tr>
+              <th className="pb-1 pr-2 font-medium" />
+              <th className="pb-1 pr-2 font-medium">Element</th>
+              <th className="pb-1 pr-2 font-medium">Found</th>
+              <th className="pb-1 font-medium">Evidence quoted from the facts</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {r.elements.map((el) => (
+              <tr key={el.predicate} data-testid="verify-element" data-status={el.status} className="align-top">
+                <td className={`py-1.5 pr-2 font-bold ${ELEMENT[el.status].cls}`} title={ELEMENT[el.status].label}>
+                  {ELEMENT[el.status].icon}
+                </td>
+                <td className="py-1.5 pr-2 text-slate-800">
+                  {el.description}
+                  <span className={`ml-1 text-xs ${ELEMENT[el.status].cls}`}>({ELEMENT[el.status].label})</span>
+                </td>
+                <td className="py-1.5 pr-2 font-mono text-xs text-slate-700">{el.found}</td>
+                <td className="py-1.5 text-xs italic text-slate-600">{el.evidence ? `“${el.evidence}”` : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+  
+        {r.alternatives.some((a) => a.status === 'CONSISTENT') && (
+          <p className="text-sm text-slate-700">
+            These facts also satisfy:{' '}
+            {r.alternatives
+              .filter((a) => a.status === 'CONSISTENT')
+              .map((a) => `s.${a.section} (${a.title})`)
+              .join('; ')}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-1.5">
+          <span className="text-xs text-slate-500">Other encoded sections:</span>
+          {r.alternatives.map((a) => (
+            <Pill key={a.section} status={a.status} section={a.section} />
+          ))}
+        </div>
+  
+        {r.warnings.length > 0 && (
+          <details className="text-xs text-amber-800">
+            <summary className="cursor-pointer">{r.warnings.length} extraction note(s)</summary>
+            <ul className="mt-1 list-disc pl-5">
+              {r.warnings.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
+          </details>
+        )}
+        <details className="text-xs text-slate-600">
+          <summary className="cursor-pointer">All facts extracted by {r.model_id}</summary>
+          <ul className="mt-1 space-y-0.5">
+            {Object.entries(r.facts).map(([k, v]) => (
+              <li key={k}>
+                <span className="font-mono">{k}</span> = <b>{v.value}</b>
+                {v.evidence && <span className="italic"> — “{v.evidence}”</span>}
+              </li>
+            ))}
+          </ul>
+        </details>
+      </section>
+  )
+}
+
 export default function VerifyPanel() {
   const [meta, setMeta] = useState(null)
   const [text, setText] = useState('')
@@ -150,82 +230,7 @@ export default function VerifyPanel() {
 
         {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{error}</p>}
 
-        {result && (
-          <section className="space-y-4 rounded-xl bg-white p-4 ring-1 ring-slate-200" data-testid="verify-result">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className={`rounded-lg px-3 py-1 text-sm font-bold ring-1 ${STATUS[result.status].cls}`} data-testid="verify-status">
-                {STATUS[result.status].label}
-              </span>
-              <p className="text-sm text-slate-700">
-                {STATUS[result.status].text(result.cited_section)} <span className="text-slate-500">({result.title})</span>
-              </p>
-            </div>
-
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs text-slate-500">
-                <tr>
-                  <th className="pb-1 pr-2 font-medium" />
-                  <th className="pb-1 pr-2 font-medium">Element</th>
-                  <th className="pb-1 pr-2 font-medium">Found</th>
-                  <th className="pb-1 font-medium">Evidence quoted from the facts</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {result.elements.map((el) => (
-                  <tr key={el.predicate} data-testid="verify-element" data-status={el.status} className="align-top">
-                    <td className={`py-1.5 pr-2 font-bold ${ELEMENT[el.status].cls}`} title={ELEMENT[el.status].label}>
-                      {ELEMENT[el.status].icon}
-                    </td>
-                    <td className="py-1.5 pr-2 text-slate-800">
-                      {el.description}
-                      <span className={`ml-1 text-xs ${ELEMENT[el.status].cls}`}>({ELEMENT[el.status].label})</span>
-                    </td>
-                    <td className="py-1.5 pr-2 font-mono text-xs text-slate-700">{el.found}</td>
-                    <td className="py-1.5 text-xs italic text-slate-600">{el.evidence ? `“${el.evidence}”` : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {result.alternatives.some((a) => a.status === 'CONSISTENT') && (
-              <p className="text-sm text-slate-700">
-                These facts also satisfy:{' '}
-                {result.alternatives
-                  .filter((a) => a.status === 'CONSISTENT')
-                  .map((a) => `s.${a.section} (${a.title})`)
-                  .join('; ')}
-              </p>
-            )}
-            <div className="flex flex-wrap gap-1.5">
-              <span className="text-xs text-slate-500">Other encoded sections:</span>
-              {result.alternatives.map((a) => (
-                <Pill key={a.section} status={a.status} section={a.section} />
-              ))}
-            </div>
-
-            {result.warnings.length > 0 && (
-              <details className="text-xs text-amber-800">
-                <summary className="cursor-pointer">{result.warnings.length} extraction note(s)</summary>
-                <ul className="mt-1 list-disc pl-5">
-                  {result.warnings.map((w) => (
-                    <li key={w}>{w}</li>
-                  ))}
-                </ul>
-              </details>
-            )}
-            <details className="text-xs text-slate-600">
-              <summary className="cursor-pointer">All facts extracted by {result.model_id}</summary>
-              <ul className="mt-1 space-y-0.5">
-                {Object.entries(result.facts).map(([k, v]) => (
-                  <li key={k}>
-                    <span className="font-mono">{k}</span> = <b>{v.value}</b>
-                    {v.evidence && <span className="italic"> — “{v.evidence}”</span>}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          </section>
-        )}
+        {result && <VerificationResultView result={result} />}
       </div>
     </div>
   )

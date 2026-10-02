@@ -1,12 +1,13 @@
-"""ChatRouter: POST /api/chat, streamed as Server-Sent Events.
+"""ChatRouter: POST /api/chat, streamed as Server-Sent Events; GET /api/models.
 
 Event stream (each `data:` line is JSON):
-  meta         {"mode", "model", "refused"}   always first
-  sources      [SourceEvidence, ...]          legal mode with evidence only
-  token        {"text"}                        answer fragments, in order
-  explanation  ExplanationRecord               legal mode, after the answer (incl. refusals)
-  error        {"message"}                     generation/retrieval failure (stream then ends)
-  done         {}                              always last
+  meta          {"mode", "model", "refused"}   always first
+  sources       [SourceEvidence, ...]          legal mode with evidence only
+  token         {"text"}                        answer fragments, in order
+  explanation   ExplanationRecord               legal mode, after the answer (incl. refusals)
+  verification  VerificationResult | {"error"}  legal mode, only when the request names verify_section
+  error         {"message"}                     generation/retrieval failure (stream then ends)
+  done          {}                              always last
 """
 
 import json
@@ -26,6 +27,7 @@ from app.core.retriever import RetrievalResult, Retriever
 
 if TYPE_CHECKING:
     from app.explainability.explanation_builder import ExplanationBuilder
+    from app.verification.verification_service import VerificationService
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +53,17 @@ class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     mode: Literal["legal", "general"] = "legal"
     history: list[ChatTurn] = Field(default_factory=list, max_length=20)
+    model: str | None = Field(default=None, max_length=40)  # an id from /api/models; None = server default
+    # Legal mode: also check the facts stated in the question against this IPC section (Module 5).
+    verify_section: str | None = Field(default=None, max_length=10)
+
+
+class ModelInfo(BaseModel):
+    id: str
+    model_id: str
+    available: bool
+    default: bool = False
+    note: str = ""
 
 
 def sse(event: str, data: Any) -> str:
@@ -64,13 +77,31 @@ class ChatRouter:
         llm: LLMClient,
         prompt_builder: PromptBuilder | None = None,
         explainer: "ExplanationBuilder | None" = None,
+        models: dict[str, LLMClient] | None = None,
+        default_model: str | None = None,
+        model_notes: dict[str, str] | None = None,
+        verifier: "VerificationService | None" = None,
     ) -> None:
+        """`llm` is the default model. `models` adds named alternatives a request can choose with
+        `model` (the base-vs-tuned toggle); `model_notes` explains slow or unavailable ones."""
         self.retriever = retriever
         self.llm = llm
+        self.models: dict[str, LLMClient] = dict(models or {})
+        self.default_model = default_model or next((k for k, v in self.models.items() if v is llm), "default")
+        self.models.setdefault(self.default_model, llm)
+        self.model_notes = dict(model_notes or {})
         self.prompt_builder = prompt_builder or PromptBuilder()
         self.explainer = explainer
+        self.verifier = verifier
         self.router = APIRouter(prefix="/api", tags=["chat"])
         self.router.add_api_route("/chat", self.chat, methods=["POST"], response_class=StreamingResponse)
+        self.router.add_api_route("/models", self.list_models, methods=["GET"], response_model=list[ModelInfo])
+
+    def list_models(self) -> list[ModelInfo]:
+        out = [ModelInfo(id=k, model_id=v.model_id, available=True, default=k == self.default_model,
+                         note=self.model_notes.get(k, "")) for k, v in self.models.items()]
+        out += [ModelInfo(id=k, model_id="", available=False, note=n) for k, n in self.model_notes.items() if k not in self.models]
+        return sorted(out, key=lambda m: not m.default)
 
     def chat(self, req: ChatRequest) -> StreamingResponse:
         return StreamingResponse(
@@ -82,19 +113,25 @@ class ChatRouter:
     def events(self, req: ChatRequest) -> Iterator[str]:
         history = [Message(t.role, t.content) for t in req.history]
         try:
+            name = req.model or self.default_model
+            if name not in self.models:
+                raise ValueError(f"model {name!r} is not available: {self.model_notes.get(name, 'unknown model')}")
+            llm = self.models[name]
             if req.mode == "general":
-                yield from self._general(req.question, history)
+                yield from self._general(req.question, history, llm)
             else:
-                yield from self._legal(req.question, history)
+                yield from self._legal(req.question, history, llm)
+                if req.verify_section:
+                    yield from self._verification(req.question, req.verify_section)
         except Exception as exc:  # surface failures to the client instead of a dropped connection
             logger.exception("chat request failed")
             yield sse("error", {"message": str(exc) or exc.__class__.__name__})
         yield sse("done", {})
 
-    def _general(self, question: str, history: list[Message]) -> Iterator[str]:
-        yield sse("meta", {"mode": "general", "model": self.llm.model_id, "refused": False})
+    def _general(self, question: str, history: list[Message], llm: LLMClient) -> Iterator[str]:
+        yield sse("meta", {"mode": "general", "model": llm.model_id, "refused": False})
         messages = self.prompt_builder.build(question, [], "general", history)
-        for text in normalize_stream(self.llm.stream(messages)):
+        for text in normalize_stream(llm.stream(messages)):
             yield sse("token", {"text": text})
         yield sse("token", {"text": GENERAL_CAUTION})
 
@@ -104,34 +141,47 @@ class ChatRouter:
         sources = self.retriever.retrieve(question, context=context)  # minimal retrievers (tests)
         return RetrievalResult(sources, max((s.similarity for s in sources), default=0.0), 0.0, len(sources))
 
-    def _legal(self, question: str, history: list[Message]) -> Iterator[str]:
+    def _legal(self, question: str, history: list[Message], llm: LLMClient) -> Iterator[str]:
         previous = next((m.content for m in reversed(history) if m.role == "user"), None)
         result = self._retrieve(question, previous)
         sources = result.sources
         if not sources:
-            yield sse("meta", {"mode": "legal", "model": self.llm.model_id, "refused": True})
+            yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": True})
             yield sse("token", {"text": SCOPE_REFUSAL})
-            yield from self._explanation(question, result, SCOPE_REFUSAL, refused=True)
+            yield from self._explanation(question, result, SCOPE_REFUSAL, True, llm.model_id)
             return
-        yield sse("meta", {"mode": "legal", "model": self.llm.model_id, "refused": False})
+        yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": False})
         yield sse("sources", [s.model_dump() for s in sources])
         messages = self.prompt_builder.build(question, sources, "legal", history)
         answer: list[str] = []
-        for text in normalize_stream(self.llm.stream(messages)):
+        for text in normalize_stream(llm.stream(messages)):
             answer.append(text)
             yield sse("token", {"text": text})
-        yield from self._explanation(question, result, "".join(answer), refused=False)
+        yield from self._explanation(question, result, "".join(answer), False, llm.model_id)
 
-    def _explanation(self, question: str, result: RetrievalResult, answer: str, refused: bool) -> Iterator[str]:
+    def _explanation(self, question: str, result: RetrievalResult, answer: str, refused: bool, model_id: str) -> Iterator[str]:
         """Emitted after the last token, so it never delays the answer. A failure here is
         logged and skipped: the answer the user already has must not turn into an error."""
         if self.explainer is None:
             return
         try:
             record = self.explainer.build(
-                question, result.sources, answer, self.llm.model_id,
+                question, result.sources, answer, model_id,
                 best_similarity=result.best_similarity, retrieval_floor=result.min_similarity, refused=refused,
             )
             yield self.explainer.to_sse_event(record)
         except Exception:
             logger.exception("explanation failed")
+
+    def _verification(self, question: str, section: str) -> Iterator[str]:
+        """Module 5 on request: check the facts stated in the question against `section`. Runs
+        after the answer and its explanation, so it never delays them; failures become an
+        error payload on this event, not a broken stream."""
+        if self.verifier is None:
+            yield sse("verification", {"error": "Verification is not available on this server (SWI-Prolog is not running)."})
+            return
+        try:
+            yield sse("verification", self.verifier.verify(question, section).to_dict())
+        except Exception as exc:  # unknown section, extraction failure, model outage
+            logger.warning("verification failed: %s", exc)
+            yield sse("verification", {"error": str(exc) or exc.__class__.__name__})

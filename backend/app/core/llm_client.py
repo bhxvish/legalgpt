@@ -40,11 +40,13 @@ class GroqClient(LLMClient):
         temperature: float = 0.1,
         max_tokens: int = 2048,  # reasoning models spend part of this budget on hidden reasoning
         client: Any | None = None,
+        max_retries: int = 5,  # 429s on the free tier (8k tokens/min) clear in seconds; the SDK honours retry-after
     ) -> None:
         self.api_key = api_key
         self.model_id = model
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.max_retries = max_retries
         self._client = client
 
     @property
@@ -54,7 +56,7 @@ class GroqClient(LLMClient):
                 raise LLMClientError("GROQ_API_KEY is not set; add it to .env (see .env.example).")
             from groq import Groq
 
-            self._client = Groq(api_key=self.api_key)
+            self._client = Groq(api_key=self.api_key, max_retries=self.max_retries)
         return self._client
 
     def _payload(self, messages: list[Message]) -> list[dict[str, str]]:

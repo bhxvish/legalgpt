@@ -1,12 +1,12 @@
 """Parse a legal text (PDF or .txt), chunk it, embed it, and upsert into ChromaDB.
 
 Usage (from the repo root):
+    python backend/scripts/ingest_corpus.py data/corpus/ipc_chunks.jsonl --reset   # committed chunks, no PDF needed
     python backend/scripts/ingest_corpus.py data/raw_corpus/the_indian_penal_code,_1860.pdf --reset
     python backend/scripts/ingest_corpus.py <file> --dry-run --show 304A,302
 """
 
 import argparse
-import json
 import sys
 import time
 from collections import Counter
@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import get_settings  # noqa: E402
+from app.core.corpus import load_chunks, write_chunks  # noqa: E402
 from app.core.embeddings import EmbeddingService  # noqa: E402
 from app.core.parser import LegalDocumentParser  # noqa: E402
 from app.core.vector_store import VectorStore  # noqa: E402
@@ -33,6 +34,11 @@ def main() -> int:
     args = ap.parse_args()
 
     settings = get_settings()
+    if args.path.suffix.lower() == ".jsonl":  # already parsed and chunked (data/corpus/ipc_chunks.jsonl)
+        chunks = load_chunks(args.path)
+        print(f"loaded {len(chunks)} chunks from {args.path}")
+        return 0 if args.dry_run else _index(chunks, args.reset)
+
     parser = LegalDocumentParser(doc_id=args.doc_id)
     t0 = time.perf_counter()
     if args.path.suffix.lower() == ".pdf":
@@ -62,17 +68,18 @@ def main() -> int:
             print(f"--- {c.citation_path} ({len(c.text)} chars)\n{c.text}")
 
     if args.dump:
-        args.dump.parent.mkdir(parents=True, exist_ok=True)
-        with args.dump.open("w", encoding="utf-8") as f:
-            for c in chunks:
-                f.write(json.dumps({"chunk_id": c.chunk_id, **c.metadata(), "text": c.text}, ensure_ascii=False) + "\n")
+        write_chunks(chunks, args.dump)
         print(f"wrote {args.dump}")
 
     if args.dry_run:
         return 0
+    return _index(chunks, args.reset)
 
+
+def _index(chunks: list, reset: bool) -> int:
+    settings = get_settings()
     store = VectorStore(settings.chroma_persist_dir, settings.chroma_collection)
-    if args.reset:
+    if reset:
         store.reset()
     t0 = time.perf_counter()
     embeddings = EmbeddingService(settings.embedding_model).embed([c.text for c in chunks])

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { streamChat } from '../api.js'
+import { API_BASE_URL, streamChat, verifyApi } from '../api.js'
 import SourceModal from './SourceModal.jsx'
+import { VerificationResultView } from './VerifyPanel.jsx'
 import WhyPanel from './WhyPanel.jsx'
 
 const HISTORY_MESSAGES = 6
@@ -88,6 +89,7 @@ function AssistantMessage({ msg, onCite }) {
     <div className={`max-w-[85%] rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed text-slate-800 shadow-sm ring-1 ${tone}`} data-testid="assistant-message">
       <div className="mb-1 flex items-center gap-2 text-xs text-slate-500">
         <span className="font-medium uppercase tracking-wide">{msg.mode === 'general' ? 'General' : 'Legal'}</span>
+        {msg.model && <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono" data-testid="answer-model">{msg.model}</span>}
         {msg.refused && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">Out of scope</span>}
       </div>
       {msg.content ? (
@@ -117,6 +119,20 @@ function AssistantMessage({ msg, onCite }) {
         </div>
       )}
       {msg.explanation && <WhyPanel explanation={msg.explanation} sources={msg.sources} onOpenSource={onCite} />}
+      {msg.verifySection && !msg.verification && !msg.error && (
+        <p className="mt-3 animate-pulse text-xs text-slate-500">Checking the facts against s.{msg.verifySection}…</p>
+      )}
+      {msg.verification &&
+        (msg.verification.error ? (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">
+            Verification against s.{msg.verifySection} failed: {msg.verification.error}
+          </p>
+        ) : (
+          <div className="mt-3">
+            <p className="mb-1 text-xs font-medium text-slate-500">Rule check of the facts in your question</p>
+            <VerificationResultView result={msg.verification} className="space-y-3 rounded-lg bg-slate-50 p-3 text-xs ring-1 ring-slate-200" />
+          </div>
+        ))}
     </div>
   )
 }
@@ -125,6 +141,10 @@ export default function ChatWindow() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [mode, setMode] = useState('legal')
+  const [models, setModels] = useState([])
+  const [model, setModel] = useState(null)
+  const [sections, setSections] = useState([])
+  const [verifySection, setVerifySection] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [openSource, setOpenSource] = useState(null)
   const abortRef = useRef(null)
@@ -133,6 +153,20 @@ export default function ChatWindow() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end' })
   }, [messages])
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/models`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list) => {
+        setModels(list)
+        setModel((m) => m || list.find((x) => x.default)?.id || null)
+      })
+      .catch(() => setModels([]))
+    verifyApi
+      .sections()
+      .then((m) => setSections(m.sections))
+      .catch(() => setSections([])) // verification not available on this server
+  }, [])
 
   const update = (id, fn) => setMessages((ms) => ms.map((m) => (m.id === id ? fn(m) : m)))
 
@@ -146,19 +180,21 @@ export default function ChatWindow() {
         .map((m) => ({ role: m.role, content: m.content }))
       const userMsg = { id: nextId++, role: 'user', content: question, mode }
       const botId = nextId++
-      setMessages((ms) => [...ms, userMsg, { id: botId, role: 'assistant', content: '', mode, sources: [] }])
+      const verify = mode === 'legal' && verifySection ? verifySection : null
+      setMessages((ms) => [...ms, userMsg, { id: botId, role: 'assistant', content: '', mode, sources: [], verifySection: verify }])
       setInput('')
       setStreaming(true)
       const controller = new AbortController()
       abortRef.current = controller
       try {
         await streamChat(
-          { question, mode, history },
+          { question, mode, history, model, verify_section: verify },
           (event, data) => {
             if (event === 'meta') update(botId, (m) => ({ ...m, refused: data.refused, model: data.model }))
             else if (event === 'sources') update(botId, (m) => ({ ...m, sources: data }))
             else if (event === 'token') update(botId, (m) => ({ ...m, content: m.content + data.text }))
             else if (event === 'explanation') update(botId, (m) => ({ ...m, explanation: data }))
+            else if (event === 'verification') update(botId, (m) => ({ ...m, verification: data }))
             else if (event === 'error') update(botId, (m) => ({ ...m, error: data.message }))
           },
           controller.signal,
@@ -170,7 +206,7 @@ export default function ChatWindow() {
         abortRef.current = null
       }
     },
-    [messages, mode, streaming],
+    [messages, mode, streaming, model, verifySection],
   )
 
   const onKeyDown = (e) => {
@@ -222,9 +258,48 @@ export default function ChatWindow() {
 
       <div className="border-t border-slate-200 bg-white px-4 py-3">
         <div className="mx-auto max-w-3xl">
-          <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
             <ModeToggle mode={mode} setMode={setMode} disabled={streaming} />
-            <span className="hidden text-xs text-slate-400 sm:inline">Enter to send · Shift+Enter for a new line</span>
+            {models.length > 1 && (
+              <div role="radiogroup" aria-label="Answer model" className="inline-flex rounded-lg bg-slate-100 p-1" data-testid="model-toggle">
+                {models.map((m) => (
+                  <button
+                    key={m.id}
+                    role="radio"
+                    aria-checked={model === m.id}
+                    disabled={streaming || !m.available}
+                    title={`${m.model_id || m.id}${m.note ? ` — ${m.note}` : ''}`}
+                    onClick={() => setModel(m.id)}
+                    className={`rounded-md px-3 py-1 text-sm font-medium transition disabled:opacity-40 ${
+                      model === m.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {m.id === 'adapter' ? 'Tuned (LoRA)' : m.id === 'groq' ? 'Base (Groq)' : m.id}
+                  </button>
+                ))}
+              </div>
+            )}
+            {mode === 'legal' && sections.length > 0 && (
+              <label className="flex items-center gap-1 text-xs text-slate-600">
+                Also verify facts against
+                <select
+                  value={verifySection}
+                  onChange={(e) => setVerifySection(e.target.value)}
+                  disabled={streaming}
+                  aria-label="Also verify facts against section"
+                  className="rounded-md border border-slate-300 px-1 py-0.5 text-xs"
+                  data-testid="verify-select"
+                >
+                  <option value="">—</option>
+                  {sections.map((s) => (
+                    <option key={s.section} value={s.section}>
+                      s.{s.section}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <span className="ml-auto hidden text-xs text-slate-400 sm:inline">Enter to send · Shift+Enter for a new line</span>
           </div>
           <form
             className="flex items-end gap-2"

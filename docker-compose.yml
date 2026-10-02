@@ -1,4 +1,9 @@
-# Local development only — no production hardening.
+# LegalGPT local stack — `docker compose up --build` from a clean checkout (after `cp .env.example .env`
+# and setting GROQ_API_KEY). Local development/demo only — no production hardening.
+#
+# The backend image already contains SWI-Prolog (pyswip runs it in-process), so no Prolog sidecar
+# is needed. On first start the backend embeds the committed IPC chunks (data/corpus/ipc_chunks.jsonl)
+# into the empty chroma_db volume (~1 min on CPU); later starts reuse the volume.
 services:
   backend:
     build: ./backend
@@ -8,11 +13,28 @@ services:
       - path: .env
         required: false
     environment:
+      # Paths inside the container; everything else comes from .env.
       CHROMA_PERSIST_DIR: /app/data/chroma_db
       ANNOTATION_STORE_DIR: /app/data/annotation_store
+      RAW_JUDGMENTS_DIR: /app/data/raw_judgments
+      CORPUS_CHUNKS_PATH: /app/data/corpus/ipc_chunks.jsonl
+      LORA_DIR: /app/data/models/lora
+      ADAPTER_PATH: ""  # a host path from .env would not exist in the container; newest under LORA_DIR is used
+      CORS_ORIGINS: http://localhost:5173
     volumes:
-      - ./backend:/app/backend
-      - ./data:/app/data
+      - chroma_db:/app/data/chroma_db
+      - annotation_store:/app/data/annotation_store
+      - raw_judgments:/app/data/raw_judgments
+      - hf_cache:/root/.cache/huggingface
+      - ./data/corpus:/app/data/corpus:ro
+      # LoRA adapters trained on the host (empty on a clean checkout: the "Tuned" toggle is then
+      # disabled). In the CPU image the adapter runs unquantized — expect ~1 min per answer.
+      - ./data/models:/app/data/models:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
 
   frontend:
     build: ./frontend
@@ -21,8 +43,12 @@ services:
     environment:
       # The browser runs on the host, so it reaches the backend via the published port.
       VITE_API_BASE_URL: http://localhost:8000
-    volumes:
-      - ./frontend:/app/frontend
-      - /app/frontend/node_modules
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+
+volumes:
+  chroma_db:
+  annotation_store:
+  raw_judgments:
+  hf_cache:
