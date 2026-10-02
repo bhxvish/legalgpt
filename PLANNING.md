@@ -356,10 +356,13 @@ legalgpt/
 - **Race found by the demo:** the startup index check and the first chat request opened ChromaDB's
   PersistentClient at the same moment ("Could not connect to tenant default_tenant"; the first demo
   question failed). `VectorStore` now opens it under a lock; a test with 8 threads fails without it.
-- **`docker compose up` from a clean clone: not yet verified.** Docker Desktop's WSL engine hung
-  during the first image build (API 500, then no pipe after a restart) — a host problem, not a
-  compose error. To re-test: `wsl --shutdown`, start Docker Desktop, then clone and
-  `docker compose up --build`.
+- **`docker compose up` from a clean clone: verified** (after Docker Desktop's WSL service hung once
+  and needed killing as administrator — a host problem). Fresh `git clone` + `.env` + `docker compose
+  up --build`, with no pre-existing volumes: backend healthy, "index ready: 685 chunks" logged ~1 min
+  later, SWI-Prolog loaded in the container, frontend on :5173, the Tuned toggle disabled (no adapter
+  in a clean clone). Demo against it: answers, s.379 CONSISTENT, s.304A INSUFFICIENT and the
+  refusal all worked before Groq's free-tier **daily** cap (200k tokens) ran out from the day's testing.
+  App INFO logs were invisible under uvicorn (no "index ready" signal); now shown.
 - **Rate limits found by the demo:** Groq's free tier allows 8k tokens/minute; one answer plus the
   two extraction runs can exceed it, and the second demo question's verification failed with 429.
   GroqClient now retries up to 5 times honouring `retry-after`.
@@ -437,9 +440,10 @@ legalgpt/
 
 ## Final acceptance (checked 2026-10-03)
 
-- [ ] **Fresh clone + `docker compose up`, only `.env` set** — not verified: Docker Desktop's WSL
-  engine hung during the first build on this machine (see Phase 7). Compose file, committed corpus
-  and startup auto-index are in place; the non-Docker path (same code) was verified.
+- [x] **Fresh clone + `docker compose up`, only `.env` set** — verified from a fresh clone with empty
+  volumes: the index builds itself from the committed corpus (685 chunks), verification runs in the
+  container, the frontend serves. A full 5/5 demo run on Docker was cut short by Groq's daily token
+  cap; the same commit ran 5/5 against the local backend.
 - [x] **Grounded answer with working citations (Module 0)** — "punishment for culpable homicide not
   amounting to murder" answered from s.304 (evidence match High 0.76); clicking [1] opens s.304.
 - [x] **Real team-labelled batch in AnnotationStore (Module 1)** — 31 cases / 4,283 sentences from the
