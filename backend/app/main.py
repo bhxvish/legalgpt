@@ -6,6 +6,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from app.annotation.collector import JudgmentCollector
+from app.annotation.router import AnnotationRouter
+from app.annotation.store import AnnotationStore
 from app.config import Settings, get_settings
 from app.core.chat_router import ChatRouter
 from app.core.embeddings import EmbeddingService
@@ -30,7 +33,11 @@ def build_chat_router(settings: Settings) -> ChatRouter:
     return ChatRouter(retriever, llm)
 
 
-def create_app(chat_router: ChatRouter | None = None) -> FastAPI:
+def build_annotation_router(settings: Settings) -> AnnotationRouter:
+    return AnnotationRouter(JudgmentCollector(settings.raw_judgments_dir), AnnotationStore(settings.annotation_store_dir))
+
+
+def create_app(chat_router: ChatRouter | None = None, annotation_router: AnnotationRouter | None = None) -> FastAPI:
     settings = get_settings()
     chat_router = chat_router or build_chat_router(settings)
 
@@ -58,6 +65,7 @@ def create_app(chat_router: ChatRouter | None = None) -> FastAPI:
         return HealthResponse(status="ok")
 
     app.include_router(chat_router.router)
+    app.include_router((annotation_router or build_annotation_router(settings)).router)
     return app
 
 

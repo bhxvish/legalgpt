@@ -4,7 +4,8 @@ Retrieval-augmented legal question answering for **Indian criminal law (IPC)**, 
 an offline annotation + fine-tuning pipeline, an explainability layer, and a Prolog-based
 verification service. See [PLANNING.md](PLANNING.md) for modules, phases and decisions.
 
-> Status: **Phase 1** — retrieval-augmented chat over the IPC bare act (Module 0).
+> Status: **Phase 2** — retrieval-augmented chat over the IPC bare act (Module 0) and the
+> rhetorical-role annotation pipeline (Module 1).
 
 ## Prerequisites
 
@@ -42,6 +43,34 @@ After re-ingesting or changing the embedding model, re-check the refusal thresho
 ```bash
 python backend/scripts/calibrate_retrieval.py
 ```
+
+## Annotate judgments (Module 1)
+
+1. Put criminal judgments as plain `.txt` files in `data/inbox/` (git-ignored), then collect them:
+
+   ```bash
+   python backend/scripts/collect_judgments.py data/inbox
+   ```
+
+   Each file is normalized and screened. Duplicates (even reformatted copies), non-English text,
+   non-criminal cases and very short files are rejected with a reason. Accepted judgments go to
+   `data/raw_judgments/` with their detected court, year and cited IPC sections.
+2. Open <http://localhost:5173/#annotate>, enter your name, pick a case and label each sentence
+   (keys **1–6**, **↑/↓**, **n** for next unlabelled). Labels save immediately to
+   `data/annotation_store/labels.jsonl`. Read `docs/annotation_guideline.md` first.
+3. Measure agreement on double-annotated cases, then freeze a corpus version for training:
+
+   ```bash
+   python backend/scripts/annotation_agreement.py alice bob
+   python backend/scripts/freeze_corpus.py v0.1 --notes "seed set"
+   ```
+
+   `freeze_corpus.py` writes `data/annotation_store/versions/<version>/manifest.json` (case ids,
+   per-case and overall SHA-256, train/val/test split by case). `--verify <version>` re-checks a
+   snapshot against its manifest.
+
+Label definitions live in `backend/app/annotation/label_scheme.py`. After changing them, regenerate the
+guideline: `python backend/scripts/build_guideline.py`. A test fails if the two disagree.
 
 ## Run the backend
 

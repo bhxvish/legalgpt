@@ -152,6 +152,27 @@ legalgpt/
 - **Citation markers are canonicalized in the stream** to `[n]` (gpt-oss emits `【1】` and
   `[1†L2-L4]`), so the UI and Phase 5's CitationValidator see one format.
 
+### Phase 2 (Module 1)
+
+- **Six labels, not five.** The LLD's Facts, Law Applied, Precedent, Argument, Ruling plus
+  **None** for headers, cause titles and boilerplate (user decision). Phase 3 can train with
+  None or filter it out. The guideline is generated from `LabelScheme`; a test enforces sync.
+- **`LabeledSentence` gains `annotator` and `created_at`** (beyond the LLD's fields), needed for
+  double annotation and Cohen's kappa. The store is an append-only log; the latest decision per
+  sentence is gold, so adjudication = re-labelling. The UI shows annotators only their own
+  labels so double annotation stays independent.
+- **Segmentation is pinned per case** (`annotation_store/segments/<case>.json`) on first open, so
+  later segmenter changes cannot shift sentence ids under existing labels.
+- **Frozen versions are immutable** (`versions/<v>/labels.jsonl` + `manifest.json` with per-case
+  and overall SHA-256 and a seeded by-case split). The digest covers content (text, label, source,
+  reviewed), not who labelled or when, so identical data gives an identical digest.
+- **Collector heuristics** (no extra dependencies): English = ≥90% Latin letters and ≥15% English
+  function words; criminal = cites an IPC section, or ≥3 criminal-procedure terms; duplicate =
+  same SHA-256 of whitespace/case-normalized text. Judgment texts are git-ignored.
+- **Sentence splitting** distinguishes abbreviations that lead into something ("S.", "v.",
+  "Smt.", "PW.") from acronyms that can end a sentence ("I.P.C.", "Cr.P.C."); initials of up to
+  two letters ("M.K.") never split.
+
 ## Known limitations
 
 _To be filled in during Phase 7._

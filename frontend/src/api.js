@@ -41,3 +41,32 @@ export async function streamChat(body, onEvent, signal) {
     }
   }
 }
+
+async function json(res) {
+  if (!res.ok) {
+    let detail = ''
+    try {
+      const body = await res.json()
+      detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)
+    } catch {
+      detail = res.statusText
+    }
+    throw new Error(`HTTP ${res.status}: ${detail}`)
+  }
+  return res.json()
+}
+
+const enc = encodeURIComponent
+
+export const annotationApi = {
+  scheme: () => fetch(`${API_BASE_URL}/api/annotation/scheme`).then(json),
+  cases: (annotator) => fetch(`${API_BASE_URL}/api/annotation/cases?annotator=${enc(annotator)}`).then(json),
+  getCase: (caseId, annotator) =>
+    fetch(`${API_BASE_URL}/api/annotation/cases/${enc(caseId)}?annotator=${enc(annotator)}`).then(json),
+  saveLabels: (caseId, annotator, labels) =>
+    fetch(`${API_BASE_URL}/api/annotation/cases/${enc(caseId)}/labels`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ annotator, labels }),
+    }).then(json),
+}

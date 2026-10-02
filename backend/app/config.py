@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     # Storage paths — defaults resolve against the repo root so they are the same
     # whether the backend is launched from the repo root or from backend/.
     chroma_persist_dir: Path = Field(default=REPO_ROOT / "data" / "chroma_db", alias="CHROMA_PERSIST_DIR")
+    raw_judgments_dir: Path = Field(default=REPO_ROOT / "data" / "raw_judgments", alias="RAW_JUDGMENTS_DIR")
     annotation_store_dir: Path = Field(
         default=REPO_ROOT / "data" / "annotation_store", alias="ANNOTATION_STORE_DIR"
     )

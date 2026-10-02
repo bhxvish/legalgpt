@@ -14,9 +14,11 @@ LEGAL_ABBREVIATIONS: frozenset[str] = frozenset(
 _BOUNDARY = re.compile(r"(?<=[.?!])[\"')\]]*\s+(?=[\"'(\[]?[A-Z0-9])")
 
 
-def split_sentences(text: str) -> list[str]:
+def split_sentences(text: str, abbreviations: frozenset[str] = LEGAL_ABBREVIATIONS) -> list[str]:
     """Split on sentence-ending punctuation, but never after a legal abbreviation
-    or a single capital initial (e.g. "A." in IPC illustrations)."""
+    or a single capital initial (e.g. "A." in IPC illustrations).
+
+    `abbreviations` are lower-cased tokens without their final period ("s", "cr.p.c")."""
     text = text.strip()
     if not text:
         return []
@@ -26,7 +28,9 @@ def split_sentences(text: str) -> list[str]:
         candidate = text[start : m.start()].rstrip()
         last_word = candidate.rsplit(None, 1)[-1] if candidate else ""
         token = last_word.rstrip(".").lstrip("(\"'[").lower()
-        if token in LEGAL_ABBREVIATIONS or re.fullmatch(r"[A-Z]", last_word.rstrip(".")):
+        # initials: "A." (IPC illustrations), "M.K." (judges, parties). Three or more letters
+        # ("I.P.C.") is an acronym that can end a sentence, so it is not treated as initials.
+        if token in abbreviations or re.fullmatch(r"(?:[A-Z]\.)?[A-Z]", last_word.rstrip(".")):
             continue
         sentences.append(text[start : m.end()].strip())
         start = m.end()
