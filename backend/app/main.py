@@ -33,6 +33,16 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# uvicorn only configures its own loggers; without this, app INFO messages (e.g. "index ready" after
+# the first-start index build) are dropped. Scoped to `app` so library request logs stay quiet.
+_app_logger = logging.getLogger("app")
+if not _app_logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s - %(message)s"))
+    _app_logger.addHandler(_handler)
+    _app_logger.setLevel(logging.INFO)
+    _app_logger.propagate = False
+
 
 class HealthResponse(BaseModel):
     status: str
