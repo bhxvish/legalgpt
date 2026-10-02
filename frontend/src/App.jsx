@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { API_BASE_URL } from './api.js'
+import ChatWindow from './components/ChatWindow.jsx'
 
 const STYLES = {
   loading: 'bg-slate-100 text-slate-600',
@@ -7,8 +8,8 @@ const STYLES = {
   error: 'bg-red-100 text-red-800',
 }
 
-export default function App() {
-  const [health, setHealth] = useState({ state: 'loading', text: 'Checking backend…' })
+function HealthBadge() {
+  const [health, setHealth] = useState({ state: 'loading', text: 'checking…' })
 
   useEffect(() => {
     const controller = new AbortController()
@@ -17,26 +18,31 @@ export default function App() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
       })
-      .then((data) => setHealth({ state: data.status === 'ok' ? 'ok' : 'error', text: data.status }))
+      .then((data) => setHealth({ state: data.status === 'ok' ? 'ok' : 'error', text: `backend ${data.status}` }))
       .catch((err) => {
-        if (err.name !== 'AbortError') setHealth({ state: 'error', text: `unreachable (${err.message})` })
+        if (err.name !== 'AbortError') setHealth({ state: 'error', text: 'backend unreachable' })
       })
     return () => controller.abort()
   }, [])
 
   return (
-    <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-        <h1 className="text-2xl font-semibold text-slate-900">LegalGPT</h1>
-        <p className="mt-1 text-sm text-slate-500">Indian criminal law assistant — Phase 0 scaffold</p>
-        <div className="mt-6 flex items-center justify-between">
-          <span className="text-sm text-slate-700">Backend health</span>
-          <span data-testid="health-status" className={`rounded-full px-3 py-1 text-sm font-medium ${STYLES[health.state]}`}>
-            {health.text}
-          </span>
+    <span data-testid="health-status" title={`${API_BASE_URL}/health`} className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STYLES[health.state]}`}>
+      {health.text}
+    </span>
+  )
+}
+
+export default function App() {
+  return (
+    <div className="flex h-dvh flex-col bg-slate-50">
+      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-900">LegalGPT</h1>
+          <p className="text-xs text-slate-500">Indian criminal law · legal information, not legal advice</p>
         </div>
-        <p className="mt-2 text-xs text-slate-400">{API_BASE_URL}/health</p>
-      </div>
-    </main>
+        <HealthBadge />
+      </header>
+      <ChatWindow />
+    </div>
   )
 }

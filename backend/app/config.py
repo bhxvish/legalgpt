@@ -36,6 +36,13 @@ class Settings(BaseSettings):
         default=BACKEND_DIR / "app" / "verification" / "rules", alias="PROLOG_RULES_DIR"
     )
 
+    # Module 0 — retrieval & generation
+    groq_model: str = Field(default="openai/gpt-oss-120b", alias="GROQ_MODEL")
+    embedding_model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2", alias="EMBEDDING_MODEL")
+    chroma_collection: str = Field(default="ipc_bare_act", alias="CHROMA_COLLECTION")
+    # Cosine-similarity floor below which retrieved chunks are discarded (all discarded -> refusal).
+    retrieval_min_similarity: float = Field(default=0.55, alias="RETRIEVAL_MIN_SIMILARITY")
+
     # Comma-separated list of origins allowed by CORS (Vite dev server by default).
     cors_origins: str = Field(default="http://localhost:5173", alias="CORS_ORIGINS")
 

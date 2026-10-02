@@ -4,7 +4,7 @@ Retrieval-augmented legal question answering for **Indian criminal law (IPC)**, 
 an offline annotation + fine-tuning pipeline, an explainability layer, and a Prolog-based
 verification service. See [PLANNING.md](PLANNING.md) for modules, phases and decisions.
 
-> Status: **Phase 0** — scaffolding only. The backend serves `/health`; the frontend shows it.
+> Status: **Phase 1** — retrieval-augmented chat over the IPC bare act (Module 0).
 
 ## Prerequisites
 
@@ -21,6 +21,27 @@ cp .env.example .env
 
 Fill in `GROQ_API_KEY` and `HF_TOKEN`. Path variables can stay empty to use the defaults
 documented in `.env.example`. `.env` is git-ignored.
+
+## Ingest the IPC corpus
+
+Download the official bare act PDF from India Code
+(<https://www.indiacode.nic.in/bitstream/123456789/11091/1/the_indian_penal_code,_1860.pdf>) into
+`data/raw_corpus/` (git-ignored; any filename), then from the repo root:
+
+```bash
+python backend/scripts/ingest_corpus.py data/raw_corpus/<file>.pdf --reset
+```
+
+The script checks the parse against the PDF's own *Arrangement of Sections* and prints how many
+listed sections were found in the body (all 574 for the India Code PDF). `--dry-run --show 304A,302`
+prints chunks without embedding; `--dump chunks.jsonl` writes every chunk for inspection. The index
+persists in `data/chroma_db/`. Re-ingesting while the backend runs is safe.
+
+After re-ingesting or changing the embedding model, re-check the refusal threshold:
+
+```bash
+python backend/scripts/calibrate_retrieval.py
+```
 
 ## Run the backend
 
@@ -41,6 +62,8 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 Check it: <http://localhost:8000/health> → `{"status":"ok"}`. Interactive docs: <http://localhost:8000/docs>.
+On Windows, `--reload` can hang after a code change (the log says "Reloading..." but the old code keeps
+serving); stop and restart uvicorn if that happens. `.env` changes always need a restart.
 
 ## Run the frontend
 
@@ -63,6 +86,21 @@ pytest backend/tests
 ```
 
 (`pytest.ini` adds `backend/` to the import path, so `pytest tests` from inside `backend/` works too.)
+
+Unit tests use a fake embedder, in-memory ChromaDB and a stub `LLMClient` — no network.
+Live tests against Groq and the ingested index are marked `integration` and skip without
+`GROQ_API_KEY`:
+
+```bash
+pytest -m integration
+```
+
+## API
+
+`POST /api/chat` with `{"question": "...", "mode": "legal" | "general", "history": [...]}`
+streams Server-Sent Events: `meta`, `sources` (legal mode), `token`*, optional `error`, `done`.
+Legal mode answers only from retrieved IPC chunks and cites them as `[n]`; if nothing clears
+`RETRIEVAL_MIN_SIMILARITY` it returns a scope-boundary refusal without calling the model.
 
 ## Docker (local dev)
 

@@ -1,1 +1,43 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+
+/**
+ * POST /api/chat and dispatch each Server-Sent Event as it arrives.
+ * (EventSource only supports GET, so the stream is read from fetch directly.)
+ *
+ * @param {{question: string, mode: 'legal'|'general', history: {role: string, content: string}[]}} body
+ * @param {(event: string, data: any) => void} onEvent
+ * @param {AbortSignal} [signal]
+ */
+export async function streamChat(body, onEvent, signal) {
+  const res = await fetch(`${API_BASE_URL}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+    body: JSON.stringify(body),
+    signal,
+  })
+  if (!res.ok || !res.body) {
+    const detail = await res.text().catch(() => '')
+    throw new Error(`HTTP ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`)
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
+    let sep
+    while ((sep = buffer.indexOf('\n\n')) !== -1) {
+      const block = buffer.slice(0, sep)
+      buffer = buffer.slice(sep + 2)
+      let event = 'message'
+      const data = []
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event:')) event = line.slice(6).trim()
+        else if (line.startsWith('data:')) data.push(line.slice(5).replace(/^ /, ''))
+      }
+      if (data.length) onEvent(event, JSON.parse(data.join('\n')))
+    }
+  }
+}

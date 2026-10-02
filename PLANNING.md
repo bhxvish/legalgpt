@@ -86,7 +86,7 @@ legalgpt/
 ## Phase checklist
 
 - [x] **Phase 0** — Scaffolding & environment setup
-- [ ] **Phase 1** — Module 0: Core retrieval & chat platform
+- [x] **Phase 1** — Module 0: Core retrieval & chat platform
 - [ ] **Phase 2** — Module 1: Domain-specific dataset pipeline
 - [ ] **Phase 3** — Module 2: InLegalBERT-assisted annotation
 - [ ] **Phase 4** — Module 3: LoRA fine-tuning pipeline
@@ -124,6 +124,33 @@ legalgpt/
 - **`httpx2` instead of `httpx`** for the FastAPI `TestClient` (Starlette deprecated plain httpx).
 - **pyswip 0.3.3 works with SWI-Prolog 10.0.2** on the dev machine (assert + query smoke-tested).
 - **Frontend calls the backend directly** at `VITE_API_BASE_URL` (CORS), no Vite proxy.
+
+### Phase 1 (Module 0)
+
+- **Generation model is `openai/gpt-oss-120b` on Groq, not Llama-3-8B.** Groq no longer serves any
+  Llama-3 model for this key (available: gpt-oss-20b/120b, qwen3.8-27b); user chose "the best".
+  Configurable via `GROQ_MODEL`. Its reasoning tokens arrive separately and are not streamed.
+  Phase 4 impact: the base-vs-tuned comparison will be gpt-oss (Groq) vs the LoRA-tuned local model,
+  not the same base model — note this when reporting ModelComparator results.
+- **Corpus:** official India Code IPC PDF (not committed). Parsed with pdfminer.six (MIT) instead of
+  pypdf (which split words, e.g. "deat h"); PyMuPDF rejected for its AGPL licence. Extraction uses
+  layout: lines re-sorted top-to-bottom, superscript footnote numbers dropped by size, footnotes
+  dropped as the bottom small-font run starting at a "1. Subs./Ins. by ..." line (illustrations
+  share the footnote font size, so size alone is not enough).
+- **The PDF's Arrangement of Sections is the source of truth** for which section numbers exist:
+  it bounds where the body starts, admits headings with irregular formatting ("17 “Government”.—"),
+  and keeps state-inserted sections (e.g. Chhattisgarh's 376F) inside their State Amendments node.
+  All 574 listed sections are parsed; a test asserts this when the PDF is present.
+- **State amendments are separate nodes** (`... > Section 304A > State Amendments`) so state-only law
+  is never chunked together with the central section text. Repealed sections get small nodes.
+- **Retrieval floor 0.55** (cosine, MiniLM) calibrated with `scripts/calibrate_retrieval.py`:
+  worst in-scope top-1 0.646, best out-of-scope top-1 0.533 (anticipatory bail). Hit@6 16/16,
+  hit@1 10/16. The same floor filters supporting chunks, hence the low end of the separating range.
+- **Retriever additions (beyond the LLD):** explicit section references ("u/s 304A") also run a
+  filtered lookup that bypasses the floor; follow-ups are searched both alone and with the previous
+  user question prepended (merged), so "within how many years?" after a dowry-death question works.
+- **Citation markers are canonicalized in the stream** to `[n]` (gpt-oss emits `【1】` and
+  `[1†L2-L4]`), so the UI and Phase 5's CitationValidator see one format.
 
 ## Known limitations
 

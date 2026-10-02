@@ -18,3 +18,5 @@ data/annotation_store/*
 chroma_db/
 *.ckpt
 *.safetensors
+data/raw_corpus/*
+!data/raw_corpus/.gitkeep
