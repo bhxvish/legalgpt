@@ -95,7 +95,17 @@ function AssistantMessage({ msg, onCite }) {
       {msg.content ? (
         <AnswerText text={msg.content} sources={msg.sources} onCite={onCite} />
       ) : (
-        !msg.error && <p className="animate-pulse text-slate-400">{msg.mode === 'legal' ? 'Searching the IPC…' : 'Thinking…'}</p>
+        !msg.error && (
+          <p className="animate-pulse text-slate-400">
+            {msg.mode === 'legal' && !msg.sources?.length && !msg.model ? 'Searching the IPC…' : 'Writing the answer…'}
+            {msg.model?.includes('+lora') && (
+              <span className="mt-1 block text-xs">
+                The tuned model runs on this server. Without a GPU, the first answer also loads it and can take a few
+                minutes; later answers about a minute.
+              </span>
+            )}
+          </p>
+        )
       )}
       {msg.error && <p className="mt-1 text-red-700">Error: {msg.error}</p>}
       {msg.sources?.length > 0 && (

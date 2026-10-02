@@ -25,8 +25,11 @@ On the first start the backend downloads the embedding model and embeds the comm
 minute after `/health` turns green. SWI-Prolog is inside the backend image, so verification works
 without a separate service. ChromaDB, the annotation store, collected judgments and the Hugging Face
 cache live in named Docker volumes (`docker compose down -v` deletes them). The **Tuned (LoRA)**
-toggle is only enabled once an adapter exists under `data/models/lora/` (see Module 3); on CPU it
-takes about a minute per answer.
+toggle is only enabled once an adapter exists under `data/models/lora/` (see Module 3). It needs the
+3 GB Qwen2.5-1.5B base model: if you already have it (e.g. from training), set
+`HF_CACHE_DIR=C:/Users/<you>/.cache/huggingface` in `.env` so Docker reuses your host cache —
+downloading it inside Docker ran at ~0.2 MB/s here (hours). On CPU the first Tuned answer takes about
+2 minutes (model load), later ones about 20–30 seconds.
 
 ## Run the demo
 

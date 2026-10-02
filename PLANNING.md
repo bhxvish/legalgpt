@@ -403,8 +403,11 @@ legalgpt/
 
 **Tuned model**
 - Trained on 124 examples from 26 cases: it cites in the required format but copies sources and
-  over-refuses (Phase 4). Not a drop-in replacement for the hosted model. In the CPU Docker image it
-  runs unquantized — about a minute per answer.
+  over-refuses (Phase 4) — in Docker it answered "I don't know" to s.304A and s.379 questions with the
+  right section as source [1] (the Why panel flags it). Not a drop-in replacement for the hosted model.
+  In the CPU Docker image it runs in bfloat16 (~3 GB; same speed as float32 on this CPU, 5 tokens/s):
+  first answer ~2 min including the model load, then ~20–30 s. Its 3 GB base model downloads at
+  ~0.2 MB/s inside Docker here, so `HF_CACHE_DIR` mounts the host's Hugging Face cache instead.
 
 **Verification**
 - 7 sections (by design). s.337/338 do not exclude cases where the victim died; s.323 ignores the

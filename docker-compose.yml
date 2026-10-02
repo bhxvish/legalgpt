@@ -25,10 +25,13 @@ services:
       - chroma_db:/app/data/chroma_db
       - annotation_store:/app/data/annotation_store
       - raw_judgments:/app/data/raw_judgments
-      - hf_cache:/root/.cache/huggingface
+      # Hugging Face model cache. Set HF_CACHE_DIR in .env to your host cache (e.g.
+      # C:/Users/<you>/.cache/huggingface) to reuse models already downloaded there — the Tuned
+      # model's 3 GB base can otherwise take hours to download inside Docker.
+      - ${HF_CACHE_DIR:-hf_cache}:/root/.cache/huggingface
       - ./data/corpus:/app/data/corpus:ro
       # LoRA adapters trained on the host (empty on a clean checkout: the "Tuned" toggle is then
-      # disabled). In the CPU image the adapter runs unquantized — expect ~1 min per answer.
+      # disabled). In the CPU image the adapter runs in bfloat16 (~3 GB RAM) — expect ~1 min per answer.
       - ./data/models:/app/data/models:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
