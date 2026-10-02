@@ -87,3 +87,13 @@ export const reviewApi = {
       body: JSON.stringify({ reviewer }),
     }).then(json),
 }
+
+export const verifyApi = {
+  sections: () => fetch(`${API_BASE_URL}/api/verify/sections`).then(json),
+  verify: (caseText, citedSection) =>
+    fetch(`${API_BASE_URL}/api/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ case_text: caseText, cited_section: citedSection }),
+    }).then(json),
+}

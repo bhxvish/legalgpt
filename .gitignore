@@ -26,3 +26,4 @@ data/raw_judgments/*
 !data/raw_judgments/.gitkeep
 data/models/
 .venv-gpu/
+data/reports/

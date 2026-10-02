@@ -1,3 +1,4 @@
+import logging
 import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -12,6 +13,7 @@ from app.annotation.store import AnnotationStore
 from app.config import Settings, get_settings
 from app.labeling_assistant.review_queue import HumanReviewQueue
 from app.labeling_assistant.router import ReviewRouter
+from app.verification.router import VerifyRouter
 from app.core.chat_router import ChatRouter
 from app.core.embeddings import EmbeddingService
 from app.core.llm_client import AdapterClient, GroqClient, LLMClient, LLMClientError, latest_adapter
@@ -61,6 +63,21 @@ def build_review_router(settings: Settings) -> ReviewRouter:
     return ReviewRouter(queue, JudgmentCollector(settings.raw_judgments_dir))
 
 
+def build_verify_router(settings: Settings) -> VerifyRouter | None:
+    """Fact extraction always uses the hosted model: it must return reliable JSON for every
+    predicate, which the small local adapter cannot. None if SWI-Prolog is unavailable."""
+    try:
+        from app.verification.fact_extractor import FactExtractor
+        from app.verification.prolog_engine import PrologEngine
+        from app.verification.verification_service import VerificationService
+
+        extractor = FactExtractor(GroqClient(settings.groq_api_key, settings.groq_model, max_tokens=4096, temperature=0.0))
+        return VerifyRouter(VerificationService(extractor, PrologEngine(settings.prolog_rules_dir)))
+    except Exception:  # pyswip missing, SWI-Prolog not installed, or broken rules
+        logging.getLogger(__name__).exception("verification disabled: could not start the Prolog engine")
+        return None
+
+
 def create_app(chat_router: ChatRouter | None = None, annotation_router: AnnotationRouter | None = None) -> FastAPI:
     settings = get_settings()
     chat_router = chat_router or build_chat_router(settings)
@@ -91,6 +108,9 @@ def create_app(chat_router: ChatRouter | None = None, annotation_router: Annotat
     app.include_router(chat_router.router)
     app.include_router((annotation_router or build_annotation_router(settings)).router)
     app.include_router(build_review_router(settings).router)
+    verify_router = build_verify_router(settings)
+    if verify_router is not None:
+        app.include_router(verify_router.router)
     return app
 
 

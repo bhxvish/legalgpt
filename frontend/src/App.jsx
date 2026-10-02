@@ -3,6 +3,7 @@ import { API_BASE_URL } from './api.js'
 import AnnotateView from './components/AnnotateView.jsx'
 import ChatWindow from './components/ChatWindow.jsx'
 import ReviewView from './components/ReviewView.jsx'
+import VerifyPanel from './components/VerifyPanel.jsx'
 
 const STYLES = {
   loading: 'bg-slate-100 text-slate-600',
@@ -38,6 +39,7 @@ const VIEWS = [
   { id: 'chat', label: 'Chat' },
   { id: 'annotate', label: 'Annotate' },
   { id: 'review', label: 'Review' },
+  { id: 'verify', label: 'Verify' },
 ]
 
 function viewFromHash() {
@@ -79,7 +81,7 @@ export default function App() {
         </div>
         <HealthBadge />
       </header>
-      {view === 'annotate' ? <AnnotateView /> : view === 'review' ? <ReviewView /> : <ChatWindow />}
+      {view === 'annotate' ? <AnnotateView /> : view === 'review' ? <ReviewView /> : view === 'verify' ? <VerifyPanel /> : <ChatWindow />}
     </div>
   )
 }

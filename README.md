@@ -143,6 +143,25 @@ cd backend
 ..\.venv-gpu\Scripts\python -m uvicorn app.main:app --port 8000
 ```
 
+## Neuro-symbolic verification (Module 5)
+
+Needs [SWI-Prolog](https://www.swi-prolog.org/download/stable) on `PATH` (the backend still starts
+without it; only `/api/verify` is disabled). Seven IPC sections are encoded as element checklists in
+`backend/app/verification/rules/*.pl`: 279, 304A, 304B, 323, 337, 338, 379.
+
+In the app's **Verify** tab, paste case facts and pick the charged section. The hosted model extracts
+each element as true / false / unknown with a quote from the text (twice — only values both runs
+agree on are kept), and Prolog returns **CONSISTENT** (every element established), **INCONSISTENT**
+(an element contradicted) or **INSUFFICIENT** (an element not established), plus the other encoded
+sections the facts fit. It checks extracted facts against encoded elements; it does not decide guilt.
+
+`POST /api/verify` with `{"case_text": "...", "cited_section": "304A"}`; `GET /api/verify/sections`.
+To produce a sanity-check report on real annotated cases (written to `data/reports/`, git-ignored):
+
+```bash
+python backend/scripts/verify_case.py case20:304A case01:279 case31:323
+```
+
 ## Run the backend
 
 From the repo root, create a virtualenv and install dependencies (PyTorch is the CPU build):

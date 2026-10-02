@@ -91,7 +91,7 @@ legalgpt/
 - [x] **Phase 3** — Module 2: InLegalBERT-assisted annotation
 - [x] **Phase 4** — Module 3: LoRA fine-tuning pipeline
 - [x] **Phase 5** — Module 4: Explainability
-- [ ] **Phase 6** — Module 5: Neuro-symbolic verification
+- [x] **Phase 6** — Module 5: Neuro-symbolic verification
 - [ ] **Phase 7** — Integration, testing & deployment
 
 ## Conventions (every phase)
@@ -298,9 +298,47 @@ legalgpt/
 - **Citation normalisation moved to `app/core/citations.py`** (chat stream, validator and
   comparator share it; avoids a chat_router ↔ explainability import cycle).
 
+### Phase 6 (Module 5)
+
+- **Seven sections, element checklists:** 279, 304A, 304B, 323, 337, 338, 379 — the offences that
+  dominate the corpus (road accidents, hurt, theft, dowry death). `element(Section, Predicate,
+  Required, Description)` is the single source; named predicates (`negligent_death/1`, `theft/1`, …)
+  are readable aliases. One shared schema of 19 predicates; a test asserts schema and rules match.
+- **Explicit `unknown`, no negation-as-failure:** the spec's `not(intent_to_kill(Case))` would read
+  "the facts do not say" as "false" and satisfy s.304A's "no intention" element by default. Facts
+  are `fact(Case, Predicate, true|false|unknown)`; an element is satisfied / violated / missing,
+  and the verdict is INCONSISTENT (any violation) > INSUFFICIENT (any missing) > CONSISTENT.
+- **Bugs caught by the hand-verified rule tests:** (1) section facts in a second .pl file replaced the
+  first file's (static predicates) — fixed with `multifile`; (2) `verdict(C, S, consistent)` with the
+  verdict already bound skipped the cut-guarded violated/missing clauses and succeeded for any
+  section with no facts (`theft(nobody)` was true) — the verdict is now computed, then unified.
+- **Extraction guards:** evidence quotes must appear in the text (elisions "…" allowed in order),
+  otherwise the value is downgraded to unknown; one repair round on invalid JSON / schema errors;
+  extraction runs twice and keeps only values both runs agree on — gpt-oss varied between runs even
+  at temperature 0 (case01 flipped from three established elements to none). Rash vs negligent is
+  not treated as a disagreement (every encoded section that needs one accepts either).
+- **Engine safety:** one process-wide lock around pyswip (not thread-safe; FastAPI uses a thread
+  pool); facts asserted in `session()` and always retracted in `finally` (tested with a verdict that
+  raises, and for leakage between consecutive verifications); only schema predicates/values and a
+  validated case id reach Prolog.
+- **Real cases (report: `data/reports/verification_examples.md`, for a team member to sanity-check):**
+  case20 (G. Manickam) s.279 **CONSISTENT** with a quote per element (convicted by both lower
+  courts); s.304A **INSUFFICIENT** — the facts never state absence of intention/knowledge;
+  case01 (Vijay Kumar, acquitted) s.279 INSUFFICIENT — no eyewitness says the accused drove, which
+  is the reason the court acquitted; case07 (Ram Suresh Tiwari) s.304A INCONSISTENT because the
+  extractor classed an "accidental fire from his country-made pistol" as accidental rather than
+  negligent — a legal judgment worth a human look.
+
 ## Known limitations
 
 _Collected as they are found; consolidated in Phase 7._
+
+- **Verification coverage:** 7 sections only (by design). s.337/338 do not exclude cases where the
+  victim died (they then also "fit" a fatal accident alongside s.304A); s.323 ignores the s.334
+  grave-provocation case; exceptions and general defences (Chapter IV) are not encoded.
+- **Verification depends on extraction:** the verdict is only as good as the extracted facts; the
+  quote check proves a quote exists, not that it supports the value (case01's first run used the
+  father's hearsay "negligence of the accused" as evidence of driving).
 
 - **Fact-pattern retrieval** (also seen in Phase 5): "The accused drove a lorry rashly and hit a
   scooter…" scored 0.54 and was refused; short questions about the same offence retrieve §279/§337
