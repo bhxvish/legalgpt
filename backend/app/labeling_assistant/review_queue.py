@@ -6,10 +6,15 @@ open -> promoted (labels appended to the AnnotationStore with source="bert_assis
         annotation in the Annotate tab and nothing from the model is promoted).
 """
 
+import functools
 import json
+import os
+import tempfile
+import threading
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
 
 from app.annotation.label_scheme import LabelScheme
 from app.annotation.models import LabeledSentence, utc_now
@@ -70,34 +75,66 @@ class ReviewIncomplete(ValueError):
     """Sign-off was attempted before every flagged prediction was reviewed."""
 
 
+F = TypeVar("F", bound=Callable[..., Any])
+
+# One lock per queue folder, shared by every HumanReviewQueue in the process. FastAPI runs the
+# review endpoints in a thread pool: without it, fast reviewing interleaved two saves into one
+# file (corrupt JSON) and overlapping read-modify-writes dropped each other's corrections.
+_FOLDER_LOCKS: dict[str, threading.RLock] = {}
+_FOLDER_LOCKS_GUARD = threading.Lock()
+
+
+def _folder_lock(root: Path) -> threading.RLock:
+    with _FOLDER_LOCKS_GUARD:
+        return _FOLDER_LOCKS.setdefault(str(root.resolve()), threading.RLock())
+
+
+def _locked(method: F) -> F:
+    @functools.wraps(method)
+    def wrapper(self: "HumanReviewQueue", *args: Any, **kwargs: Any) -> Any:
+        with self._lock:
+            return method(self, *args, **kwargs)
+
+    return wrapper  # type: ignore[return-value]
+
+
 class HumanReviewQueue:
     def __init__(self, store: AnnotationStore, max_audit_error: float = 0.2) -> None:
         self.store = store
         self.max_audit_error = max_audit_error
         self.root = store.root / "review_queue"
+        self._lock = _folder_lock(self.root)
 
     # ------------------------------------------------------------ persistence
 
     def _path(self, case_id: str) -> Path:
         return self.root / f"{case_id}.json"
 
+    @_locked
     def load(self, case_id: str) -> QueueCase:
         path = self._path(case_id)
         if not path.exists():
             raise KeyError(f"no review queue for case {case_id!r}")
         return QueueCase.from_dict(json.loads(path.read_text(encoding="utf-8")))
 
+    @_locked
     def _save(self, case: QueueCase) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
-        tmp = self._path(case.case_id).with_suffix(".tmp")
-        tmp.write_text(json.dumps(case.to_dict(), ensure_ascii=False, indent=1), encoding="utf-8")
-        tmp.replace(self._path(case.case_id))  # atomic: a crash never leaves half a file
+        fd, tmp = tempfile.mkstemp(prefix=f".{case.case_id}.", suffix=".tmp", dir=self.root)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(json.dumps(case.to_dict(), ensure_ascii=False, indent=1))
+            os.replace(tmp, self._path(case.case_id))  # atomic: a crash never leaves half a file
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
 
     def case_ids(self) -> list[str]:
         return sorted(p.stem for p in self.root.glob("*.json")) if self.root.exists() else []
 
     # ---------------------------------------------------------------- queue
 
+    @_locked
     def enqueue(self, batch: ReviewBatch, model: str = "") -> QueueCase:
         if self._path(batch.case_id).exists():
             raise FileExistsError(f"case {batch.case_id!r} is already queued")
@@ -114,6 +151,7 @@ class HumanReviewQueue:
         self._save(case)
         return case
 
+    @_locked
     def apply_correction(self, sentence_id: str, label: str, reviewer: str) -> QueueItem:
         """Record the reviewer's label. Giving the model's own label counts as accepting it."""
         if not LabelScheme.validate(label):
@@ -132,6 +170,7 @@ class HumanReviewQueue:
         self._save(case)
         return item
 
+    @_locked
     def audit_error_rate(self, case_id: str) -> float:
         """Share of reviewed audit items (confident predictions sampled for checking) that the
         reviewer had to correct. 0.0 when there is nothing audited yet."""
@@ -141,6 +180,7 @@ class HumanReviewQueue:
     def sign_off(self, case_id: str, reviewer: str) -> bool:
         return self.decide(case_id, reviewer).promoted
 
+    @_locked
     def decide(self, case_id: str, reviewer: str) -> SignOffResult:
         """sign_off() with the reason. Requires every flagged item to be reviewed. Escalates the
         case if audit_error_rate exceeds max_audit_error, otherwise promotes all its labels."""

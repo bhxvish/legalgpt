@@ -95,6 +95,22 @@ def _queue_case(queue: HumanReviewQueue, case: str, n: int = 20) -> None:
     queue.enqueue(ReviewSelector(tau_conf=0.7, audit_rate=0.5, seed=0).select(preds, case), model="test-model")
 
 
+def test_concurrent_corrections_are_all_kept(store: AnnotationStore) -> None:
+    """A fast reviewer's saves arrive in parallel (FastAPI thread pool): none may be lost and the
+    case file must stay valid JSON. Two queue objects, as the API and a script would have."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    _queue_case(HumanReviewQueue(store), "fast", n=60)
+    queues = [HumanReviewQueue(store), HumanReviewQueue(store)]
+    flagged = [it.prediction.sentence_id for it in queues[0].load("fast").items if it.needs_review]
+    with ThreadPoolExecutor(8) as pool:
+        list(pool.map(lambda i_sid: queues[i_sid[0] % 2].apply_correction(i_sid[1], "Ruling", "priya"),
+                      enumerate(flagged)))
+    case = queues[1].load("fast")
+    assert sum(it.status == "corrected" for it in case.items) == len(flagged) > 20
+    assert not list(store.root.glob("review_queue/*.tmp"))
+
+
 def test_high_audit_error_case_is_escalated_not_promoted(store: AnnotationStore) -> None:
     queue = HumanReviewQueue(store, max_audit_error=0.2)
     _queue_case(queue, "bad")
