@@ -20,7 +20,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.core.citations import normalize_stream  # noqa: F401  (re-exported for callers)
-from app.core.llm_client import LLMClient
+from app.core.llm_client import LLMClient, LLMRateLimitError
 from app.core.models import Message
 from app.core.prompt_builder import PromptBuilder
 from app.core.retriever import RetrievalResult, Retriever
@@ -112,8 +112,8 @@ class ChatRouter:
 
     def events(self, req: ChatRequest) -> Iterator[str]:
         history = [Message(t.role, t.content) for t in req.history]
+        name = req.model or self.default_model
         try:
-            name = req.model or self.default_model
             if name not in self.models:
                 raise ValueError(f"model {name!r} is not available: {self.model_notes.get(name, 'unknown model')}")
             llm = self.models[name]
@@ -123,6 +123,11 @@ class ChatRouter:
                 yield from self._legal(req.question, history, llm)
                 if req.verify_section:
                     yield from self._verification(req.question, req.verify_section)
+        except LLMRateLimitError as exc:  # expected on the free tier: no traceback, say what to do
+            logger.warning("chat request rate-limited: %s", exc)
+            hint = (" You can switch to the Tuned (LoRA) model, which runs on this server."
+                    if "adapter" in self.models and name != "adapter" else "")
+            yield sse("error", {"message": f"{exc}{hint}"})
         except Exception as exc:  # surface failures to the client instead of a dropped connection
             logger.exception("chat request failed")
             yield sse("error", {"message": str(exc) or exc.__class__.__name__})

@@ -5,6 +5,7 @@ open model locally, optionally with a LoRA adapter. Callers depend on LLMClient 
 """
 
 import json
+import re
 import threading
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
@@ -18,6 +19,10 @@ class LLMClientError(RuntimeError):
     """Raised when the backing model cannot be reached or is misconfigured."""
 
 
+class LLMRateLimitError(LLMClientError):
+    """The hosted model refused the request because a usage limit was reached."""
+
+
 class LLMClient(ABC):
     model_id: str
 
@@ -28,6 +33,39 @@ class LLMClient(ABC):
     @abstractmethod
     def stream(self, messages: list[Message]) -> Iterator[str]:
         """Yield the completion incrementally as text fragments."""
+
+
+def _wait_text(message: str) -> str:
+    """'Please try again in 9m28.08s' -> 'about 10 minutes' (empty if Groq gave no time)."""
+    m = re.search(r"try again in ((?:\d+h)?(?:\d+m)?(?:[\d.]+s)?)", message)
+    if not m or not m.group(1):
+        return ""
+    parts = {unit: float(num) for num, unit in re.findall(r"([\d.]+)([hms])", m.group(1))}
+    seconds = parts.get("h", 0) * 3600 + parts.get("m", 0) * 60 + parts.get("s", 0)
+    if seconds < 60:
+        n = max(1, round(seconds))
+        return f"about {n} second{'s' if n != 1 else ''}"
+    minutes = -(-seconds // 60)  # round up
+    return f"about {int(minutes)} minute{'s' if minutes != 1 else ''}"
+
+
+def groq_error(exc: Exception) -> Exception:
+    """Turn Groq SDK errors users can act on into a readable LLMClientError; others pass through."""
+    import groq
+
+    message = str(getattr(exc, "body", None) or exc)
+    if isinstance(exc, groq.RateLimitError):
+        daily = "per day" in message or "(TPD)" in message or "(RPD)" in message
+        wait = _wait_text(message)
+        what = ("The hosted model's daily usage limit (Groq free tier) has been reached"
+                if daily else "The hosted model is receiving too many requests right now (Groq rate limit)")
+        retry = f"Try again in {wait}" if wait else "Try again later"
+        return LLMRateLimitError(f"{what}. {retry}.")
+    if isinstance(exc, groq.AuthenticationError):
+        return LLMClientError("Groq rejected GROQ_API_KEY; check the key in .env and restart the backend.")
+    if isinstance(exc, groq.APIConnectionError):
+        return LLMClientError("Could not reach Groq (network error); check the internet connection.")
+    return exc
 
 
 class GroqClient(LLMClient):
@@ -62,24 +100,23 @@ class GroqClient(LLMClient):
     def _payload(self, messages: list[Message]) -> list[dict[str, str]]:
         return [{"role": m.role, "content": m.content} for m in messages]
 
+    def _create(self, messages: list[Message], **kwargs: Any) -> Any:
+        try:
+            return self.client.chat.completions.create(
+                model=self.model_id,
+                messages=self._payload(messages),
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                **kwargs,
+            )
+        except Exception as exc:
+            raise groq_error(exc) from exc
+
     def generate(self, messages: list[Message]) -> str:
-        resp = self.client.chat.completions.create(
-            model=self.model_id,
-            messages=self._payload(messages),
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-        )
-        return resp.choices[0].message.content or ""
+        return self._create(messages).choices[0].message.content or ""
 
     def stream(self, messages: list[Message]) -> Iterator[str]:
-        stream = self.client.chat.completions.create(
-            model=self.model_id,
-            messages=self._payload(messages),
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            stream=True,
-        )
-        for event in stream:
+        for event in self._create(messages, stream=True):
             if event.choices and (delta := event.choices[0].delta.content):
                 yield delta
 
