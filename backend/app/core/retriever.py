@@ -31,6 +31,14 @@ _SECTION_REF = re.compile(
     r"|\b(\d{1,3}[a-z]{0,2})\s*(?:of\s+(?:the\s+)?)?(?:ipc|indian penal code)\b",
     re.IGNORECASE,
 )
+# What follows a section number when it belongs to a different law: "(1) of the Code of Criminal
+# Procedure", " Cr.P.C.", " of the POCSO Act", " of the Arms Act, 1959".
+_OTHER_ENACTMENT = re.compile(
+    r"(?:\s*\(\w+\))*\s*(?:,\s*)?(?:of\s+(?:the\s+)?)?"
+    r"(?:code\s+of\s+criminal\s+procedure|cr\.?\s?p\.?\s?c|crpc|bnss|bns\b|bharatiya|evidence\s+act|constitution"
+    r"|(?!indian\s+penal)[a-z][\w.()\-]*(?:\s+[a-z][\w.()\-]*){0,6}\s+act\b)",
+    re.IGNORECASE,
+)
 
 
 class QueryExpander:
@@ -49,9 +57,13 @@ class QueryExpander:
 
     @staticmethod
     def section_refs(question: str) -> list[str]:
-        """Section numbers explicitly mentioned, e.g. "u/s 304a IPC" -> ["304A"]."""
+        """IPC section numbers explicitly mentioned, e.g. "u/s 304a IPC" -> ["304A"]. A number
+        that belongs to another enactment ("Section 378(1) of the Code of Criminal Procedure",
+        "s. 6 of the POCSO Act") is not an IPC reference and is skipped."""
         refs: list[str] = []
         for m in _SECTION_REF.finditer(question):
+            if m.group(1) and _OTHER_ENACTMENT.match(question, m.end()):
+                continue
             ref = (m.group(1) or m.group(2)).upper()
             if ref not in refs:
                 refs.append(ref)

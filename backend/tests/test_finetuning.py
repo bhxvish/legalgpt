@@ -98,6 +98,8 @@ SOURCES = [_src(1, "304A", "Whoever causes death by negligence ... two years."),
 def test_score_citations_grounded_answer() -> None:
     s = ModelComparator.score_citations("Under Section 304A the punishment is two years [1]; murder is under Section 302 [2].", SOURCES)
     assert s.markers == [1, 2] and s.sections == ["302", "304A"] and s.citation_accuracy == 1.0 and not s.refused
+    assert s.uses_markers
+    assert not ModelComparator.score_citations("Section 304A applies.", SOURCES).uses_markers
 
 
 def test_score_citations_flags_hallucinations() -> None:

@@ -9,6 +9,8 @@ evidence that was actually retrieved — computed, never estimated:
 - every precedent the answer names ("X v. Y") must appear in a retrieved source.
 
 citation_accuracy = grounded citations / all citations (None when an answer cites nothing).
+It measures grounding, not correctness: citing retrieved-but-irrelevant evidence still counts as
+grounded. uses_markers records whether the answer follows the required [n] citation format.
 """
 
 import json
@@ -39,6 +41,7 @@ class CitationScore:
     ungrounded_precedents: list[str]
     citation_accuracy: float | None
     refused: bool
+    uses_markers: bool  # follows the required inline [n] citation format at all
 
 
 @dataclass
@@ -94,6 +97,7 @@ class ModelComparator:
             ungrounded_precedents=ungrounded_precedents,
             citation_accuracy=round((total - bad) / total, 4) if total else None,
             refused=NOT_COVERED_REPLY.split("—")[0].strip().lower() in text.lower(),
+            uses_markers=bool(markers),
         )
 
     def run(self, retriever: Any, log: Any = print) -> list[ComparisonRow]:
@@ -133,6 +137,7 @@ class ModelComparator:
                 "answered": len(scored),
                 "mean_citation_accuracy": round(sum(accs) / len(accs), 4) if accs else None,
                 "answers_with_citations": len(accs),
+                "answers_using_markers": sum(s.uses_markers for s in scored),
                 "answers_without_citations": sum(1 for s in scored if s.citation_accuracy is None and not s.refused),
                 "refusals": sum(s.refused for s in scored),
                 "invalid_markers": sum(len(s.invalid_markers) for s in scored),
@@ -156,7 +161,7 @@ class ModelComparator:
         for k, v in (meta or {}).items():
             md.append(f"- **{k}:** {v}")
         md += ["", "## Summary", "", "| metric | " + " | ".join(names) + " |", "|---|" + "---|" * len(names)]
-        for metric in ("model_id", "answered", "mean_citation_accuracy", "answers_with_citations", "answers_without_citations",
+        for metric in ("model_id", "answered", "mean_citation_accuracy", "answers_with_citations", "answers_using_markers", "answers_without_citations",
                        "refusals", "invalid_markers", "ungrounded_sections", "ungrounded_precedents", "errors", "mean_seconds"):
             md.append(f"| {metric} | " + " | ".join(str(summary[n][metric]) for n in names) + " |")
         for i, r in enumerate(rows, 1):

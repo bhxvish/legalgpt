@@ -99,3 +99,18 @@ def test_follow_up_uses_previous_question_as_context(retriever: Retriever) -> No
 def test_context_does_not_hide_a_change_of_topic(retriever: Retriever) -> None:
     ev = retriever.retrieve("Whoever intending to take dishonestly movable property commits theft", context="negligent death")
     assert ev[0].section == "378"
+
+
+@pytest.mark.parametrize(
+    "question, refs",
+    [
+        ("Appeal under Section 378(1) of the Code of Criminal Procedure against acquittal", []),
+        ("convicted u/s 302 IPC and Section 25 of the Arms Act, 1959", ["302"]),
+        ("statement u/s 313 Cr.P.C. was recorded; charge under Section 304A", ["304A"]),
+        ("Section 6 of the POCSO Act and Section 377 of the Indian Penal Code", ["377"]),
+        ("What does Section 279 of the Indian Penal Code provide?", ["279"]),
+        ("Sections 302 and 34 apply", ["302"]),
+    ],
+)
+def test_section_refs_ignore_other_enactments(question: str, refs: list[str]) -> None:
+    assert QueryExpander.section_refs(question) == refs

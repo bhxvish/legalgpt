@@ -5,6 +5,8 @@ saved (tens of MB); the frozen base model is never modified or copied.
 """
 
 import json
+import math
+import shutil
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -118,6 +120,8 @@ class LoRATrainer:
         if self.model is None or not hasattr(self.model, "peft_config"):
             self.attach_adapter()
         adapter_path = Path(adapter_path)
+        steps_per_epoch = math.ceil(len(train_ds) / (self.cfg.batch_size * self.cfg.grad_accum))
+        total_steps = self.cfg.max_steps if self.cfg.max_steps > 0 else steps_per_epoch * self.cfg.epochs
         args = SFTConfig(
             output_dir=str(adapter_path / "_trainer"),
             num_train_epochs=self.cfg.epochs,
@@ -127,8 +131,9 @@ class LoRATrainer:
             gradient_accumulation_steps=self.cfg.grad_accum,
             learning_rate=self.cfg.lr,
             lr_scheduler_type="cosine",
-            warmup_ratio=0.05,
+            warmup_steps=max(1, round(0.05 * total_steps)),
             max_length=self.cfg.max_length,
+            completion_only_loss=True,  # loss on the answer only, never on the prompt
             gradient_checkpointing=True,
             bf16=torch.cuda.is_available(),
             optim="paged_adamw_8bit" if self.cfg.load_in_4bit else "adamw_torch",
@@ -154,6 +159,7 @@ class LoRATrainer:
         eval_after = trainer.evaluate()["eval_loss"] if eval_ds else None
 
         adapter_path.mkdir(parents=True, exist_ok=True)
+        shutil.rmtree(adapter_path / "_trainer", ignore_errors=True)  # scratch dir; checkpoints are not kept (save_strategy="no")
         trainer.model.save_pretrained(adapter_path)  # adapter weights only
         self.tokenizer.save_pretrained(adapter_path)
         report = TrainingReport(

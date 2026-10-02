@@ -89,7 +89,7 @@ legalgpt/
 - [x] **Phase 1** — Module 0: Core retrieval & chat platform
 - [x] **Phase 2** — Module 1: Domain-specific dataset pipeline
 - [x] **Phase 3** — Module 2: InLegalBERT-assisted annotation
-- [ ] **Phase 4** — Module 3: LoRA fine-tuning pipeline
+- [x] **Phase 4** — Module 3: LoRA fine-tuning pipeline
 - [ ] **Phase 5** — Module 4: Explainability
 - [ ] **Phase 6** — Module 5: Neuro-symbolic verification
 - [ ] **Phase 7** — Integration, testing & deployment
@@ -229,9 +229,60 @@ legalgpt/
   handling now reads synchronously updated refs. Sign-off stays disabled until every flagged
   sentence is checked, so a skip could never be promoted.
 
+### Phase 4 (Module 3)
+
+- **No existing fine-tuning notebook** in the repo to adapt; the pipeline was written fresh.
+- **Compute and model (user decisions):** local RTX 3050 Ti (4 GB) and **Qwen2.5-1.5B-Instruct**
+  (Apache-2.0, not gated). CUDA PyTorch (2.14.1+cu130) lives in a separate `.venv-gpu` from
+  `backend/requirements-gpu.txt`; the base install stays CPU-only. The disk was full (2 GB free):
+  the user approved `pip cache purge` (8.3 GB); the GPU env is installed with `--no-cache-dir`.
+- **Training data (v0.2, 32 cases):** 124 instruction examples — facts→law (32),
+  facts+arguments→ruling (31), grounded answers in the exact inference prompt format with [n]
+  citations (32), grounded refusals pairing unrelated cases (29); split by case 100/12/12
+  (26/3/3 cases), verified disjoint. Small: this demonstrates the pipeline more than it teaches law.
+- **Training run `v0.2-20261002-203807`:** 4-bit NF4 QLoRA, r=16, α=32, all attention + MLP
+  projections, lr 2e-4, 3 epochs (39 optimizer steps), loss on answers only, 12 min, peak GPU 3.06
+  GB. Validation loss **1.292 (untuned) → 1.062 / 1.047 / 1.045** after epochs 1–3. Adapter 37 MB,
+  saved without the base model.
+- **Comparison** (6 held-out questions from the 3 test cases, same retrieved evidence for every
+  model; report in `docs/reports/lora_v0.2_comparison.md`):
+
+  | | Groq gpt-oss-120b | Qwen-1.5B base | Qwen-1.5B + LoRA |
+  |---|---|---|---|
+  | mean citation accuracy | 1.00 | 0.83 | 1.00 |
+  | answers using `[n]` markers | 5/5 | 0/6 | 5/5 |
+  | ungrounded sections | 0 | 1 | 0 |
+  | refusals | 1 | 0 | 1 |
+  | mean seconds | 1.1 | 8.7 | 11.9 |
+
+  What fine-tuning changed: the base model never used the required citation format and once
+  invented a section ("378(1) … obscene material"); the tuned model cites in the required format
+  and stayed grounded. What it broke: it learned to **copy sources** (its targets were source
+  sentences concatenated with markers) — degenerate listings, a state amendment pasted as the
+  answer — and to **over-refuse** (refusals were 23% of examples): with `LLM_BACKEND=adapter` it
+  answered "I don't know" to the punishment for death by negligence although §304A was source
+  [1]. Better targets need human-written answers, not concatenated sources.
+- **citation_accuracy measures grounding, not relevance or correctness:** citing a retrieved but
+  irrelevant chunk counts as grounded (the tuned model cited §211/§292 for a CrPC appeal).
+  `answers_using_markers` was added after the first run because base answers scored 1.0 without
+  any markers.
+- **Retriever fix found by the comparison:** "Section 378(1) of the Code of Criminal Procedure"
+  had pulled IPC §378 (theft) through the explicit-section lookup; section numbers followed by
+  another enactment (CrPC, BNS, "… Act") are no longer treated as IPC references.
+- **Serving:** `LLM_BACKEND=adapter` switches ChatRouter to AdapterClient with no code change
+  (verified end to end through `/api/chat`); run the backend from `.venv-gpu` for GPU inference.
+
 ## Known limitations
 
 _Collected as they are found; consolidated in Phase 7._
+
+- **Retrieval floor vs long fact patterns:** questions written as fact narratives pull generic
+  chunks (IPC §1/§2, state-amendment boilerplate) at 0.6–0.7 similarity, above the 0.55 floor,
+  because the Phase 1 calibration set only had short questions. A CrPC appeal therefore reaches the
+  model with irrelevant IPC sources instead of being refused. Needs a fact-pattern calibration set
+  and probably down-weighting of definitional / state-amendment chunks.
+- **Tuned model quality:** see Phase 4 — copies sources and over-refuses; not a drop-in
+  replacement for the hosted model.
 
 - **Seed corpus (v0.1):** 31 cases, single annotation pass. No double annotation yet, so
   inter-annotator agreement (Cohen's kappa) on real data is **unmeasured**; the guideline is not yet

@@ -113,6 +113,36 @@ guideline: `python backend/scripts/build_guideline.py`. A test fails if the two 
    confident predictions needed correction, the case is sent to full manual annotation instead;
    otherwise every sentence is added to the corpus with `source="bert_assisted"`.
 
+## LoRA fine-tuning (Module 3)
+
+Fine-tuning needs a CUDA GPU and runs from a separate environment, so the base install stays
+CPU-only (~9 GB of disk for CUDA PyTorch + the base model):
+
+```bash
+python -m venv .venv-gpu
+.venv-gpu\Scripts\python -m pip install --no-cache-dir -r backend/requirements-gpu.txt
+```
+
+Train a LoRA adapter on Qwen2.5-1.5B-Instruct (4-bit, fits a 4 GB GPU; ~12 minutes on an RTX 3050 Ti)
+from a frozen corpus version, then compare it with the hosted model and the untuned base on held-out
+questions through the same retriever:
+
+```bash
+.venv-gpu\Scripts\python backend/scripts/train_lora.py --version v0.2
+.venv-gpu\Scripts\python backend/scripts/compare_models.py
+```
+
+The adapter (~37 MB, base model not copied), `examples.jsonl` (every training example with its
+split) and `comparison.json` / `comparison.md` go to `data/models/lora/<version>-<time>/`.
+
+To serve the tuned model in the chat app, set `LLM_BACKEND=adapter` in `.env` (optionally
+`ADAPTER_PATH`) and start the backend from the GPU environment:
+
+```bash
+cd backend
+..\.venv-gpu\Scripts\python -m uvicorn app.main:app --port 8000
+```
+
 ## Run the backend
 
 From the repo root, create a virtualenv and install dependencies (PyTorch is the CPU build):
