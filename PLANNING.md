@@ -48,6 +48,8 @@ legalgpt/
 │   │   │   ├── classifier.py       # RRLClassifier (InLegalBERT)
 │   │   │   ├── review_selector.py  # ReviewSelector
 │   │   │   ├── review_queue.py     # HumanReviewQueue
+│   │   │   ├── segmenter.py        # AssistedSegmenter (PDF-tuned; assisted path only)
+│   │   │   ├── titles.py           # cause-title detection for the Review list
 │   │   │   └── evaluator.py        # ClassifierEvaluator, Metrics
 │   │   ├── finetuning/             # Module 3 — LoRA pipeline
 │   │   │   ├── instruction_builder.py
@@ -220,6 +222,17 @@ legalgpt/
   wrapped at ~70 characters and page breaks mid-sentence were split. Headings are now recognised
   by shape (all caps, bracketed coram), not length, and clause markers ("(a)") join the next line.
   The four cases went from 1,725 fragments to 1,270 sentences; seed boundary F1 stays ≥ 0.94.
+  *Moved out of Module 1 afterwards:* the Module 2 spec says the manual module must not change, so
+  `annotation/segmenter.py`, `collector.py` and `AnnotateView.jsx` were restored to their Module 1
+  state; the retuned segmenter is `labeling_assistant/segmenter.py` (AssistedSegmenter) and title
+  detection `labeling_assistant/titles.py`, used only by the assisted path. Queued cases pin their
+  segments, so an escalated case is annotated manually against the same sentences. The only
+  remaining change to Module 1 is the five-label scheme (None dropped, a user decision).
+- **Review queue corrupted case files under fast reviewing** (found re-checking the Module 2
+  acceptance list): accepting 103 sentences with Enter held down sent parallel saves that
+  interleaved in one shared temp file (corrupt JSON, 160 failed requests) and could drop each
+  other's corrections. Fixed with one lock per queue folder and a unique temp file per save;
+  regression test with 8 threads. The real queue files were checked and were intact.
 - **End-to-end on a real new case:** State of U.P. v. Sonu Kushwaha (2023 INSC 603): 79 sentences,
   30 flagged (24 low-confidence + 6 audit), reviewed in the Review tab by reviewer **"claude"**
   (17 corrections; 1 of 6 audits wrong = 17% < 20% limit), signed off and promoted as

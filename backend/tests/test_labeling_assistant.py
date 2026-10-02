@@ -254,3 +254,38 @@ def test_freeze_layers_freezes_embeddings_and_lower_layers(tiny_classifier) -> N
     assert all(p.requires_grad for p in clf.model.classifier.parameters())
     clf._freeze(0)
     assert all(p.requires_grad for p in clf.model.parameters())
+
+
+# ------------------------------------------------------- assisted-path segmentation and titles
+
+
+@pytest.mark.parametrize(
+    "header, title",
+    [
+        ("Supreme Court of India\nRAJO @ RAJWA versus THE STATE OF BIHAR & ORS.\nDecided on 25-08-2023", "RAJO @ RAJWA versus THE STATE OF BIHAR & ORS."),
+        ("Delhi High Court\nNarender vs State Of Delhi on 12 October, 2021\n", "Narender vs State Of Delhi on 12 October, 2021"),
+        ("JUDGMENT\nThe appeal is dismissed.", ""),
+    ],
+)
+def test_title_detection(header: str, title: str) -> None:
+    from app.labeling_assistant.titles import detect_title
+
+    assert detect_title(header) == title
+
+
+def test_assisted_segmenter_joins_page_breaks_and_splits_coram_manual_one_unchanged() -> None:
+    from app.annotation.segmenter import SentenceSegmenter
+    from app.labeling_assistant.segmenter import AssistedSegmenter
+
+    page_break = ("The accused was driving the truck at a high speed on the\n\nhighway near the village when "
+                  "the accident occurred. He was arrested.")
+    assert AssistedSegmenter().segment(page_break, "t") == [
+        "The accused was driving the truck at a high speed on the highway near the village when the accident occurred.",
+        "He was arrested.",
+    ]
+    assert len(SentenceSegmenter().segment(page_break, "t")) == 3  # manual flow keeps its Phase 2 behaviour
+
+    coram = "[ABHAY S. OKA, J.]\nThe appeal arises out of a judgment of the High Court."
+    assert AssistedSegmenter().segment(coram, "t") == [
+        "[ABHAY S. OKA, J.]", "The appeal arises out of a judgment of the High Court."]
+    assert len(SentenceSegmenter().segment(coram, "t")) == 1

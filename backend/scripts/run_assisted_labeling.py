@@ -18,11 +18,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.annotation.collector import JudgmentCollector  # noqa: E402
 from app.annotation.models import sentence_id  # noqa: E402
-from app.annotation.segmenter import SentenceSegmenter  # noqa: E402
 from app.annotation.store import AnnotationStore  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.labeling_assistant.classifier import RRLClassifier  # noqa: E402
 from app.labeling_assistant.dataset import RRLExample  # noqa: E402
+from app.labeling_assistant.segmenter import AssistedSegmenter  # noqa: E402
 from app.labeling_assistant.review_queue import HumanReviewQueue  # noqa: E402
 from app.labeling_assistant.review_selector import ReviewSelector  # noqa: E402
 
@@ -55,7 +55,7 @@ def main() -> int:
     checkpoint = args.model or latest_checkpoint(s.rrl_model_dir)
     clf = RRLClassifier.load(checkpoint)
     selector = ReviewSelector(tau_conf=args.tau, audit_rate=args.audit_rate, seed=args.seed)
-    segmenter = SentenceSegmenter()
+    segmenter = AssistedSegmenter()
     print(f"model {checkpoint.name} (labels {clf.labels}); tau_conf {args.tau}, audit rate {args.audit_rate:.0%}\n")
 
     for case_id in cases:

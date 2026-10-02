@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.annotation.collector import JudgmentCollector
 from app.labeling_assistant.review_queue import HumanReviewQueue, QueueCase, ReviewIncomplete
+from app.labeling_assistant.titles import detect_title
 
 
 class ReviewerBody(BaseModel):
@@ -36,7 +37,8 @@ class ReviewRouter:
     def _summary(self, case: QueueCase) -> dict[str, Any]:
         flagged = [it for it in case.items if it.needs_review]
         try:
-            title = self.collector.load(case.case_id).title
+            record = self.collector.load(case.case_id)
+            title = record.title or detect_title(record.raw_text)
         except KeyError:
             title = ""
         return {
