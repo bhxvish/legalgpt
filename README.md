@@ -55,6 +55,15 @@ python backend/scripts/calibrate_retrieval.py
    Each file is normalized and screened. Duplicates (even reformatted copies), non-English text,
    non-criminal cases and very short files are rejected with a reason. Accepted judgments go to
    `data/raw_judgments/` with their detected court, year and cited IPC sections.
+   Annotations already made in the team spreadsheet (columns `doc_id, case_name, sentence_id,
+   sentence_text, label, annotator, notes`) are imported instead:
+
+   ```bash
+   python backend/scripts/import_annotations.py data/inbox/legaltech_dataset.xlsx --dry-run
+   python backend/scripts/import_annotations.py data/inbox/legaltech_dataset.xlsx
+   ```
+
+   The sheet's own sentences become the case's segmentation; re-running skips cases already imported.
 2. Open <http://localhost:5173/#annotate>, enter your name, pick a case and label each sentence
    (keys **1–6**, **↑/↓**, **n** for next unlabelled). Labels save immediately to
    `data/annotation_store/labels.jsonl`. Read `docs/annotation_guideline.md` first.

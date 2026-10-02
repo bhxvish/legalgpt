@@ -149,9 +149,9 @@ function CaseAnnotator({ caseId, annotator, scheme, onProgress, onBack }) {
             <button onClick={onBack} className="text-xs text-indigo-600 hover:underline">
               ← All cases
             </button>
-            <h2 className="truncate font-mono text-sm font-semibold text-slate-900">{detail.case_id}</h2>
+            <h2 className="truncate text-sm font-semibold text-slate-900">{detail.title || detail.case_id}</h2>
             <p className="text-xs text-slate-500">
-              {[detail.court, detail.decision_year, detail.sections_cited.length && `IPC ${detail.sections_cited.join(', ')}`]
+              {[detail.title && detail.case_id, detail.court, detail.decision_year, detail.sections_cited.length && `IPC ${detail.sections_cited.join(', ')}`]
                 .filter(Boolean)
                 .join(' · ')}
             </p>
@@ -344,9 +344,9 @@ export default function AnnotateView() {
                   className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 text-left hover:bg-slate-50"
                 >
                   <div className="min-w-0">
-                    <p className="truncate font-mono text-sm font-medium text-slate-900">{c.case_id}</p>
+                    <p className="truncate text-sm font-medium text-slate-900">{c.title || c.case_id}</p>
                     <p className="text-xs text-slate-500">
-                      {[c.court || 'court unknown', c.decision_year, c.sections_cited.length && `IPC ${c.sections_cited.join(', ')}`]
+                      {[c.title && c.case_id, c.court, c.decision_year, c.sections_cited.length && `IPC ${c.sections_cited.join(', ')}`]
                         .filter(Boolean)
                         .join(' · ')}
                     </p>

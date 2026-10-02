@@ -87,7 +87,7 @@ legalgpt/
 
 - [x] **Phase 0** — Scaffolding & environment setup
 - [x] **Phase 1** — Module 0: Core retrieval & chat platform
-- [ ] **Phase 2** — Module 1: Domain-specific dataset pipeline
+- [x] **Phase 2** — Module 1: Domain-specific dataset pipeline
 - [ ] **Phase 3** — Module 2: InLegalBERT-assisted annotation
 - [ ] **Phase 4** — Module 3: LoRA fine-tuning pipeline
 - [ ] **Phase 5** — Module 4: Explainability
@@ -171,8 +171,40 @@ legalgpt/
   same SHA-256 of whitespace/case-normalized text. Judgment texts are git-ignored.
 - **Sentence splitting** distinguishes abbreviations that lead into something ("S.", "v.",
   "Smt.", "PW.") from acronyms that can end a sentence ("I.P.C.", "Cr.P.C."); initials of up to
-  two letters ("M.K.") never split.
+  two letters ("M.K.") never split. Tuned against the team's seed segmentation: boundary F1
+  **0.956** (P 0.967 / R 0.946) over 4,283 sentences; a test keeps it ≥ 0.94 when the seed
+  corpus is present. Colon-introduced quotations ("reads as under:-") end a sentence, as the
+  team segmented them.
+- **Seed corpus imported, not hand-built in our UI.** The team supplied `legaltech_dataset.xlsx`
+  (31 criminal judgments, 4,283 labelled sentences, labels FACT/LAW/PRECEDENT/ARGUMENT/RULING).
+  `scripts/import_annotations.py` normalizes doc ids ("case 11" / "case11"), drops a repeated
+  header row, pins the sheet's own sentences as each case's segmentation, screens the rebuilt
+  text through JudgmentCollector (all 31 eligible), and records empty annotator cells as
+  `team-sheet`. Frozen as **v0.1** (sha256 `44659d79…`, split 25/3/3 cases, seed 13).
+- **The team's tie-break order** (Ruling > Argument > Precedent > Law Applied > Facts) and their
+  LAW/FACT conventions (uncited "well settled" principles = Law Applied; witness testimony =
+  Facts) were added to LabelScheme and the guideline, since the gold data follows them.
+- **Acceptance check on real text was run in a scratch store**, not the real one: labelling an
+  imported case in the real store would overwrite the team's gold labels (latest decision wins).
+  case04's rebuilt text went through collect → our segmenter (26 sentences, same count as the
+  team) → keyboard labelling of every sentence; κ vs the team's labels was 0.848 (approximate:
+  2 of 26 sentence boundaries differ).
 
 ## Known limitations
 
-_To be filled in during Phase 7._
+## Known limitations
+
+_Collected as they are found; consolidated in Phase 7._
+
+- **Seed corpus (v0.1):** 31 cases, single annotation pass. No double annotation yet, so
+  inter-annotator agreement (Cohen's kappa) on real data is **unmeasured**; the guideline is not yet
+  validated the way the LLD intends. The seed never uses **None**: headers and boilerplate were
+  forced into the five roles, so new UI annotations that use None will differ in distribution.
+- **Label skew:** Facts 38%, Precedent 23%, Ruling 21%, Argument 10%, Law Applied 9% — Phase 3 should
+  report per-class metrics, not only accuracy. Precedent-heavy cases (case01, case08, case31) partly
+  consist of long quotations from earlier judgments.
+- **Sheet gaps:** case18 and case21 skip 2 and 5 sentence ids, so their rebuilt text is missing
+  those sentences. Court and decision year are unknown/approximate for imported cases (the sheet
+  has no cover page; year comes from the title).
+- **Codes:** one seed case (case04) also cites the BNS/BNSS, which replaced the IPC in July 2024;
+  the corpus and Prolog scope remain IPC-only.

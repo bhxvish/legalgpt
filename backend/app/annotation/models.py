@@ -19,6 +19,7 @@ class JudgmentRecord:
     rejection_reason: str = ""
     source_path: str = ""
     sha256: str = ""  # of the normalized text; used for duplicate detection
+    title: str = ""  # cause title, e.g. "Narender vs State of Delhi (12 Oct, 2021)", when known
 
     def index_entry(self) -> dict[str, Any]:
         """Everything except the text, for data/raw_judgments/index.jsonl."""

@@ -251,3 +251,43 @@ def test_paired_labels_aligns_shared_sentences(store: AnnotationStore) -> None:
 )
 def test_court_detection(header: str, court: str) -> None:
     assert JudgmentCollector.detect_court(header) == court
+
+
+def _boundaries(stream: str, sentences: list[str]) -> set[int]:
+    """Sentence-end offsets in an alphanumeric-only stream, found by matching each sentence's
+    text in order (so dropped paragraph numbers or punctuation cannot shift later offsets)."""
+    import re as _re
+
+    ends, ptr = set(), 0
+    for s in sentences:
+        key = _re.sub(r"[^0-9a-z]", "", s.lower())
+        i = stream.find(key, ptr) if key else -1
+        if i != -1:
+            ptr = i + len(key)
+            ends.add(ptr)
+    return ends
+
+
+def test_segmenter_agrees_with_team_seed_segmentation() -> None:
+    """On the imported seed corpus (git-ignored, so skipped without it), re-segmenting each case's
+    text must reproduce the team's sentence boundaries closely. Measured 0.956 F1 at import."""
+    import re as _re
+
+    from app.config import get_settings
+
+    store = AnnotationStore(get_settings().annotation_store_dir)
+    def imported_from_sheet(case_id: str) -> bool:
+        path = store.root / "segments" / f"{case_id}.json"
+        return path.exists() and json.loads(path.read_text(encoding="utf-8"))["segmenter"].startswith("xlsx:")
+
+    cases = [c for c in store.case_ids() if imported_from_sheet(c)]
+    if len(cases) < 5:
+        pytest.skip("team seed corpus not imported (backend/scripts/import_annotations.py)")
+    seg, tp, fp, fn = SentenceSegmenter(), 0, 0, 0
+    for c in cases:
+        gold = store.load_segments(c)
+        stream = _re.sub(r"[^0-9a-z]", "", " ".join(gold).lower())
+        g, o = _boundaries(stream, gold), _boundaries(stream, seg.segment(" ".join(gold), c))
+        tp, fp, fn = tp + len(g & o), fp + len(o - g), fn + len(g - o)
+    precision, recall = tp / (tp + fp), tp / (tp + fn)
+    assert 2 * precision * recall / (precision + recall) >= 0.94, (precision, recall)

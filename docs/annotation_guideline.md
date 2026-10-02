@@ -20,6 +20,13 @@ consistency matters more than speed.
 5. When unsure between two roles, use the decision rules below. If still unsure, pick the
    better fit and note the sentence for discussion — do not leave it unlabelled.
 
+### Tie-break order
+
+If a sentence genuinely fits more than one role, choose the first that applies:
+**Ruling > Argument > Precedent > Law Applied > Facts**. This is the order the team used for
+the seed corpus (`legaltech_dataset.xlsx`), so keep it for consistency. *None* is outside this
+order: use it only when no role fits at all.
+
 ### Decision rules for common confusions
 
 - **Who is speaking?** Counsel's submissions are *Argument* even when they recite facts or law.
@@ -46,7 +53,7 @@ sentence becomes the gold label, so adjudication is simply re-labelling the sent
 
 **Definition.** The events of the case and its procedural history as the court records them: who did what, when and where, and how the matter reached this court.
 
-**How to apply.** Includes the prosecution story as narrated by the court, the FIR, investigation, charges framed, and what the lower courts decided. If the sentence reports what a party argues about the facts, it is Argument instead.
+**How to apply.** Includes the prosecution story as narrated by the court, the FIR, investigation, charges framed, witness testimony as recorded ('PW-2 deposed that…'), and what the lower courts decided. If the sentence reports what a party argues about the facts, it is Argument instead.
 
 **Examples** (representative sentences, not quotations):
 
@@ -59,7 +66,7 @@ sentence becomes the gold label, so adjudication is simply re-labelling the sent
 
 **Definition.** The text, elements or meaning of a statutory provision (such as an IPC section) that the court sets out or applies, stated as law rather than as a finding on these facts.
 
-**How to apply.** Quoting or paraphrasing a section, listing its ingredients, or explaining what a provision requires. When the court applies the law to these facts and reaches a conclusion, use Ruling. When the law comes from an earlier case, use Precedent.
+**How to apply.** Quoting or paraphrasing a section, listing its ingredients, or explaining what a provision requires. General principles stated without citing a case ('it is well settled that…') also belong here. When the court applies the law to these facts and reaches a conclusion, use Ruling. When the principle is attributed to an earlier case, use Precedent.
 
 **Examples** (representative sentences, not quotations):
 

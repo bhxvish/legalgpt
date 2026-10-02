@@ -14,11 +14,17 @@ JUDGMENT_ABBREVIATIONS: frozenset[str] = LEGAL_ABBREVIATIONS | frozenset(
         "cr", "crl", "hon", "hon'ble", "ld", "smt", "sri", "shri", "kum", "km", "pw", "dw", "cw",
         "ex", "exh", "exts", "u/s", "r/w", "sec", "w.p", "s.l.p", "sl", "nos", "addl", "asst", "dy",
         "insp", "const", "s.i", "a.s.i", "dist", "vill", "p.s", "approx", "fig", "crl.a", "crl.r.p",
-        "edn", "art", "ch",
+        "edn", "art", "ch", "sh", "col", "lt", "capt", "maj", "gen", "brig", "prof", "mohd", "ms",
+        "hc", "asi", "si", "ct", "dt", "mt", "w/o", "s/o", "d/o", "r/o", "ext", "pws", "dws",
+        "crl.m.a", "crl.m.c", "crl.rev", "crl.misc", "crl.rev.p", "m.a", "m.c", "retd", "ps", "u/sec",
     }
 )
 
 _PARA_NUMBER = re.compile(r"^(?:\d{1,3}\.|\(\d{1,3}\)|\[\d{1,3}\])\s+(?=\S)")
+_ENUMERATOR_ONLY = re.compile(r"^(?:\d{1,3}|[ivxlc]{1,6}|[a-z])[.)]$", re.I)  # "8.", "(iv)" left alone
+# A colon that introduces a quotation or list ends a sentence ("... reads as under:-", "... the
+# following:"), as in the team's seed annotations; only when a new sentence visibly starts.
+_COLON_BREAK = re.compile(r"(?<=:-)\s+|(?<=:—)\s+|(?<=:)\s+(?=[\"“‘'(]?[A-Z0-9])")
 _TERMINAL = re.compile(r"[.?!:;\"”’)\]]$")
 
 
@@ -39,11 +45,11 @@ class SentenceSegmenter:
     def segment(self, text: str, case_id: str = "") -> list[str]:
         sentences: list[str] = []
         for unit in self._units(text):
-            unit = _PARA_NUMBER.sub("", unit)
-            for sentence in split_sentences(unit, self.abbreviations):
-                sentence = _PARA_NUMBER.sub("", sentence).strip()
-                if sentence and re.search(r"\w", sentence):
-                    sentences.append(sentence)
+            for part in _COLON_BREAK.split(_PARA_NUMBER.sub("", unit)):
+                for sentence in split_sentences(part, self.abbreviations):
+                    sentence = _PARA_NUMBER.sub("", sentence).strip()
+                    if sentence and re.search(r"\w", sentence) and not _ENUMERATOR_ONLY.match(sentence):
+                        sentences.append(sentence)
         return sentences
 
     def _units(self, text: str) -> list[str]:

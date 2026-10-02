@@ -14,6 +14,9 @@ LEGAL_ABBREVIATIONS: frozenset[str] = frozenset(
 _BOUNDARY = re.compile(r"(?<=[.?!])[\"')\]]*\s+(?=[\"'(\[]?[A-Z0-9])")
 
 
+_VERSUS = frozenset({"v.", "vs.", "vs", "versus", "v/s", "v/s."})
+
+
 def split_sentences(text: str, abbreviations: frozenset[str] = LEGAL_ABBREVIATIONS) -> list[str]:
     """Split on sentence-ending punctuation, but never after a legal abbreviation
     or a single capital initial (e.g. "A." in IPC illustrations).
@@ -31,6 +34,9 @@ def split_sentences(text: str, abbreviations: frozenset[str] = LEGAL_ABBREVIATIO
         # initials: "A." (IPC illustrations), "M.K." (judges, parties). Three or more letters
         # ("I.P.C.") is an acronym that can end a sentence, so it is not treated as initials.
         if token in abbreviations or re.fullmatch(r"(?:[A-Z]\.)?[A-Z]", last_word.rstrip(".")):
+            continue
+        # "... Singh & Ors. Vs. State of Punjab": the case title continues
+        if text[m.end() :].split(None, 1)[:1] and text[m.end() :].split(None, 1)[0].lower() in _VERSUS:
             continue
         sentences.append(text[start : m.end()].strip())
         start = m.end()

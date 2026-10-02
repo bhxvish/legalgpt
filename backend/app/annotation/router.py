@@ -53,6 +53,7 @@ class Progress(BaseModel):
 
 class CaseSummary(BaseModel):
     case_id: str
+    title: str = ""
     court: str
     decision_year: int | None
     sections_cited: list[str]
@@ -85,7 +86,7 @@ class AnnotationRouter:
             if segments is not None:
                 labelled = len(self.store.load_case(e["case_id"], annotator=annotator)) if annotator else 0
                 progress = Progress(sentences=len(segments), labelled=labelled)
-            out.append(CaseSummary(case_id=e["case_id"], court=e["court"], decision_year=e["decision_year"],
+            out.append(CaseSummary(case_id=e["case_id"], title=e.get("title", ""), court=e["court"], decision_year=e["decision_year"],
                                    sections_cited=e["sections_cited"], progress=progress))
         return out
 
@@ -112,6 +113,7 @@ class AnnotationRouter:
         mine = {s.idx: s.label for s in self.store.load_case(case_id, annotator=annotator)} if annotator else {}
         return CaseDetail(
             case_id=case_id,
+            title=record.title,
             court=record.court,
             decision_year=record.decision_year,
             sections_cited=record.sections_cited,

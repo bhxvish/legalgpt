@@ -38,6 +38,13 @@ consistency matters more than speed.
 5. When unsure between two roles, use the decision rules below. If still unsure, pick the
    better fit and note the sentence for discussion — do not leave it unlabelled.
 
+### Tie-break order
+
+If a sentence genuinely fits more than one role, choose the first that applies:
+**Ruling > Argument > Precedent > Law Applied > Facts**. This is the order the team used for
+the seed corpus (`legaltech_dataset.xlsx`), so keep it for consistency. *None* is outside this
+order: use it only when no role fits at all.
+
 ### Decision rules for common confusions
 
 - **Who is speaking?** Counsel's submissions are *Argument* even when they recite facts or law.

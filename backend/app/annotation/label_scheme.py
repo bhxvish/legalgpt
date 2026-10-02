@@ -33,8 +33,8 @@ _LABELS: tuple[LabelDef, ...] = (
         ),
         guidance=(
             "Includes the prosecution story as narrated by the court, the FIR, investigation, charges "
-            "framed, and what the lower courts decided. If the sentence reports what a party argues "
-            "about the facts, it is Argument instead."
+            "framed, witness testimony as recorded ('PW-2 deposed that…'), and what the lower courts "
+            "decided. If the sentence reports what a party argues about the facts, it is Argument instead."
         ),
         examples=(
             "On the night of 14 March 2009, the deceased was returning home on his motorcycle when the "
@@ -54,8 +54,10 @@ _LABELS: tuple[LabelDef, ...] = (
         ),
         guidance=(
             "Quoting or paraphrasing a section, listing its ingredients, or explaining what a "
-            "provision requires. When the court applies the law to these facts and reaches a "
-            "conclusion, use Ruling. When the law comes from an earlier case, use Precedent."
+            "provision requires. General principles stated without citing a case ('it is well "
+            "settled that…') also belong here. When the court applies the law to these facts and "
+            "reaches a conclusion, use Ruling. When the principle is attributed to an earlier case, "
+            "use Precedent."
         ),
         examples=(
             "Section 304A of the Indian Penal Code punishes whoever causes the death of any person by "
