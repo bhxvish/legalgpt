@@ -1,0 +1,29 @@
+# CPU-only PyTorch wheels (see PLANNING.md "Decisions log"; GPU deps revisited in Phase 4).
+# On Windows/macOS PyPI torch is already CPU-only; this index keeps Linux/Docker builds CPU-only too.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# API
+fastapi==0.142.2
+uvicorn[standard]==0.54.0
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-dotenv==1.2.4
+
+# Retrieval / generation
+chromadb==1.5.9
+sentence-transformers==6.1.0
+groq==1.7.0
+
+# Research pipeline (Modules 2-3)
+torch==2.14.1
+transformers==5.18.0
+peft==0.21.2
+trl==1.14.1
+
+# Neuro-symbolic verification (Module 5) — needs SWI-Prolog installed on the host
+pyswip==0.3.3
+
+# Testing
+pytest==9.1.1
+pytest-asyncio==1.4.0
+httpx2==2.13.1  # TestClient transport (starlette deprecated plain httpx for this)

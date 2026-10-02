@@ -1,0 +1,20 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Node / frontend
+node_modules/
+dist/
+
+# Data & model artifacts (keep folder structure via .gitkeep)
+data/annotation_store/*
+!data/annotation_store/.gitkeep
+chroma_db/
+*.ckpt
+*.safetensors

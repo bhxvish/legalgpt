@@ -1,0 +1,2 @@
+# Keep LF everywhere so files mounted into Linux containers behave.
+* text=auto eol=lf

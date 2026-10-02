@@ -1,0 +1,28 @@
+# Local development only — no production hardening.
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      CHROMA_PERSIST_DIR: /app/data/chroma_db
+      ANNOTATION_STORE_DIR: /app/data/annotation_store
+    volumes:
+      - ./backend:/app/backend
+      - ./data:/app/data
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      # The browser runs on the host, so it reaches the backend via the published port.
+      VITE_API_BASE_URL: http://localhost:8000
+    volumes:
+      - ./frontend:/app/frontend
+      - /app/frontend/node_modules
+    depends_on:
+      - backend
