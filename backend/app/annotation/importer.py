@@ -31,7 +31,6 @@ LABEL_MAP: dict[str, str] = {
     "PRECEDENT": "Precedent",
     "ARGUMENT": "Argument",
     "RULING": "Ruling",
-    "NONE": "None",
 }
 COLUMNS = ("doc_id", "case_name", "sentence_id", "sentence_text", "label", "annotator", "notes")
 _YEAR_IN_TITLE = re.compile(r"\b(19[5-9]\d|20\d\d)\b")

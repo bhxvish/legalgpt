@@ -70,3 +70,20 @@ export const annotationApi = {
       body: JSON.stringify({ annotator, labels }),
     }).then(json),
 }
+
+export const reviewApi = {
+  cases: () => fetch(`${API_BASE_URL}/api/review/cases`).then(json),
+  getCase: (caseId) => fetch(`${API_BASE_URL}/api/review/cases/${enc(caseId)}`).then(json),
+  setLabel: (caseId, sentenceId, reviewer, label) =>
+    fetch(`${API_BASE_URL}/api/review/cases/${enc(caseId)}/items/${enc(sentenceId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reviewer, label }),
+    }).then(json),
+  signOff: (caseId, reviewer) =>
+    fetch(`${API_BASE_URL}/api/review/cases/${enc(caseId)}/sign-off`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reviewer }),
+    }).then(json),
+}

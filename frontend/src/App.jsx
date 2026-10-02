@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { API_BASE_URL } from './api.js'
 import AnnotateView from './components/AnnotateView.jsx'
 import ChatWindow from './components/ChatWindow.jsx'
+import ReviewView from './components/ReviewView.jsx'
 
 const STYLES = {
   loading: 'bg-slate-100 text-slate-600',
@@ -36,6 +37,7 @@ function HealthBadge() {
 const VIEWS = [
   { id: 'chat', label: 'Chat' },
   { id: 'annotate', label: 'Annotate' },
+  { id: 'review', label: 'Review' },
 ]
 
 function viewFromHash() {
@@ -77,7 +79,7 @@ export default function App() {
         </div>
         <HealthBadge />
       </header>
-      {view === 'annotate' ? <AnnotateView /> : <ChatWindow />}
+      {view === 'annotate' ? <AnnotateView /> : view === 'review' ? <ReviewView /> : <ChatWindow />}
     </div>
   )
 }

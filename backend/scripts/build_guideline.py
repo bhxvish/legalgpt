@@ -42,8 +42,11 @@ consistency matters more than speed.
 
 If a sentence genuinely fits more than one role, choose the first that applies:
 **Ruling > Argument > Precedent > Law Applied > Facts**. This is the order the team used for
-the seed corpus (`legaltech_dataset.xlsx`), so keep it for consistency. *None* is outside this
-order: use it only when no role fits at all.
+the seed corpus (`legaltech_dataset.xlsx`), so keep it for consistency.
+
+Headers, cause titles and boilerplate have no label of their own: give them the closest role,
+as the seed corpus does — procedural steps ("Heard learned counsel for the parties.") are
+*Facts*, disposal formalities ("Pending applications, if any, stand disposed of.") are *Ruling*.
 
 ### Decision rules for common confusions
 

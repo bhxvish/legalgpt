@@ -42,7 +42,7 @@ def test_label_every_sentence_of_a_case(env: tuple[TestClient, AnnotationStore])
     assert len(sentences) > 10 and all(s["label"] is None for s in sentences)
     assert case["sections_cited"] == ["279", "304A"]
 
-    labels = [{"idx": s["idx"], "label": LabelScheme.LABELS[s["idx"] % 6]} for s in sentences]
+    labels = [{"idx": s["idx"], "label": LabelScheme.LABELS[s["idx"] % 5]} for s in sentences]
     progress = client.put(f"/api/annotation/cases/{CASE}/labels", json={"annotator": "alice", "labels": labels}).json()
     assert progress == {"sentences": len(sentences), "labelled": len(sentences)}
 
@@ -58,7 +58,7 @@ def test_label_every_sentence_of_a_case(env: tuple[TestClient, AnnotationStore])
 
 def test_annotators_never_see_each_others_labels(env: tuple[TestClient, AnnotationStore]) -> None:
     client, _ = env
-    client.put(f"/api/annotation/cases/{CASE}/labels", json={"annotator": "alice", "labels": [{"idx": 0, "label": "None"}]})
+    client.put(f"/api/annotation/cases/{CASE}/labels", json={"annotator": "alice", "labels": [{"idx": 0, "label": "Facts"}]})
     bob = client.get(f"/api/annotation/cases/{CASE}", params={"annotator": "bob"}).json()
     assert bob["sentences"][0]["label"] is None and bob["progress"]["labelled"] == 0
 

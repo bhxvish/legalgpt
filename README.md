@@ -81,6 +81,38 @@ python backend/scripts/calibrate_retrieval.py
 Label definitions live in `backend/app/annotation/label_scheme.py`. After changing them, regenerate the
 guideline: `python backend/scripts/build_guideline.py`. A test fails if the two disagree.
 
+## BERT-assisted labelling (Module 2)
+
+1. Train the rhetorical-role classifier (InLegalBERT, top 4 layers + head) on a frozen corpus
+   version. It prints held-out test metrics and saves a checkpoint under `data/models/rrl/`
+   (git-ignored). On CPU this takes about 15 minutes.
+
+   ```bash
+   python backend/scripts/train_rrl_classifier.py --version v0.1
+   python backend/scripts/train_rrl_classifier.py --version v0.1 --cv 5   # case-grouped cross-validation (~1 h on CPU)
+   ```
+
+2. Get new judgments. For example, fetch Supreme Court judgments from the CC-BY-4.0 dataset
+   `labofsahil/Indian-Supreme-Court-Judgments` (only the chosen PDFs are downloaded), then collect them:
+
+   ```bash
+   python backend/scripts/fetch_sc_judgments.py --year 2023 --list-criminal 80
+   python backend/scripts/fetch_sc_judgments.py --year 2023 --files 2023_10_993_1000_EN.pdf
+   python backend/scripts/collect_judgments.py data/inbox
+   ```
+
+3. Predict and queue them for review. Low-confidence predictions (below `REVIEW_TAU_CONF`) and a
+   random audit sample of confident ones (`REVIEW_AUDIT_RATE`) are flagged:
+
+   ```bash
+   python backend/scripts/run_assisted_labeling.py
+   ```
+
+4. Reviewers open <http://localhost:5173/#review>, check the highlighted sentences (Enter accepts,
+   1–5 picks a role) and click **Sign off**. If more than `REVIEW_MAX_AUDIT_ERROR` of the audited
+   confident predictions needed correction, the case is sent to full manual annotation instead;
+   otherwise every sentence is added to the corpus with `source="bert_assisted"`.
+
 ## Run the backend
 
 From the repo root, create a virtualenv and install dependencies (PyTorch is the CPU build):

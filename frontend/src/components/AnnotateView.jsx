@@ -216,6 +216,7 @@ function CaseAnnotator({ caseId, annotator, scheme, onProgress, onBack }) {
                   setCursor((c) => Math.min(c + 1, detail.sentences.length - 1))
                 }}
                 title={l.description}
+                aria-label={`${l.name}, key ${l.shortcut}`}
                 className={`rounded-md px-2.5 py-1.5 text-sm font-medium ring-1 hover:brightness-95 ${PALETTE[i].pill}`}
               >
                 <kbd className="mr-1 font-mono text-xs opacity-70">{l.shortcut}</kbd>

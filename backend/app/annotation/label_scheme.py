@@ -4,9 +4,9 @@ This module is the single source of truth for labels, their definitions, keyboar
 and worked examples. docs/annotation_guideline.md is generated from it
 (scripts/build_guideline.py) and a test fails if the two drift apart.
 
-Five roles come from the LLD (Facts, Law Applied, Precedent, Argument, Ruling). A sixth,
-None, was added (decision recorded in PLANNING.md) for headers, cause titles and procedural
-boilerplate that fit none of the five; Phase 3 may train with it or filter it out.
+The five roles of the LLD: Facts, Law Applied, Precedent, Argument, Ruling. A sixth label,
+None, was tried in Phase 2 and dropped in Phase 3 (PLANNING.md): the team's seed corpus never
+used it, so headers and boilerplate take the closest role under the tie-break order.
 """
 
 from dataclasses import dataclass
@@ -128,23 +128,6 @@ _LABELS: tuple[LabelDef, ...] = (
             "negligently, and the benefit of doubt must go to him.",
             "The appeal is accordingly allowed, and the conviction and sentence of the appellant are "
             "set aside.",
-        ),
-    ),
-    LabelDef(
-        name="None",
-        shortcut="6",
-        definition=(
-            "Headers, cause titles, coram, dates, page furniture and procedural boilerplate that "
-            "carry none of the five roles."
-        ),
-        guidance=(
-            "Use sparingly. If a sentence has any substantive content, choose the closest of the "
-            "five roles instead."
-        ),
-        examples=(
-            "IN THE SUPREME COURT OF INDIA CRIMINAL APPELLATE JURISDICTION",
-            "Heard learned counsel for the parties.",
-            "Leave granted.",
         ),
     ),
 )

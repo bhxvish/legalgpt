@@ -112,7 +112,8 @@ def test_normalize_text_unifies_whitespace() -> None:
 
 
 def test_label_scheme() -> None:
-    assert LabelScheme.LABELS == ("Facts", "Law Applied", "Precedent", "Argument", "Ruling", "None")
+    assert LabelScheme.LABELS == ("Facts", "Law Applied", "Precedent", "Argument", "Ruling")
+    assert not LabelScheme.validate("None")  # dropped in Phase 3
     assert all(LabelScheme.validate(label) for label in LabelScheme.LABELS)
     assert not LabelScheme.validate("Ratio")
     assert all(LabelScheme.describe(label).endswith(".") for label in LabelScheme.LABELS)
@@ -220,7 +221,7 @@ def test_cohen_kappa_on_double_annotated_fixture() -> None:
     # hand computation: p_o = 8/10; p_e = (3*3 + 2*3 + 3*2 + 1*1 + 1*1)/100 = 0.23
     assert kappa == pytest.approx((0.8 - 0.23) / (1 - 0.23))
     cm = calc.confusion_matrix(a, b)
-    assert cm.shape == (6, 6) and cm.sum() == 10 and np.trace(cm) == 8
+    assert cm.shape == (5, 5) and cm.sum() == 10 and np.trace(cm) == 8
     assert cm[0, 3] == 1  # A said Facts, B said Argument
 
 
@@ -291,3 +292,15 @@ def test_segmenter_agrees_with_team_seed_segmentation() -> None:
         tp, fp, fn = tp + len(g & o), fp + len(o - g), fn + len(g - o)
     precision, recall = tp / (tp + fp), tp / (tp + fn)
     assert 2 * precision * recall / (precision + recall) >= 0.94, (precision, recall)
+
+
+@pytest.mark.parametrize(
+    "header, title",
+    [
+        ("Supreme Court of India\nRAJO @ RAJWA versus THE STATE OF BIHAR & ORS.\nDecided on 25-08-2023", "RAJO @ RAJWA versus THE STATE OF BIHAR & ORS."),
+        ("Delhi High Court\nNarender vs State Of Delhi on 12 October, 2021\n", "Narender vs State Of Delhi on 12 October, 2021"),
+        ("JUDGMENT\nThe appeal is dismissed.", ""),
+    ],
+)
+def test_title_detection(header: str, title: str) -> None:
+    assert JudgmentCollector.detect_title(header) == title

@@ -24,3 +24,4 @@ data/inbox/*
 !data/inbox/.gitkeep
 data/raw_judgments/*
 !data/raw_judgments/.gitkeep
+data/models/

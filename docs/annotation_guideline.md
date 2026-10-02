@@ -11,7 +11,7 @@ consistency matters more than speed.
 
 1. Open the **Annotate** tab, enter your name (it is stored with every label), and pick a case.
 2. Read the whole judgment once before labelling, so you know who is speaking where.
-3. Label each sentence with one role. Keys **1/2/3/4/5/6** assign a label and move to the next
+3. Label each sentence with one role. Keys **1/2/3/4/5** assign a label and move to the next
    sentence; **↑/↓** (or **k/j**) move; **n** jumps to the next unlabelled sentence. Labels save
    immediately.
 4. Judge each sentence **by its function in the judgment**, not by its topic: a sentence that
@@ -24,8 +24,11 @@ consistency matters more than speed.
 
 If a sentence genuinely fits more than one role, choose the first that applies:
 **Ruling > Argument > Precedent > Law Applied > Facts**. This is the order the team used for
-the seed corpus (`legaltech_dataset.xlsx`), so keep it for consistency. *None* is outside this
-order: use it only when no role fits at all.
+the seed corpus (`legaltech_dataset.xlsx`), so keep it for consistency.
+
+Headers, cause titles and boilerplate have no label of their own: give them the closest role,
+as the seed corpus does — procedural steps ("Heard learned counsel for the parties.") are
+*Facts*, disposal formalities ("Pending applications, if any, stand disposed of.") are *Ruling*.
 
 ### Decision rules for common confusions
 
@@ -112,16 +115,3 @@ sentence becomes the gold label, so adjudication is simply re-labelling the sent
 - We find that the evidence of the eyewitnesses is consistent and is corroborated by the medical evidence.
 - The prosecution has failed to prove that the appellant was driving rashly or negligently, and the benefit of doubt must go to him.
 - The appeal is accordingly allowed, and the conviction and sentence of the appellant are set aside.
-
-
-### 6 · None
-
-**Definition.** Headers, cause titles, coram, dates, page furniture and procedural boilerplate that carry none of the five roles.
-
-**How to apply.** Use sparingly. If a sentence has any substantive content, choose the closest of the five roles instead.
-
-**Examples** (representative sentences, not quotations):
-
-- IN THE SUPREME COURT OF INDIA CRIMINAL APPELLATE JURISDICTION
-- Heard learned counsel for the parties.
-- Leave granted.

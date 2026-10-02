@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     # Cosine-similarity floor below which retrieved chunks are discarded (all discarded -> refusal).
     retrieval_min_similarity: float = Field(default=0.55, alias="RETRIEVAL_MIN_SIMILARITY")
 
+    # Module 2 — BERT-assisted annotation
+    rrl_model_dir: Path = Field(default=REPO_ROOT / "data" / "models" / "rrl", alias="RRL_MODEL_DIR")
+    review_tau_conf: float = Field(default=0.7, alias="REVIEW_TAU_CONF")
+    review_audit_rate: float = Field(default=0.1, alias="REVIEW_AUDIT_RATE")
+    review_max_audit_error: float = Field(default=0.2, alias="REVIEW_MAX_AUDIT_ERROR")
+
     # Comma-separated list of origins allowed by CORS (Vite dev server by default).
     cors_origins: str = Field(default="http://localhost:5173", alias="CORS_ORIGINS")
 

@@ -15,6 +15,7 @@ sentence-transformers==6.1.0
 groq==1.7.0
 pdfminer.six==20260107  # PDF text + font sizes (used to drop footnotes)
 openpyxl==3.1.5  # reading team annotation spreadsheets
+pyarrow==25.0.1  # reading dataset metadata (fetch_sc_judgments.py)
 
 # Research pipeline (Modules 2-3)
 torch==2.14.1

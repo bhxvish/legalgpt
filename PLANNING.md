@@ -88,7 +88,7 @@ legalgpt/
 - [x] **Phase 0** — Scaffolding & environment setup
 - [x] **Phase 1** — Module 0: Core retrieval & chat platform
 - [x] **Phase 2** — Module 1: Domain-specific dataset pipeline
-- [ ] **Phase 3** — Module 2: InLegalBERT-assisted annotation
+- [x] **Phase 3** — Module 2: InLegalBERT-assisted annotation
 - [ ] **Phase 4** — Module 3: LoRA fine-tuning pipeline
 - [ ] **Phase 5** — Module 4: Explainability
 - [ ] **Phase 6** — Module 5: Neuro-symbolic verification
@@ -190,7 +190,41 @@ legalgpt/
   team) → keyboard labelling of every sentence; κ vs the team's labels was 0.848 (approximate:
   2 of 26 sentence boundaries differ).
 
-## Known limitations
+### Phase 3 (Module 2)
+
+- **None dropped; five labels** everywhere (user decision), matching the seed corpus and the LLD.
+  The frozen v0.1 manifest still lists six labels in its scheme snapshot; versions are immutable
+  and v0.1's data never used None.
+- **Seed size:** 31 cases (25 train / 3 val / 3 test), below the plan's 50+; noted as a limitation.
+- **Compute:** CPU-only (Phase 0 decision). InLegalBERT (MIT, BERT-base, 110M params) trains with
+  embeddings + the bottom 8 of 12 encoder layers frozen (28.9M trainable), class-weighted loss,
+  3 epochs, ~4 min/epoch with length-grouped batches.
+- **"Sortish" batching, not global length sorting.** Sorting the whole corpus by length made
+  batches label-homogeneous wherever length correlates with the label, which a unit test exposed
+  (a tiny model learned nothing). Batches are now sorted only within shuffled pools of 50 batches.
+- **Held-out test (3 cases, 296 sentences), model `v0.1-20261002-191352`:** accuracy 0.669,
+  macro-F1 0.642 (validation macro-F1 0.751). Per-class F1: Facts 0.79, Argument 0.65,
+  Law Applied 0.64, Ruling 0.60, Precedent 0.54. Precedent↔Ruling and Facts→Ruling are the main
+  confusions. With 3 test cases these numbers are noisy; see cross-validation below.
+- **New real judgments:** the user could not supply files, so `scripts/fetch_sc_judgments.py`
+  pulls individual Supreme Court PDFs from the CC-BY-4.0 HF dataset
+  `labofsahil/Indian-Supreme-Court-Judgments` via HTTP range requests into its yearly tars
+  (~5 MB instead of 400 MB). It cuts the SCR editorial headnote (the reporter's summary, not the
+  court's text), page numbers and running headers, and skips PDFs with a garbled text layer
+  (Ravi Mandal v. State of Uttarakhand was skipped). Four 2023 criminal appeals were collected.
+- **Segmenter fixed for PDF-derived text** after the first review pass showed fragments: lines
+  wrapped at ~70 characters and page breaks mid-sentence were split. Headings are now recognised
+  by shape (all caps, bracketed coram), not length, and clause markers ("(a)") join the next line.
+  The four cases went from 1,725 fragments to 1,270 sentences; seed boundary F1 stays ≥ 0.94.
+- **End-to-end on a real new case:** State of U.P. v. Sonu Kushwaha (2023 INSC 603): 79 sentences,
+  30 flagged (24 low-confidence + 6 audit), reviewed in the Review tab by reviewer **"claude"**
+  (17 corrections; 1 of 6 audits wrong = 17% < 20% limit), signed off and promoted as
+  `bert_assisted` (30 reviewed, 49 model-accepted, annotator `model:<checkpoint>`). These labels
+  are Claude's, not the team's; a teammate can re-review them (latest decision wins). The other
+  three fetched cases are queued for the team.
+- **Review UI race fixed:** fast keystrokes acted on a stale cursor and skipped sentences; key
+  handling now reads synchronously updated refs. Sign-off stays disabled until every flagged
+  sentence is checked, so a skip could never be promoted.
 
 ## Known limitations
 

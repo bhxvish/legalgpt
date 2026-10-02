@@ -37,6 +37,8 @@ _COURTS = (
     re.compile(r"court of (?:the )?(?:additional )?sessions judge[^\n,]*", re.I),
 )
 _SMALL_WORDS = {"of", "at", "for", "the", "and"}
+# "A versus B", "A vs. B", "A v. B" between two capitalised party names
+_TITLE = re.compile(r"\S\s+(?:versus|vs\.?|v\.)\s+[A-Z]", re.I)
 _DECIDED_ON = re.compile(r"\bon\s+\d{1,2}(?:st|nd|rd|th)?\s+[A-Z][a-z]+,?\s+(\d{4})\b")
 _YEAR = re.compile(r"\b(19[5-9]\d|20\d\d)\b")
 
@@ -83,7 +85,18 @@ class JudgmentCollector:
             sections_cited=self.detect_sections(text),
             source_path=source_path,
             sha256=content_hash(text),
+            title=self.detect_title(text),
         )
+
+    @staticmethod
+    def detect_title(text: str) -> str:
+        """The cause title from the header: the first short line naming parties, e.g.
+        "RAJO @ RAJWA versus THE STATE OF BIHAR" or "Narender vs State Of Delhi on 12 October, 2021"."""
+        for line in text.split("\n")[:15]:
+            line = line.strip()
+            if 5 < len(line) <= 200 and _TITLE.search(line):
+                return line
+        return ""
 
     @staticmethod
     def _read(path: Path) -> str:

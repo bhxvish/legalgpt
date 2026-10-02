@@ -10,6 +10,8 @@ from app.annotation.collector import JudgmentCollector
 from app.annotation.router import AnnotationRouter
 from app.annotation.store import AnnotationStore
 from app.config import Settings, get_settings
+from app.labeling_assistant.review_queue import HumanReviewQueue
+from app.labeling_assistant.router import ReviewRouter
 from app.core.chat_router import ChatRouter
 from app.core.embeddings import EmbeddingService
 from app.core.llm_client import GroqClient
@@ -35,6 +37,11 @@ def build_chat_router(settings: Settings) -> ChatRouter:
 
 def build_annotation_router(settings: Settings) -> AnnotationRouter:
     return AnnotationRouter(JudgmentCollector(settings.raw_judgments_dir), AnnotationStore(settings.annotation_store_dir))
+
+
+def build_review_router(settings: Settings) -> ReviewRouter:
+    queue = HumanReviewQueue(AnnotationStore(settings.annotation_store_dir), settings.review_max_audit_error)
+    return ReviewRouter(queue, JudgmentCollector(settings.raw_judgments_dir))
 
 
 def create_app(chat_router: ChatRouter | None = None, annotation_router: AnnotationRouter | None = None) -> FastAPI:
@@ -66,6 +73,7 @@ def create_app(chat_router: ChatRouter | None = None, annotation_router: Annotat
 
     app.include_router(chat_router.router)
     app.include_router((annotation_router or build_annotation_router(settings)).router)
+    app.include_router(build_review_router(settings).router)
     return app
 
 
