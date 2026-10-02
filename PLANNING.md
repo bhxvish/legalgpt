@@ -206,6 +206,9 @@ legalgpt/
   macro-F1 0.642 (validation macro-F1 0.751). Per-class F1: Facts 0.79, Argument 0.65,
   Law Applied 0.64, Ruling 0.60, Precedent 0.54. Precedent↔Ruling and Facts→Ruling are the main
   confusions. With 3 test cases these numbers are noisy; see cross-validation below.
+- **5-fold cross-validation grouped by case** (same config, v0.1, `data/models/rrl_cv/`):
+  accuracy **0.712 ± 0.041**, macro-F1 **0.664 ± 0.031** (folds 0.606–0.693). The single held-out
+  split (0.642) sits inside this range; ~0.66 macro-F1 is the honest estimate for this seed size.
 - **New real judgments:** the user could not supply files, so `scripts/fetch_sc_judgments.py`
   pulls individual Supreme Court PDFs from the CC-BY-4.0 HF dataset
   `labofsahil/Indian-Supreme-Court-Judgments` via HTTP range requests into its yearly tars

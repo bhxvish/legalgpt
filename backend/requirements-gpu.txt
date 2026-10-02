@@ -1,0 +1,8 @@
+# GPU environment for Module 3 (LoRA fine-tuning and local adapter inference).
+# Install into a separate venv:  python -m venv .venv-gpu && .venv-gpu\Scripts\pip install -r backend/requirements-gpu.txt
+# The base requirements.txt stays CPU-only (PLANNING.md, Phase 0 decision).
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==2.14.1+cu130
+-r requirements.txt
+bitsandbytes  # 4-bit (QLoRA) loading
+accelerate

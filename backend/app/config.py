@@ -50,6 +50,13 @@ class Settings(BaseSettings):
     review_audit_rate: float = Field(default=0.1, alias="REVIEW_AUDIT_RATE")
     review_max_audit_error: float = Field(default=0.2, alias="REVIEW_MAX_AUDIT_ERROR")
 
+    # Module 3 — LoRA fine-tuning
+    # Which LLMClient answers chat requests: "groq" (hosted, GROQ_MODEL) or "adapter" (local
+    # base model + LoRA adapter; run the backend from .venv-gpu for GPU inference).
+    llm_backend: str = Field(default="groq", alias="LLM_BACKEND", pattern="^(groq|adapter)$")
+    lora_dir: Path = Field(default=REPO_ROOT / "data" / "models" / "lora", alias="LORA_DIR")
+    adapter_path: Path | None = Field(default=None, alias="ADAPTER_PATH")  # default: newest under LORA_DIR
+
     # Comma-separated list of origins allowed by CORS (Vite dev server by default).
     cors_origins: str = Field(default="http://localhost:5173", alias="CORS_ORIGINS")
 

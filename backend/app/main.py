@@ -14,7 +14,7 @@ from app.labeling_assistant.review_queue import HumanReviewQueue
 from app.labeling_assistant.router import ReviewRouter
 from app.core.chat_router import ChatRouter
 from app.core.embeddings import EmbeddingService
-from app.core.llm_client import GroqClient
+from app.core.llm_client import AdapterClient, GroqClient, LLMClient, LLMClientError, latest_adapter
 from app.core.retriever import Retriever
 from app.core.vector_store import VectorStore
 
@@ -31,8 +31,17 @@ def build_chat_router(settings: Settings) -> ChatRouter:
         store=VectorStore(settings.chroma_persist_dir, settings.chroma_collection),
         min_similarity=settings.retrieval_min_similarity,
     )
-    llm = GroqClient(api_key=settings.groq_api_key, model=settings.groq_model)
-    return ChatRouter(retriever, llm)
+    return ChatRouter(retriever, build_llm_client(settings))
+
+
+def build_llm_client(settings: Settings) -> LLMClient:
+    """LLM_BACKEND switches the chat model without code changes (both implement LLMClient)."""
+    if settings.llm_backend == "adapter":
+        path = settings.adapter_path or latest_adapter(settings.lora_dir)
+        if path is None:
+            raise LLMClientError(f"LLM_BACKEND=adapter but no adapter in {settings.lora_dir}; train one first")
+        return AdapterClient(path)
+    return GroqClient(api_key=settings.groq_api_key, model=settings.groq_model)
 
 
 def build_annotation_router(settings: Settings) -> AnnotationRouter:
