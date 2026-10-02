@@ -387,6 +387,10 @@ legalgpt/
   demo, the bicycle-theft narrative retrieved §378's illustrations and §381 but not §379, and the
   answer (correctly) said the punishment was not in its sources. Needs a fact-pattern calibration set
   and down-weighting of definitional / state-amendment chunks.
+- **Follow-up context leaks into unrelated questions:** in a conversation, "How do I file my income
+  tax return online?" after a question on s.304 retrieved s.304/302/304A at 0.62 instead of being
+  refused (alone it scores 0.24 and is refused). The model still answered "I don't know", but the
+  refusal should not depend on the model.
 - MiniLM is a general-purpose embedder; no legal-domain embedding model or re-ranker was evaluated.
 
 **Answers and explanation**
@@ -430,3 +434,30 @@ legalgpt/
 - BNS/BNSS corpus and IPC↔BNS section mapping; judgments as a second retrieval source.
 - Double annotation with measured kappa; human-written answer targets for LoRA training.
 - More Prolog sections, exceptions and Chapter IV defences.
+
+## Final acceptance (checked 2026-10-03)
+
+- [ ] **Fresh clone + `docker compose up`, only `.env` set** — not verified: Docker Desktop's WSL
+  engine hung during the first build on this machine (see Phase 7). Compose file, committed corpus
+  and startup auto-index are in place; the non-Docker path (same code) was verified.
+- [x] **Grounded answer with working citations (Module 0)** — "punishment for culpable homicide not
+  amounting to murder" answered from s.304 (evidence match High 0.76); clicking [1] opens s.304.
+- [x] **Real team-labelled batch in AnnotationStore (Module 1)** — 31 cases / 4,283 sentences from the
+  team sheet (`legaltech_dataset.xlsx`; 8 of them carry the sheet's own annotator name "example"),
+  frozen as v0.1 and v0.2 with hashes.
+- [x] **InLegalBERT trained, metrics saved (Module 2)** — `data/models/rrl/v0.1-20261002-191352/metrics.json`
+  (test macro-F1 0.642) and `data/models/rrl_cv/v0.1-cv5-20261002-200419.json` (5-fold, 0.664 ± 0.031).
+- [x] **LoRA checkpoint + real base-vs-tuned report (Module 3)** — adapter `v0.2-20261002-203807`;
+  `docs/reports/lora_v0.2_comparison.md`.
+- [x] **Band + "Why this answer?" on every legal answer (Module 4)** — checked in the UI on an answer
+  and on an out-of-scope question; refusals carry an explanation too (demo question 5).
+- [x] **Real Prolog verdict for a genuine case in VerifyPanel (Module 5)** — case20 (G. Manickam,
+  convicted under s.279/304A), s.279: INSUFFICIENT, three elements satisfied with quotes
+  ("Goodshed Road, Coimbatore", "due to rash and negligent driving of the lorry driver…"),
+  "endangered human life" not established. The Phase 6 report run gave CONSISTENT for the same
+  input: the verdict depends on run-to-run extraction (see Known limitations).
+- [x] **`demo.py` runs cleanly end to end** — exit 0, 5/5 ok (s.379 CONSISTENT, s.304A INSUFFICIENT,
+  s.304B CONSISTENT, private defence High, income tax refused). On the Groq free tier, verified
+  questions take 35–100 s because of rate-limit waits; `--no-verify` runs in seconds.
+- [x] **README and PLANNING state implemented vs deferred, ZKML explicit** — README "Implemented vs
+  future work" table; PLANNING "Future work".
