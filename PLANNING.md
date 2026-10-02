@@ -90,7 +90,7 @@ legalgpt/
 - [x] **Phase 2** — Module 1: Domain-specific dataset pipeline
 - [x] **Phase 3** — Module 2: InLegalBERT-assisted annotation
 - [x] **Phase 4** — Module 3: LoRA fine-tuning pipeline
-- [ ] **Phase 5** — Module 4: Explainability
+- [x] **Phase 5** — Module 4: Explainability
 - [ ] **Phase 6** — Module 5: Neuro-symbolic verification
 - [ ] **Phase 7** — Integration, testing & deployment
 
@@ -272,9 +272,39 @@ legalgpt/
 - **Serving:** `LLM_BACKEND=adapter` switches ChatRouter to AdapterClient with no code change
   (verified end to end through `/api/chat`); run the backend from `.venv-gpu` for GPU inference.
 
+### Phase 5 (Module 4)
+
+- **Evidence-centric, no SHAP/LIME:** everything comes from retrieval similarities, the answer
+  text and the source text. `explanation` is emitted after the last token (never delays the
+  answer); a failure there is logged and skipped rather than turning a delivered answer into an
+  error. Refusals get an explanation too: the retriever now reports the best candidate similarity
+  even when nothing cleared the floor, so every legal response has a non-null relevance and band.
+- **Bands calibrated, not the spec's example 0.75/0.5:** High ≥ 0.70, Medium ≥ 0.60 (answerable
+  questions scored 0.65–0.86, median 0.73; floor 0.55). With 0.75 most good matches would read
+  "Medium". Docstring, `BAND_NOTE` and the panel all state the band is evidence match, not answer
+  correctness.
+- **Attribution against source sentences, not chunks** (MiniLM truncates at ~256 tokens; sentence
+  level also yields the supporting excerpt). Support threshold **0.55**, measured on real answers:
+  90% of sentences scored against their own sources clear it vs 10% against sources about unrelated
+  offences. Sources about a *neighbouring* offence are not separable this way, so attribution
+  catches off-topic/unsupported sentences, not subtle legal errors.
+- **When the cited source supports a sentence, it is credited** even if another source scores a
+  little higher (e.g. s.304 vs the cited s.304A); a sentence whose citation does not support it is
+  flagged separately.
+- **Found while testing on real answers:** a correct "I don't know" was being attributed and
+  flagged as unsupported (fixed: the not-covered sentence is excluded); and the tuned model's
+  over-refusals went unflagged (fixed: "the model said the sources do not cover this, but the
+  evidence match is high/medium" — it fires on the adapter's dowry-death and theft answers).
+- **Citation normalisation moved to `app/core/citations.py`** (chat stream, validator and
+  comparator share it; avoids a chat_router ↔ explainability import cycle).
+
 ## Known limitations
 
 _Collected as they are found; consolidated in Phase 7._
+
+- **Fact-pattern retrieval** (also seen in Phase 5): "The accused drove a lorry rashly and hit a
+  scooter…" scored 0.54 and was refused; short questions about the same offence retrieve §279/§337
+  fine.
 
 - **Retrieval floor vs long fact patterns:** questions written as fact narratives pull generic
   chunks (IPC §1/§2, state-amendment boilerplate) at 0.6–0.7 similarity, above the 0.55 floor,

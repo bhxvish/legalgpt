@@ -17,6 +17,9 @@ from app.core.embeddings import EmbeddingService
 from app.core.llm_client import AdapterClient, GroqClient, LLMClient, LLMClientError, latest_adapter
 from app.core.retriever import Retriever
 from app.core.vector_store import VectorStore
+from app.explainability.attribution_analyzer import AttributionAnalyzer
+from app.explainability.confidence_scorer import ConfidenceScorer
+from app.explainability.explanation_builder import ExplanationBuilder
 
 
 class HealthResponse(BaseModel):
@@ -26,12 +29,17 @@ class HealthResponse(BaseModel):
 def build_chat_router(settings: Settings) -> ChatRouter:
     """Default wiring. Every service initializes lazily, so building this is cheap and
     does not load the embedding model, open ChromaDB, or contact Groq."""
+    embedder = EmbeddingService(settings.embedding_model)
     retriever = Retriever(
-        embedder=EmbeddingService(settings.embedding_model),
+        embedder=embedder,
         store=VectorStore(settings.chroma_persist_dir, settings.chroma_collection),
         min_similarity=settings.retrieval_min_similarity,
     )
-    return ChatRouter(retriever, build_llm_client(settings))
+    explainer = ExplanationBuilder(
+        AttributionAnalyzer(embedder, settings.explain_support_threshold),
+        ConfidenceScorer(high=settings.explain_band_high, medium=settings.explain_band_medium),
+    )
+    return ChatRouter(retriever, build_llm_client(settings), explainer=explainer)
 
 
 def build_llm_client(settings: Settings) -> LLMClient:

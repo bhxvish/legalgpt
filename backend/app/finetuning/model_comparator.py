@@ -21,7 +21,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from app.core.chat_router import normalize_stream
+from app.core.citations import normalize_stream
 from app.core.llm_client import LLMClient
 from app.core.models import SourceEvidence
 from app.core.prompt_builder import NOT_COVERED_REPLY, PromptBuilder

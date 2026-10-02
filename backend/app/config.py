@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     lora_dir: Path = Field(default=REPO_ROOT / "data" / "models" / "lora", alias="LORA_DIR")
     adapter_path: Path | None = Field(default=None, alias="ADAPTER_PATH")  # default: newest under LORA_DIR
 
+    # Module 4 — explainability. Bands describe how well the evidence matched the question,
+    # NOT whether the answer is correct. Defaults calibrated on this corpus (PLANNING.md, Phase 5).
+    explain_band_high: float = Field(default=0.70, alias="EXPLAIN_BAND_HIGH")
+    explain_band_medium: float = Field(default=0.60, alias="EXPLAIN_BAND_MEDIUM")
+    explain_support_threshold: float = Field(default=0.55, alias="EXPLAIN_SUPPORT_THRESHOLD")
+
     # Comma-separated list of origins allowed by CORS (Vite dev server by default).
     cors_origins: str = Field(default="http://localhost:5173", alias="CORS_ORIGINS")
 

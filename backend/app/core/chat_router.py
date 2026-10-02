@@ -1,27 +1,31 @@
 """ChatRouter: POST /api/chat, streamed as Server-Sent Events.
 
 Event stream (each `data:` line is JSON):
-  meta     {"mode", "model", "refused"}   always first
-  sources  [SourceEvidence, ...]          legal mode with evidence only
-  token    {"text"}                        answer fragments, in order
-  error    {"message"}                     generation/retrieval failure (stream then ends)
-  done     {}                              always last
+  meta         {"mode", "model", "refused"}   always first
+  sources      [SourceEvidence, ...]          legal mode with evidence only
+  token        {"text"}                        answer fragments, in order
+  explanation  ExplanationRecord               legal mode, after the answer (incl. refusals)
+  error        {"message"}                     generation/retrieval failure (stream then ends)
+  done         {}                              always last
 """
 
 import json
 import logging
-import re
-from collections.abc import Iterable, Iterator
-from typing import Any, Literal
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any, Literal
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.core.citations import normalize_stream  # noqa: F401  (re-exported for callers)
 from app.core.llm_client import LLMClient
-from app.core.models import Message, SourceEvidence
+from app.core.models import Message
 from app.core.prompt_builder import PromptBuilder
-from app.core.retriever import Retriever
+from app.core.retriever import RetrievalResult, Retriever
+
+if TYPE_CHECKING:
+    from app.explainability.explanation_builder import ExplanationBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -49,43 +53,22 @@ class ChatRequest(BaseModel):
     history: list[ChatTurn] = Field(default_factory=list, max_length=20)
 
 
-# Models differ in how they write citations: gpt-oss emits 【1】 and [1†L2-L4]. Markers are
-# canonicalized to [n] so the UI (and Phase 5's CitationValidator) see one format.
-_CANONICAL = str.maketrans({chr(0x3010): "[", chr(0x3011): "]", chr(0xFF3B): "[", chr(0xFF3D): "]", chr(0x202F): " ", chr(0x00A0): " "})  # CJK and full-width brackets, narrow and no-break spaces
-_MARKER = re.compile(r"\[(\d+)(?:[" + chr(0x2020) + chr(0x2021) + r"][^\]]*)?\]")  # [1], [1<dagger>L2-L4], [1<double dagger>...]
-_MAX_PENDING = 32  # longest bracket we hold back waiting for its "]"
-
-
-def _canonical_markers(text: str) -> str:
-    return _MARKER.sub(lambda m: f"[{m.group(1)}]", text)
-
-
-def normalize_stream(fragments: Iterable[str]) -> Iterator[str]:
-    """Canonicalize citation markers in a token stream. A marker can be split across fragments
-    ("[", "1†L2", "-L4]"), so text from an unclosed "[" is held back until it closes."""
-    pending = ""
-    for fragment in fragments:
-        text = pending + fragment.translate(_CANONICAL)
-        open_at = text.rfind("[")
-        if open_at != -1 and "]" not in text[open_at:] and len(text) - open_at <= _MAX_PENDING:
-            text, pending = text[:open_at], text[open_at:]
-        else:
-            pending = ""
-        if text:
-            yield _canonical_markers(text)
-    if pending:
-        yield _canonical_markers(pending)
-
-
 def sse(event: str, data: Any) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
 class ChatRouter:
-    def __init__(self, retriever: Retriever, llm: LLMClient, prompt_builder: PromptBuilder | None = None) -> None:
+    def __init__(
+        self,
+        retriever: Retriever,
+        llm: LLMClient,
+        prompt_builder: PromptBuilder | None = None,
+        explainer: "ExplanationBuilder | None" = None,
+    ) -> None:
         self.retriever = retriever
         self.llm = llm
         self.prompt_builder = prompt_builder or PromptBuilder()
+        self.explainer = explainer
         self.router = APIRouter(prefix="/api", tags=["chat"])
         self.router.add_api_route("/chat", self.chat, methods=["POST"], response_class=StreamingResponse)
 
@@ -115,15 +98,40 @@ class ChatRouter:
             yield sse("token", {"text": text})
         yield sse("token", {"text": GENERAL_CAUTION})
 
+    def _retrieve(self, question: str, context: str | None) -> RetrievalResult:
+        if hasattr(self.retriever, "retrieve_with_diagnostics"):
+            return self.retriever.retrieve_with_diagnostics(question, context=context)
+        sources = self.retriever.retrieve(question, context=context)  # minimal retrievers (tests)
+        return RetrievalResult(sources, max((s.similarity for s in sources), default=0.0), 0.0, len(sources))
+
     def _legal(self, question: str, history: list[Message]) -> Iterator[str]:
         previous = next((m.content for m in reversed(history) if m.role == "user"), None)
-        sources: list[SourceEvidence] = self.retriever.retrieve(question, context=previous)
+        result = self._retrieve(question, previous)
+        sources = result.sources
         if not sources:
             yield sse("meta", {"mode": "legal", "model": self.llm.model_id, "refused": True})
             yield sse("token", {"text": SCOPE_REFUSAL})
+            yield from self._explanation(question, result, SCOPE_REFUSAL, refused=True)
             return
         yield sse("meta", {"mode": "legal", "model": self.llm.model_id, "refused": False})
         yield sse("sources", [s.model_dump() for s in sources])
         messages = self.prompt_builder.build(question, sources, "legal", history)
+        answer: list[str] = []
         for text in normalize_stream(self.llm.stream(messages)):
+            answer.append(text)
             yield sse("token", {"text": text})
+        yield from self._explanation(question, result, "".join(answer), refused=False)
+
+    def _explanation(self, question: str, result: RetrievalResult, answer: str, refused: bool) -> Iterator[str]:
+        """Emitted after the last token, so it never delays the answer. A failure here is
+        logged and skipped: the answer the user already has must not turn into an error."""
+        if self.explainer is None:
+            return
+        try:
+            record = self.explainer.build(
+                question, result.sources, answer, self.llm.model_id,
+                best_similarity=result.best_similarity, retrieval_floor=result.min_similarity, refused=refused,
+            )
+            yield self.explainer.to_sse_event(record)
+        except Exception:
+            logger.exception("explanation failed")

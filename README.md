@@ -198,9 +198,17 @@ pytest -m integration
 ## API
 
 `POST /api/chat` with `{"question": "...", "mode": "legal" | "general", "history": [...]}`
-streams Server-Sent Events: `meta`, `sources` (legal mode), `token`*, optional `error`, `done`.
+streams Server-Sent Events: `meta`, `sources` (legal mode), `token`*, `explanation` (legal mode,
+after the answer), optional `error`, `done`.
 Legal mode answers only from retrieved IPC chunks and cites them as `[n]`; if nothing clears
 `RETRIEVAL_MIN_SIMILARITY` it returns a scope-boundary refusal without calling the model.
+
+The `explanation` event (shown in the app's **Why this answer?** panel) carries the evidence-match
+score and band, citation checks (markers that point at no retrieved source), per-sentence
+attribution to the supporting source excerpt, a support ratio, and plain-language warnings. The
+evidence-match band says how closely the retrieved IPC text matches the question — **not** whether
+the answer is correct. Thresholds: `EXPLAIN_BAND_HIGH`, `EXPLAIN_BAND_MEDIUM`,
+`EXPLAIN_SUPPORT_THRESHOLD`.
 
 ## Docker (local dev)
 

@@ -78,6 +78,14 @@ class Candidate:
     explicit: bool = False  # matched a section number the user named
 
 
+@dataclass
+class RetrievalResult:
+    sources: list[SourceEvidence]
+    best_similarity: float  # over every candidate considered, including those below the floor
+    min_similarity: float  # the floor in force
+    candidates: int
+
+
 class Retriever:
     def __init__(
         self,
@@ -103,6 +111,11 @@ class Retriever:
         """`context` is the previous user turn, if any. Follow-ups ("within how many years?")
         rarely retrieve well alone, so the question is also searched with the context prepended;
         both result sets are merged, so a change of topic still matches on its own words."""
+        return self.retrieve_with_diagnostics(question, context).sources
+
+    def retrieve_with_diagnostics(self, question: str, context: str | None = None) -> "RetrievalResult":
+        """retrieve(), plus the best similarity among *all* candidates — also when none cleared
+        the floor and the answer will be a refusal (the explainability layer reports it)."""
         queries = [question] + ([f"{context}\n{question}"] if context else [])
         embeddings = self.embedder.embed([self.expander.expand(q) for q in queries])
         cands: list[Candidate] = []
@@ -111,7 +124,13 @@ class Retriever:
         for section in self.expander.section_refs(question):
             for r in self.store.query(embeddings[0], k=3, where={"section": section}):
                 cands.append(Candidate(r.chunk, r.similarity, explicit=True))
-        return self.assemble_context(self.rerank(cands), self.max_chunks, self.max_context_chars)
+        ranked = self.rerank(cands)
+        return RetrievalResult(
+            sources=self.assemble_context(ranked, self.max_chunks, self.max_context_chars),
+            best_similarity=max((c.similarity for c in ranked), default=0.0),
+            min_similarity=self.min_similarity,
+            candidates=len(ranked),
+        )
 
     def rerank(self, cands: list[Candidate]) -> list[Candidate]:
         """Score = similarity x role preference; explicit section matches rank first.

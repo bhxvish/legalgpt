@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { streamChat } from '../api.js'
 import SourceModal from './SourceModal.jsx'
+import WhyPanel from './WhyPanel.jsx'
 
 const HISTORY_MESSAGES = 6
 
@@ -115,6 +116,7 @@ function AssistantMessage({ msg, onCite }) {
           </ul>
         </div>
       )}
+      {msg.explanation && <WhyPanel explanation={msg.explanation} sources={msg.sources} onOpenSource={onCite} />}
     </div>
   )
 }
@@ -156,6 +158,7 @@ export default function ChatWindow() {
             if (event === 'meta') update(botId, (m) => ({ ...m, refused: data.refused, model: data.model }))
             else if (event === 'sources') update(botId, (m) => ({ ...m, sources: data }))
             else if (event === 'token') update(botId, (m) => ({ ...m, content: m.content + data.text }))
+            else if (event === 'explanation') update(botId, (m) => ({ ...m, explanation: data }))
             else if (event === 'error') update(botId, (m) => ({ ...m, error: data.message }))
           },
           controller.signal,
