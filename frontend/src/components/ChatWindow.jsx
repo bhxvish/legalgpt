@@ -68,7 +68,7 @@ function ModeToggle({ mode, setMode, disabled }) {
           title={o.hint}
           disabled={disabled}
           onClick={() => setMode(o.value)}
-          className={`rounded-md px-3 py-1 text-sm font-medium transition disabled:opacity-50 ${
+          className={`rounded-md px-2.5 py-1 text-xs font-medium transition disabled:opacity-50 sm:px-3 sm:text-sm ${
             mode === o.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
@@ -80,6 +80,7 @@ function ModeToggle({ mode, setMode, disabled }) {
 }
 
 function AssistantMessage({ msg, onCite }) {
+  const cited = new Set([...(msg.content || '').matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])))
   const tone = msg.error
     ? 'bg-red-50 ring-red-200'
     : msg.refused
@@ -110,14 +111,23 @@ function AssistantMessage({ msg, onCite }) {
       {msg.error && <p className="mt-1 text-red-700">Error: {msg.error}</p>}
       {msg.sources?.length > 0 && (
         <div className="mt-3 border-t border-slate-100 pt-2">
-          <p className="mb-1 text-xs font-medium text-slate-500">Sources</p>
+          <p className="mb-1 text-xs font-medium text-slate-500">
+            Sources
+            {cited.size > 0 && <span className="font-normal text-slate-400"> · highlighted = cited in the answer</span>}
+          </p>
           <ul className="flex flex-wrap gap-1.5">
             {msg.sources.map((s) => (
               <li key={s.chunk_id}>
                 <button
                   onClick={() => onCite(s)}
-                  className="rounded-md bg-slate-50 px-2 py-1 text-left text-xs text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                  title={cited.has(s.marker) ? 'Cited in the answer: open the IPC text' : 'Retrieved but not cited: open the IPC text'}
+                  className={`rounded-md px-2 py-1 text-left text-xs ring-1 hover:brightness-95 ${
+                    cited.has(s.marker)
+                      ? 'bg-indigo-50 font-medium text-indigo-900 ring-indigo-200'
+                      : 'bg-white text-slate-500 ring-slate-200'
+                  }`}
                   data-testid="source-chip"
+                  data-cited={cited.has(s.marker)}
                 >
                   <span className="font-semibold">[{s.marker}]</span>{' '}
                   {s.section ? `§${s.section}` : s.citation_path}
@@ -219,6 +229,12 @@ export default function ChatWindow() {
     [messages, mode, streaming, model, verifySection],
   )
 
+  const newChat = () => {
+    abortRef.current?.abort()
+    setMessages([])
+    setInput('')
+  }
+
   const onKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -280,7 +296,7 @@ export default function ChatWindow() {
                     disabled={streaming || !m.available}
                     title={`${m.model_id || m.id}${m.note ? ` — ${m.note}` : ''}`}
                     onClick={() => setModel(m.id)}
-                    className={`rounded-md px-3 py-1 text-sm font-medium transition disabled:opacity-40 ${
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition disabled:opacity-40 sm:px-3 sm:text-sm ${
                       model === m.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -290,8 +306,9 @@ export default function ChatWindow() {
               </div>
             )}
             {mode === 'legal' && sections.length > 0 && (
-              <label className="flex items-center gap-1 text-xs text-slate-600">
-                Also verify facts against
+              <label className="flex items-center gap-1 text-xs text-slate-600" title="After the answer, check the facts in your question against an encoded IPC section">
+                <span className="hidden sm:inline">Also verify facts against</span>
+                <span className="sm:hidden">Verify facts</span>
                 <select
                   value={verifySection}
                   onChange={(e) => setVerifySection(e.target.value)}
@@ -309,7 +326,18 @@ export default function ChatWindow() {
                 </select>
               </label>
             )}
-            <span className="ml-auto hidden text-xs text-slate-400 sm:inline">Enter to send · Shift+Enter for a new line</span>
+            <span className="ml-auto hidden text-xs text-slate-400 lg:inline">Enter to send · Shift+Enter for a new line</span>
+            {messages.length > 0 && (
+              <button
+                type="button"
+                onClick={newChat}
+                className="ml-auto rounded-md px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50 lg:ml-0"
+                data-testid="new-chat"
+                title="Clear this conversation and start again"
+              >
+                New chat
+              </button>
+            )}
           </div>
           <form
             className="flex items-end gap-2"

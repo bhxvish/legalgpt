@@ -53,7 +53,8 @@ export function VerificationResultView({ result: r, className = "space-y-4 round
           </p>
         </div>
   
-        <table className="w-full text-left text-sm">
+        <div className="-mx-1 overflow-x-auto px-1">
+        <table className="w-full min-w-[32rem] text-left text-sm">
           <thead className="text-xs text-slate-500">
             <tr>
               <th className="pb-1 pr-2 font-medium" />
@@ -78,6 +79,7 @@ export function VerificationResultView({ result: r, className = "space-y-4 round
             ))}
           </tbody>
         </table>
+        </div>
   
         {r.alternatives.some((a) => a.status === 'CONSISTENT') && (
           <p className="text-sm text-slate-700">
@@ -181,12 +183,12 @@ export default function VerifyPanel() {
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
           />
           <div className="flex flex-wrap items-end gap-3">
-            <label className="text-sm text-slate-700">
+            <label className="w-full min-w-0 text-sm text-slate-700 sm:w-auto">
               <span className="block font-medium">Section charged</span>
               <select
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
-                className="mt-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                className="mt-1 w-full max-w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm sm:w-auto"
                 aria-label="Section charged"
               >
                 {meta?.sections.map((s) => (

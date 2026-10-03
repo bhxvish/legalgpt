@@ -56,6 +56,25 @@ function AnnotateNote() {
   )
 }
 
+function Nav({ view, className }) {
+  return (
+    <nav className={`gap-1 ${className}`} aria-label="Sections">
+      {VIEWS.map((v) => (
+        <a
+          key={v.id}
+          href={`#${v.id}`}
+          aria-current={view === v.id ? 'page' : undefined}
+          className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium ${
+            view === v.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          {v.label}
+        </a>
+      ))}
+    </nav>
+  )
+}
+
 function viewFromHash() {
   const id = window.location.hash.replace('#', '')
   return VIEWS.some((v) => v.id === id) ? id : 'chat'
@@ -72,28 +91,21 @@ export default function App() {
 
   return (
     <div className="flex h-dvh flex-col bg-slate-50">
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-900">LegalGPT</h1>
-            <p className="text-xs text-slate-500">Indian criminal law · legal information, not legal advice</p>
+      <header className="border-b border-slate-200 bg-white px-4 py-2 sm:py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="min-w-0">
+              <h1 className="text-lg font-semibold leading-tight text-slate-900">LegalGPT</h1>
+              <p className="text-xs text-slate-500">
+                <span className="hidden sm:inline">Indian criminal law · legal information, not legal advice</span>
+                <span className="sm:hidden">Not legal advice</span>
+              </p>
+            </div>
+            <Nav view={view} className="hidden sm:flex" />
           </div>
-          <nav className="flex gap-1" aria-label="Sections">
-            {VIEWS.map((v) => (
-              <a
-                key={v.id}
-                href={`#${v.id}`}
-                aria-current={view === v.id ? 'page' : undefined}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                  view === v.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                {v.label}
-              </a>
-            ))}
-          </nav>
+          <HealthBadge />
         </div>
-        <HealthBadge />
+        <Nav view={view} className="-mx-1 mt-2 flex overflow-x-auto sm:hidden" />
       </header>
       {view === 'annotate' ? (
         <div className="flex min-h-0 flex-1 flex-col">

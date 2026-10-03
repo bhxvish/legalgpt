@@ -323,6 +323,7 @@ export default function ReviewView() {
 
   if (!reviewer) {
     return (
+      <div className="min-h-0 flex-1 overflow-y-auto px-4">
       <form
         className="mx-auto mt-12 w-full max-w-sm rounded-xl bg-white p-6 ring-1 ring-slate-200"
         onSubmit={(e) => {
@@ -340,12 +341,14 @@ export default function ReviewView() {
           onChange={(e) => setDraft(e.target.value)}
           maxLength={40}
           aria-label="Reviewer name"
+          placeholder="e.g. priya"
           className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
         <button type="submit" disabled={!draft.trim()} className="mt-3 w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">
           Start reviewing
         </button>
       </form>
+      </div>
     )
   }
 

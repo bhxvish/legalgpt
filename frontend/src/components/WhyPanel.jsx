@@ -136,8 +136,9 @@ export default function WhyPanel({ explanation: ex, sources, onOpenSource }) {
                   >
                     [{s.marker}]
                   </button>
-                  <span className="min-w-0 flex-1 truncate text-slate-700" title={s.citation_path}>
-                    {s.citation_path.replace(/^IPC > /, '')}
+                  <span className="min-w-[10rem] flex-1 truncate text-slate-700" title={s.citation_path}>
+                    {s.section ? `§${s.section}` : s.citation_path.replace(/^IPC > /, '')}
+                    {s.title ? ` · ${s.title}` : ''}
                   </span>
                   <Bar value={s.similarity} />
                   <span className="w-9 text-right tabular-nums text-slate-500">{pct(s.similarity)}</span>
