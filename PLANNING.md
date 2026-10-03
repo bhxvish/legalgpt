@@ -410,9 +410,9 @@ legalgpt/
   layer and verification service over real IPC text with stub embedder/LLMs (and the real
   PrologEngine when SWI-Prolog is installed, a Python stand-in otherwise); `LEGALGPT_LIVE_E2E=1`
   runs the same chain through `create_app()` with Groq, MiniLM, the real index and SWI-Prolog.
-  CI (`.github/workflows/ci.yml`): `pytest -m "not integration"` + frontend build. There is no git
-  remote, so the workflow has not run on GitHub; the same pytest command was run inside the
-  Linux backend image instead.
+  CI (`.github/workflows/ci.yml`): `pytest -m "not integration"` + frontend build. Not run on
+  GitHub at first (no remote yet); since the repo was pushed (2026-10-03) every push runs it on
+  GitHub Actions, and the first runs passed (backend tests with SWI-Prolog, frontend build).
 
 ## Known limitations
 

@@ -1,336 +1,165 @@
 # LegalGPT
 
-Retrieval-augmented legal question answering for **Indian criminal law (IPC)**, with
-an offline annotation + fine-tuning pipeline, an explainability layer, and a Prolog-based
-verification service. See [PLANNING.md](PLANNING.md) for modules, phases and decisions.
+**Ask questions about the Indian Penal Code and get answers grounded in the text of the law.**
+Every answer cites the sections it used, explains how well they matched your question, and can
+check the facts you describe against the legal elements of an offence.
 
-> Status: **all 8 phases complete** (Phase 0–7). Not legal advice: answers are grounded in the
-> IPC bare act only, and the IPC was replaced by the Bharatiya Nyaya Sanhita on 1 July 2024.
+[![CI](https://github.com/bhxvish/legalgpt/actions/workflows/ci.yml/badge.svg)](https://github.com/bhxvish/legalgpt/actions/workflows/ci.yml)
 
-## Quick start (Docker)
+> ⚖️ **Legal information, not legal advice.** LegalGPT covers the Indian Penal Code, 1860 only.
+> The IPC was replaced by the Bharatiya Nyaya Sanhita (BNS) for offences from 1 July 2024.
 
-From a clean checkout, with [Docker](https://docs.docker.com/get-docker/) running:
+![LegalGPT answering a question with a cited source and the "Why this answer?" panel](docs/images/chat.jpg)
+
+---
+
+## What it does
+
+| | Feature | In plain words |
+|---|---|---|
+| 💬 | **Grounded answers** | Finds the relevant IPC sections, answers only from them, and cites each one as `[1]`, `[2]`… Click a citation to read the section. If nothing in the IPC matches, it says so instead of guessing. |
+| 🔍 | **"Why this answer?"** | Shows how closely the retrieved law matched your question, which source supports each sentence of the answer, and warns about anything unsupported. |
+| ✅ | **Fact check with rules** | Describe a case and pick a section (e.g. 304A). An AI pulls out the facts, each with a quote from your text, and a Prolog rule engine checks them against the section's elements: *consistent*, *inconsistent* or *insufficient facts*. |
+| 🏷️ | **Faster dataset building** | An InLegalBERT model suggests the role of every sentence in a judgment (Facts, Argument, Ruling…). People check only the uncertain ones plus random spot checks. |
+| 🧪 | **Fine-tuned model comparison** | Switch between a hosted model and a small model fine-tuned on our data (LoRA) to compare their answers side by side. |
+
+## How it works
+
+```mermaid
+flowchart LR
+    Q[Your question] --> R[Retriever<br/>ChromaDB + MiniLM<br/>over 574 IPC sections]
+    R -->|nothing relevant| X[Polite refusal]
+    R -->|top sections| G[LLM answers only from them<br/>gpt-oss-120b via Groq<br/>or LoRA-tuned Qwen 1.5B]
+    G --> E[Explanation<br/>evidence match, per-sentence support,<br/>citation checks]
+    G -.->|if you ask| V[Fact check<br/>AI extracts facts → Prolog rules]
+    E --> A[Answer with citations]
+    V --> A
+```
+
+The research side feeds the app:
+**judgments → sentence roles (manual + InLegalBERT-assisted, human-reviewed) → versioned dataset
+→ LoRA fine-tuning.**
+
+## Try it
+
+You need [Docker Desktop](https://www.docker.com/products/docker-desktop/) and a free
+[Groq API key](https://console.groq.com/keys).
 
 ```bash
-cp .env.example .env            # then set GROQ_API_KEY in .env
+git clone https://github.com/bhxvish/legalgpt.git
+cd legalgpt
+cp .env.example .env        # then open .env and paste your key after GROQ_API_KEY=
 docker compose up --build
 ```
 
-- Frontend: <http://localhost:5173> — Chat (Legal / General mode, **Base (Groq)** vs **Tuned (LoRA)**
-  toggle, "also verify facts against" a section), Verify, Annotate, Review.
-- Backend: <http://localhost:8000/docs>.
+Open **http://localhost:5173**. The first build takes about 10 minutes. On first start the backend
+also builds its search index from the IPC text in this repo (about a minute; the log says
+`index ready: 685 chunks`).
 
-On the first start the backend downloads the embedding model and embeds the committed IPC chunks
-(`data/corpus/ipc_chunks.jsonl`) into the `chroma_db` volume — legal-mode questions work about a
-minute after `/health` turns green. SWI-Prolog is inside the backend image, so verification works
-without a separate service. ChromaDB, the annotation store, collected judgments and the Hugging Face
-cache live in named Docker volumes (`docker compose down -v` deletes them). The **Tuned (LoRA)**
-toggle is only enabled once an adapter exists under `data/models/lora/` (see Module 3). It needs the
-3 GB Qwen2.5-1.5B base model: if you already have it (e.g. from training), set
-`HF_CACHE_DIR=C:/Users/<you>/.cache/huggingface` in `.env` so Docker reuses your host cache —
-downloading it inside Docker ran at ~0.2 MB/s here (hours). On CPU the first Tuned answer takes about
-2 minutes (model load), later ones about 20–30 seconds.
+**What works out of the box:** Chat (Legal and General modes), citations, the Why panel, fact
+checking and the Verify tab. The annotation data and trained models are not in this repository,
+so the **Review** and **Annotate** tabs start empty and the **Tuned (LoRA)** model is disabled until
+you train one (see the [full guide](docs/GUIDE.md)).
 
-### With the team's data
+Try asking:
+- *What is the punishment for causing death by negligence?*
+- *What is the difference between culpable homicide and murder?*
+- *A lorry driver overtook rashly and killed a motorcyclist. Which section applies?* (then pick
+  *Also verify facts against → s.304A*)
 
-Annotations, judgments and trained models are not in git. If you were given the team data zip,
-unzip it into the repo root (it adds `data/annotation_store`, `data/raw_judgments` and
-`data/models/...`), then start with the data overlay so the Annotate and Review tabs use it:
+## The tabs
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.data.yml up --build
-```
-
-Your labels and reviews are written to `data/annotation_store/` on your machine; they do not reach
-anyone else's copy unless you send that folder back.
-
-## Run the demo
-
-With the stack up (Docker or the local backend below):
-
-```bash
-python backend/scripts/demo.py                    # 5 questions: retrieve -> generate -> explain -> verify
-python backend/scripts/demo.py --model adapter    # same questions through the LoRA-tuned model
-python backend/scripts/demo.py --no-verify --only 2,5
-```
-
-Standard library only, so any Python 3.11 works. For each question it prints the answer, the
-sources (`*` = cited), the evidence-match band, sentence support, warnings and — for the three fact
-patterns — the rule-engine verdict with the quote behind each element, then a summary table. The
-last question (income tax) is outside the IPC and shows the refusal path. The scenarios are
-illustrative facts, not real cases.
-
-## Implemented vs future work
-
-| Module | Implemented | Future work |
+| Tab | Who it's for | What you do there |
 |---|---|---|
-| 0 Retrieval & chat | IPC bare act, hierarchical chunks, ChromaDB + MiniLM, calibrated refusal floor, SSE chat with `[n]` citations, Legal/General modes | BNS/BNSS and IPC↔BNS mapping; judgments as a retrieval source; re-ranker |
-| 1 Dataset | Collector with screening, 5-role scheme + guideline, append-only store, kappa tooling, frozen versions with hashes | Double annotation to actually measure agreement |
-| 2 Assisted labelling | InLegalBERT classifier (CV macro-F1 0.664 ± 0.031), confidence + audit review queue, review UI | Larger corpus, active learning |
-| 3 Fine-tuning | 4-bit LoRA on Qwen2.5-1.5B, instruction builder, base-vs-tuned comparison, in-app toggle | Human-written answer targets (the adapter copies sources and over-refuses) |
-| 4 Explainability | Evidence-match band, citation checks, sentence attribution, warnings on every legal answer | Detecting subtle legal errors, not just unsupported sentences |
-| 5 Verification | Prolog element checklists for 7 sections (279, 304A, 304B, 323, 337, 338, 379), quote-checked two-run fact extraction | More sections, exceptions and Chapter IV defences |
-| — | — | **ZKML proofs of inference: not implemented** — proving a transformer forward pass in zero knowledge is still orders of magnitude too slow for a 1.5B+ model on this hardware, and it would prove which model ran, not that the answer is legally right. |
+| **Chat** | Everyone | Ask questions. *Legal* mode answers only from the IPC with citations; *General* mode is an ordinary chatbot answer. |
+| **Review** | Annotators | Check the computer's suggested sentence roles. Only uncertain sentences and a random sample of confident ones need you. Press Enter to accept or 1–5 to change, then *Sign off*. |
+| **Annotate** | Annotators | Label a judgment fully by hand: cases the Review step sent back, and a small "gold" sample used to keep measuring the model. |
+| **Verify** | Everyone | Paste case facts and check them against one of 7 encoded sections (279, 304A, 304B, 323, 337, 338, 379). |
 
-Known limitations are consolidated in [PLANNING.md](PLANNING.md#known-limitations).
+## Results
 
-## Prerequisites
+All numbers are measured on held-out data; the details are in [PLANNING.md](PLANNING.md).
 
-- Python 3.11
-- Node.js 20+ (22 used in Docker)
-- [SWI-Prolog](https://www.swi-prolog.org/download/stable) 9+ on `PATH` (needed by `pyswip` from Phase 6)
-- Docker (optional, for `docker compose`)
+| Part | Result |
+|---|---|
+| **Retrieval** | All 574 sections of the India Code IPC parsed into 685 chunks. The refusal threshold (0.55 cosine similarity) was calibrated on in-scope vs out-of-scope questions. |
+| **Sentence-role classifier** (InLegalBERT) | Accuracy **78%**, macro-F1 **0.74 ± 0.04** (5-fold cross-validation over 31 annotated judgments, up from 71% and 0.66 after adding sentence context). At the default confidence bar, **19%** of sentences need a human check (was 44%). |
+| **LoRA fine-tuning** (Qwen2.5-1.5B, 4-bit) | Learned the required citation format (5 of 6 answers vs 0 of 6 for the untuned model) but copies sources and refuses too often. Useful as a study, not a replacement for the hosted model. |
+| **Fact verification** | 7 IPC sections encoded as element checklists in Prolog; each extracted fact must quote the user's text, and extraction runs twice to keep only stable answers. |
 
-## Configuration
+## Run without Docker
 
-```bash
-cp .env.example .env
-```
-
-Fill in `GROQ_API_KEY` and `HF_TOKEN`. Path variables can stay empty to use the defaults
-documented in `.env.example`. `.env` is git-ignored.
-
-## Ingest the IPC corpus
-
-The parsed act is committed as `data/corpus/ipc_chunks.jsonl` (bare-act text is public domain), and
-the backend embeds it automatically when the index is empty — so this section is only needed to
-rebuild from the PDF or re-index by hand:
-
-```bash
-python backend/scripts/ingest_corpus.py data/corpus/ipc_chunks.jsonl --reset   # no PDF needed
-```
-
-To parse from the source, download the official bare act PDF from India Code
-(<https://www.indiacode.nic.in/bitstream/123456789/11091/1/the_indian_penal_code,_1860.pdf>) into
-`data/raw_corpus/` (git-ignored; any filename), then from the repo root:
-
-```bash
-python backend/scripts/ingest_corpus.py data/raw_corpus/<file>.pdf --reset
-```
-
-The script checks the parse against the PDF's own *Arrangement of Sections* and prints how many
-listed sections were found in the body (all 574 for the India Code PDF). `--dry-run --show 304A,302`
-prints chunks without embedding; `--dump data/corpus/ipc_chunks.jsonl` regenerates the committed chunks. The index
-persists in `data/chroma_db/`. Re-ingesting while the backend runs is safe.
-
-After re-ingesting or changing the embedding model, re-check the refusal threshold:
-
-```bash
-python backend/scripts/calibrate_retrieval.py
-```
-
-## Annotate judgments (Module 1)
-
-1. Put criminal judgments as plain `.txt` files in `data/inbox/` (git-ignored), then collect them:
-
-   ```bash
-   python backend/scripts/collect_judgments.py data/inbox
-   ```
-
-   Each file is normalized and screened. Duplicates (even reformatted copies), non-English text,
-   non-criminal cases and very short files are rejected with a reason. Accepted judgments go to
-   `data/raw_judgments/` with their detected court, year and cited IPC sections.
-   Annotations already made in the team spreadsheet (columns `doc_id, case_name, sentence_id,
-   sentence_text, label, annotator, notes`) are imported instead:
-
-   ```bash
-   python backend/scripts/import_annotations.py data/inbox/legaltech_dataset.xlsx --dry-run
-   python backend/scripts/import_annotations.py data/inbox/legaltech_dataset.xlsx
-   ```
-
-   The sheet's own sentences become the case's segmentation; re-running skips cases already imported.
-2. Open <http://localhost:5173/#annotate>, enter your name, pick a case and label each sentence
-   (keys **1–6**, **↑/↓**, **n** for next unlabelled). Labels save immediately to
-   `data/annotation_store/labels.jsonl`. Read `docs/annotation_guideline.md` first.
-3. Measure agreement on double-annotated cases, then freeze a corpus version for training:
-
-   ```bash
-   python backend/scripts/annotation_agreement.py alice bob
-   python backend/scripts/freeze_corpus.py v0.1 --notes "seed set"
-   ```
-
-   `freeze_corpus.py` writes `data/annotation_store/versions/<version>/manifest.json` (case ids,
-   per-case and overall SHA-256, train/val/test split by case). `--verify <version>` re-checks a
-   snapshot against its manifest.
-
-Label definitions live in `backend/app/annotation/label_scheme.py`. After changing them, regenerate the
-guideline: `python backend/scripts/build_guideline.py`. A test fails if the two disagree.
-
-## BERT-assisted labelling (Module 2)
-
-1. Train the rhetorical-role classifier (InLegalBERT, top 4 layers + head) on a frozen corpus
-   version. It prints held-out test metrics and saves a checkpoint under `data/models/rrl/`
-   (git-ignored). On CPU this takes about 15 minutes.
-
-   ```bash
-   python backend/scripts/train_rrl_classifier.py --version v0.1
-   python backend/scripts/train_rrl_classifier.py --version v0.1 --cv 5   # case-grouped cross-validation (~1 h on CPU)
-   ```
-
-2. Get new judgments. For example, fetch Supreme Court judgments from the CC-BY-4.0 dataset
-   `labofsahil/Indian-Supreme-Court-Judgments` (only the chosen PDFs are downloaded), then collect them:
-
-   ```bash
-   python backend/scripts/fetch_sc_judgments.py --year 2023 --list-criminal 80
-   python backend/scripts/fetch_sc_judgments.py --year 2023 --files 2023_10_993_1000_EN.pdf
-   python backend/scripts/collect_judgments.py data/inbox
-   ```
-
-3. Predict and queue them for review. Low-confidence predictions (below `REVIEW_TAU_CONF`) and a
-   random audit sample of confident ones (`REVIEW_AUDIT_RATE`) are flagged:
-
-   ```bash
-   python backend/scripts/run_assisted_labeling.py
-   ```
-
-4. Reviewers open <http://localhost:5173/#review>, check the highlighted sentences (Enter accepts,
-   1–5 picks a role) and click **Sign off**. If more than `REVIEW_MAX_AUDIT_ERROR` of the audited
-   confident predictions needed correction, the case is sent to full manual annotation instead;
-   otherwise every sentence is added to the corpus with `source="bert_assisted"`.
-
-## LoRA fine-tuning (Module 3)
-
-Fine-tuning needs a CUDA GPU and runs from a separate environment, so the base install stays
-CPU-only (~9 GB of disk for CUDA PyTorch + the base model):
-
-```bash
-python -m venv .venv-gpu
-.venv-gpu\Scripts\python -m pip install --no-cache-dir -r backend/requirements-gpu.txt
-```
-
-Train a LoRA adapter on Qwen2.5-1.5B-Instruct (4-bit, fits a 4 GB GPU; ~12 minutes on an RTX 3050 Ti)
-from a frozen corpus version, then compare it with the hosted model and the untuned base on held-out
-questions through the same retriever:
-
-```bash
-.venv-gpu\Scripts\python backend/scripts/train_lora.py --version v0.2
-.venv-gpu\Scripts\python backend/scripts/compare_models.py
-```
-
-The adapter (~37 MB, base model not copied), `examples.jsonl` (every training example with its
-split) and `comparison.json` / `comparison.md` go to `data/models/lora/<version>-<time>/`.
-
-The chat app offers the newest adapter next to the hosted model (the **Base / Tuned** toggle;
-`LLM_BACKEND=adapter` makes it the default). For GPU inference start the backend from the GPU
-environment:
-
-```bash
-cd backend
-..\.venv-gpu\Scripts\python -m uvicorn app.main:app --port 8000
-```
-
-## Neuro-symbolic verification (Module 5)
-
-Needs [SWI-Prolog](https://www.swi-prolog.org/download/stable) on `PATH` (the backend still starts
-without it; only `/api/verify` is disabled). Seven IPC sections are encoded as element checklists in
-`backend/app/verification/rules/*.pl`: 279, 304A, 304B, 323, 337, 338, 379.
-
-In the chat, pick a section under **Also verify facts against** (Legal mode) to check the facts in
-your question after the answer. In the app's **Verify** tab, paste case facts and pick the charged section. The hosted model extracts
-each element as true / false / unknown with a quote from the text (twice — only values both runs
-agree on are kept), and Prolog returns **CONSISTENT** (every element established), **INCONSISTENT**
-(an element contradicted) or **INSUFFICIENT** (an element not established), plus the other encoded
-sections the facts fit. It checks extracted facts against encoded elements; it does not decide guilt.
-
-`POST /api/verify` with `{"case_text": "...", "cited_section": "304A"}`; `GET /api/verify/sections`.
-To produce a sanity-check report on real annotated cases (written to `data/reports/`, git-ignored):
-
-```bash
-python backend/scripts/verify_case.py case20:304A case01:279 case31:323
-```
-
-## Run the backend
-
-From the repo root, create a virtualenv and install dependencies (PyTorch is the CPU build):
+You need Python 3.11, Node.js 20+ and [SWI-Prolog](https://www.swi-prolog.org/download/stable)
+(for fact checking).
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate          # Windows
-source .venv/bin/activate       # macOS / Linux
-pip install -r backend/requirements.txt
+.venv/Scripts/pip install -r backend/requirements.txt      # Windows (macOS/Linux: .venv/bin/pip)
+.venv/Scripts/python -m uvicorn app.main:app --app-dir backend --port 8000
 ```
 
-Then start the API from `backend/`:
+In a second terminal:
 
 ```bash
-cd backend
-uvicorn app.main:app --reload --port 8000
+npm --prefix frontend install
+npm --prefix frontend run dev
 ```
 
-Check it: <http://localhost:8000/health> → `{"status":"ok"}`. Interactive docs: <http://localhost:8000/docs>.
-On Windows, `--reload` can hang after a code change (the log says "Reloading..." but the old code keeps
-serving); stop and restart uvicorn if that happens. `.env` changes always need a restart.
+**Tests:** `pytest -m "not integration"` (the same command CI runs; no network or API key needed).
+**Demo:** with the app running, `python backend/scripts/demo.py` sends five questions through the
+whole pipeline and prints a summary.
 
-## Run the frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open <http://localhost:5173>. The page calls `GET /health` on the backend and shows the result
-(green `ok` when the backend is up). The backend URL comes from `VITE_API_BASE_URL`
-(default `http://localhost:8000`).
-
-## Run the tests
-
-From the repo root (with the `.venv` from *Run the backend* active):
-
-```bash
-pytest -m "not integration"
-```
-
-This is what CI runs (`.github/workflows/ci.yml`, plus `npm run build` for the frontend).
-`backend/tests/test_integration_e2e.py` drives the whole chain — question → retrieval over real IPC
-text → answer → explanation → Prolog verification — with stub embedder and LLMs; it uses the real
-SWI-Prolog engine when installed and a Python stand-in otherwise. To run the same chain live
-(Groq, MiniLM, the real index, SWI-Prolog):
-
-```bash
-LEGALGPT_LIVE_E2E=1 pytest backend/tests/test_integration_e2e.py
-```
-
-(`pytest.ini` adds `backend/` to the import path, so `pytest tests` from inside `backend/` works too.)
-
-Unit tests use a fake embedder, in-memory ChromaDB and a stub `LLMClient` — no network.
-Live tests against Groq and the ingested index are marked `integration` and skip without
-`GROQ_API_KEY`:
-
-```bash
-pytest -m integration
-```
-
-## API
-
-`POST /api/chat` with `{"question": "...", "mode": "legal" | "general", "history": [...],
-"model": "groq" | "adapter", "verify_section": "304A"}` (the last two optional) streams Server-Sent
-Events: `meta` (with the answering model), `sources` (legal mode), `token`*, `explanation` (legal
-mode, after the answer), `verification` (only with `verify_section`), optional `error`, `done`.
-`GET /api/models` lists the models the toggle offers.
-Legal mode answers only from retrieved IPC chunks and cites them as `[n]`; if nothing clears
-`RETRIEVAL_MIN_SIMILARITY` it returns a scope-boundary refusal without calling the model.
-
-The `explanation` event (shown in the app's **Why this answer?** panel) carries the evidence-match
-score and band, citation checks (markers that point at no retrieved source), per-sentence
-attribution to the supporting source excerpt, a support ratio, and plain-language warnings. The
-evidence-match band says how closely the retrieved IPC text matches the question — **not** whether
-the answer is correct. Thresholds: `EXPLAIN_BAND_HIGH`, `EXPLAIN_BAND_MEDIUM`,
-`EXPLAIN_SUPPORT_THRESHOLD`.
-
-
-## Repository layout
+## Project layout
 
 ```text
-backend/app/core/                 Module 0 — retrieval & chat platform
-backend/app/annotation/           Module 1 — dataset pipeline
-backend/app/labeling_assistant/   Module 2 — InLegalBERT-assisted annotation
-backend/app/finetuning/           Module 3 — LoRA fine-tuning
-backend/app/explainability/       Module 4 — explainability
-backend/app/verification/         Module 5 — neuro-symbolic verification (Prolog)
-backend/scripts/                  CLI entry points
-backend/tests/                    pytest suite
-frontend/                         React 19 + Vite + Tailwind
-data/corpus/                      parsed IPC chunks (committed)
-data/                             raw judgments, annotation store, ChromaDB, models (not committed)
+backend/app/core/                 retrieval, prompts, chat API, LLM clients
+backend/app/annotation/           judgment collection, sentence splitting, label scheme, annotation store
+backend/app/labeling_assistant/   InLegalBERT classifier, review queue
+backend/app/finetuning/           LoRA training data, trainer, model comparison
+backend/app/explainability/       evidence match, citation checks, sentence attribution
+backend/app/verification/         fact extraction + Prolog rules (rules/*.pl)
+backend/scripts/                  command-line tools (ingest, train, review, demo…)
+frontend/                         React + Tailwind web app
+data/corpus/ipc_chunks.jsonl      the parsed IPC (public domain)
+docs/                             full guide, annotation guideline, reports
 ```
+
+## Limitations
+
+- **IPC only**, and only the bare act: no case law, no CrPC or Evidence Act. Offences after 1 July
+  2024 fall under the BNS, which is not covered.
+- **"Evidence match" is not correctness.** It says how well the retrieved law matches the question,
+  not whether the answer is right.
+- **Small dataset:** 31 hand-labelled judgments plus one assisted case; agreement between
+  annotators has not been measured yet.
+- **The fact check is only as good as the extracted facts**, and covers 7 sections without
+  exceptions or general defences.
+- **No login or rate limiting:** run it locally or behind your own access control.
+
+The full list is in [PLANNING.md → Known limitations](PLANNING.md#known-limitations).
+
+## Future work
+
+- **BNS coverage**, with a mapping from IPC to BNS sections; judgments as a second source.
+- **More Prolog sections**, including exceptions and general defences.
+- **Double annotation** to measure inter-annotator agreement; human-written answers for LoRA training.
+- **ZKML (zero-knowledge proofs of model inference): deliberately not implemented.** Proving a
+  transformer's forward pass in zero knowledge is still orders of magnitude too slow for a 1.5B+
+  model on this hardware, and it would prove *which model ran*, not that the legal answer is right.
+
+## Documentation
+
+- [Full guide](docs/GUIDE.md): every module, script, setting and API endpoint
+- [PLANNING.md](PLANNING.md): design decisions, measured results and known limitations, phase by phase
+- [Annotation guideline](docs/annotation_guideline.md): how to label sentence roles
+- [LoRA comparison report](docs/reports/lora_v0.2_comparison.md)
+
+## Acknowledgements
+
+- [law-ai/InLegalBERT](https://huggingface.co/law-ai/InLegalBERT) for the legal-domain BERT model
+- [Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) and
+  [gpt-oss-120b](https://huggingface.co/openai/gpt-oss-120b) (served by [Groq](https://groq.com))
+- [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) for embeddings
+- [India Code](https://www.indiacode.nic.in/) for the bare act text
+- Supreme Court judgments from the CC-BY-4.0 dataset
+  [labofsahil/Indian-Supreme-Court-Judgments](https://huggingface.co/datasets/labofsahil/Indian-Supreme-Court-Judgments)
