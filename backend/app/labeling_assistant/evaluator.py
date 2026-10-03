@@ -79,6 +79,35 @@ class CVReport:
         return "\n".join(rows + [f"mean over {self.k} folds: accuracy {acc:.3f} ± {acc_sd:.3f}   macro-F1 {f1:.3f} ± {f1_sd:.3f}"])
 
 
+@dataclass
+class ReviewLoadRow:
+    bar: float  # ReviewSelector.tau_conf
+    skip_share: float  # share of sentences at or above the bar (only the audit sample of these is reviewed)
+    skip_accuracy: float | None  # how often those confident predictions are right
+    review_share: float  # share below the bar: mandatory review
+
+
+def review_load(confidences: Sequence[float], correct: Sequence[bool],
+                bars: Sequence[float] = (0.5, 0.6, 0.7, 0.8, 0.9, 0.95)) -> list[ReviewLoadRow]:
+    """What each confidence bar would mean on held-out sentences: how much skips mandatory review
+    and how accurate the skipped labels are. This is the number that decides human workload."""
+    n = len(confidences)
+    rows = []
+    for bar in bars:
+        hi = [c for conf, c in zip(confidences, correct) if conf >= bar]
+        rows.append(ReviewLoadRow(bar, len(hi) / n if n else 0.0,
+                                  sum(hi) / len(hi) if hi else None, 1 - len(hi) / n if n else 0.0))
+    return rows
+
+
+def format_review_load(rows: Sequence[ReviewLoadRow]) -> str:
+    lines = ["bar   skip review   accuracy of skipped   must review"]
+    for r in rows:
+        acc = f"{r.skip_accuracy:.1%}" if r.skip_accuracy is not None else "  -  "
+        lines.append(f"{r.bar:.2f}  {r.skip_share:10.1%}   {acc:>19}   {r.review_share:10.1%}")
+    return "\n".join(lines)
+
+
 class ClassifierEvaluator:
     def evaluate(self, y_true: Sequence[str], y_pred: Sequence[str], labels: Sequence[str]) -> Metrics:
         if len(y_true) != len(y_pred):

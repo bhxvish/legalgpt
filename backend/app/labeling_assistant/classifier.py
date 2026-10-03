@@ -37,6 +37,7 @@ class TrainConfig:
     seed: int = 13
     max_steps: int | None = None  # cap for smoke tests
     bucket_pool_batches: int = 50  # sortish batching pool; 0 = plain random batches
+    bf16: bool = False  # bfloat16 autocast on CUDA: full fine-tuning at 256 tokens fits a 4 GB GPU
 
 
 @dataclass
@@ -75,9 +76,13 @@ class RRLClassifier:
         device: str | None = None,
         model: Any | None = None,
         tokenizer: Any | None = None,
+        context: bool = False,
+        temperature: float = 1.0,
     ) -> None:
         """Loads `model_name` with a fresh classification head, unless `model`/`tokenizer` are
-        given (load() and tests pass them)."""
+        given (load() and tests pass them). context: read each sentence with its neighbours and
+        position (see dataset.context_texts). temperature: logits are divided by it before the
+        softmax; calibrate() fits it so confidences match accuracy."""
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
         from transformers.utils import logging as hf_logging
 
@@ -85,6 +90,8 @@ class RRLClassifier:
         self.labels = list(labels)
         self.model_name = model_name
         self.max_length = max_length
+        self.context = context
+        self.temperature = temperature
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.tokenizer = tokenizer or AutoTokenizer.from_pretrained(model_name)
         self.model = model or AutoModelForSequenceClassification.from_pretrained(
@@ -96,8 +103,8 @@ class RRLClassifier:
         self.model.to(self.device)
         self.report: TrainReport | None = None
 
-    def dataset(self, examples: Sequence[RRLExample]) -> RRLDataset:
-        return RRLDataset(examples, self.tokenizer, self.labels, self.max_length)
+    def dataset(self, examples: Sequence[RRLExample], context_pool: Sequence[RRLExample] | None = None) -> RRLDataset:
+        return RRLDataset(examples, self.tokenizer, self.labels, self.max_length, self.context, context_pool)
 
     # --------------------------------------------------------------- training
 
@@ -162,7 +169,9 @@ class RRLClassifier:
             for i, batch in enumerate(loader, start=1):
                 batch = {k: v.to(self.device) for k, v in batch.items()}
                 labels = batch.pop("labels")
-                loss = loss_fn(self.model(**batch).logits, labels)
+                with torch.autocast("cuda", dtype=torch.bfloat16, enabled=cfg.bf16 and self.device == "cuda"):
+                    logits = self.model(**batch).logits
+                loss = loss_fn(logits.float(), labels)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_([p for p in self.model.parameters() if p.requires_grad], cfg.grad_clip)
                 optimizer.step()
@@ -203,16 +212,38 @@ class RRLClassifier:
     # ------------------------------------------------------------- inference
 
     @torch.no_grad()
-    def _probabilities(self, ds: RRLDataset, batch_size: int = 32) -> np.ndarray:
+    def _logits(self, ds: RRLDataset, batch_size: int = 32) -> np.ndarray:
         self.model.eval()
         sampler = LengthBucketSampler(ds.lengths(), batch_size, seed=0, shuffle=False)
         out = np.zeros((len(ds), len(self.labels)), dtype=np.float32)
-        items = [{"input_ids": ids} for ids in ds.input_ids]
+        items = [{k: v for k, v in ds[i].items() if k != "labels"} for i in range(len(ds))]
         pad = collate(self.tokenizer)
         for idxs in sampler:
             batch = {k: v.to(self.device) for k, v in pad([items[i] for i in idxs]).items()}
-            out[idxs] = torch.softmax(self.model(**batch).logits, dim=-1).cpu().numpy()
+            out[idxs] = self.model(**batch).logits.float().cpu().numpy()
         return out
+
+    def _probabilities(self, ds: RRLDataset, batch_size: int = 32) -> np.ndarray:
+        return torch.softmax(torch.from_numpy(self._logits(ds, batch_size)) / self.temperature, dim=-1).numpy()
+
+    def calibrate(self, val_ds: RRLDataset) -> float:
+        """Temperature scaling (Guo et al., 2017): one number T, fitted on held-out cases, that
+        rescales confidence so "90% sure" means right about 90% of the time. Accuracy is unchanged
+        (the top label never changes). Fully fine-tuned models are usually overconfident (T > 1)."""
+        logits = torch.from_numpy(self._logits(val_ds))
+        gold = torch.tensor([val_ds.label2id[e.label] for e in val_ds.examples])
+        log_t = torch.zeros(1, requires_grad=True)
+        opt = torch.optim.LBFGS([log_t], lr=0.1, max_iter=200)
+
+        def closure() -> torch.Tensor:
+            opt.zero_grad()
+            loss = torch.nn.functional.cross_entropy(logits / log_t.exp(), gold)
+            loss.backward()
+            return loss
+
+        opt.step(closure)
+        self.temperature = float(log_t.detach().exp())
+        return self.temperature
 
     @torch.no_grad()
     def evaluate(self, ds: RRLDataset, loss_fn: Any | None = None) -> tuple[Metrics, float]:
@@ -233,7 +264,7 @@ class RRLClassifier:
         if not examples:
             return []
         unlabelled = [RRLExample(e.sentence_id, e.case_id, e.idx, e.text, None) for e in examples]
-        probs = self._probabilities(self.dataset(unlabelled))
+        probs = self._probabilities(self.dataset(unlabelled))  # neighbours: the other sentences given
         out = []
         for e, p in zip(examples, probs):
             order = np.argsort(p)[::-1]
@@ -261,6 +292,8 @@ class RRLClassifier:
             "labels": self.labels,
             "base_model": self.model_name,
             "max_length": self.max_length,
+            "context": self.context,
+            "temperature": self.temperature,
             "report": self.report.to_dict() if self.report else None,
             **(extra or {}),
         }
@@ -280,6 +313,8 @@ class RRLClassifier:
             device=device,
             model=AutoModelForSequenceClassification.from_pretrained(path),
             tokenizer=AutoTokenizer.from_pretrained(path),
+            context=meta.get("context", False),  # checkpoints before context/calibration: plain sentences
+            temperature=meta.get("temperature", 1.0),
         )
         clf.meta = meta  # type: ignore[attr-defined]
         return clf

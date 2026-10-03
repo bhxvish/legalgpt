@@ -289,3 +289,76 @@ def test_assisted_segmenter_joins_page_breaks_and_splits_coram_manual_one_unchan
     assert AssistedSegmenter().segment(coram, "t") == [
         "[ABHAY S. OKA, J.]", "The appeal arises out of a judgment of the High Court."]
     assert len(SentenceSegmenter().segment(coram, "t")) == 1
+
+
+# ----------------------------------------------- context, human-checked data, calibration, review load
+
+
+def test_context_gives_position_and_neighbours_within_the_same_case() -> None:
+    from app.labeling_assistant.dataset import RRLExample, context_texts
+
+    ex = [RRLExample(f"a:{i:04d}", "a", i, f"A{i}.") for i in (2, 0, 1)] + [RRLExample("b:0000", "b", 0, "B0.")]
+    ctx = context_texts(ex + [RRLExample("x", "", -1, "no case")])
+    assert ctx["a:0000"] == "start of judgment. before: (none) after: A1."
+    assert ctx["a:0001"] == "early of judgment. before: A0. after: A2."  # position j * 5 // n: 1 * 5 // 3 = 1
+    assert ctx["a:0002"] == "late of judgment. before: A1. after: (none)"
+    assert ctx["b:0000"] == "start of judgment. before: (none) after: (none)"  # never crosses into case a
+    assert "x" not in ctx
+
+
+def test_context_is_the_second_segment(tiny_classifier) -> None:
+    from app.labeling_assistant.dataset import RRLDataset
+
+    ex = _examples(10)
+    plain = RRLDataset(ex, tiny_classifier.tokenizer, LABELS, context=False)
+    paired = RRLDataset(ex, tiny_classifier.tokenizer, LABELS, max_length=64, context=True)
+    assert "token_type_ids" not in plain[0] and set(paired[0]["token_type_ids"]) == {0, 1}
+    assert len(paired[0]["input_ids"]) > len(plain[0]["input_ids"])
+    short = RRLDataset(ex, tiny_classifier.tokenizer, LABELS, max_length=12, context=True)
+    assert all(len(ids) <= 12 for ids in short.input_ids)
+
+
+def test_human_only_trains_on_checked_labels_but_keeps_unchecked_as_context(tmp_path: Path, tiny_classifier) -> None:
+    from app.annotation.models import LabeledSentence
+    from app.labeling_assistant.dataset import RRLDataset, is_human_checked
+
+    store = AnnotationStore(tmp_path / "store")
+    rows = [LabeledSentence(f"c{c}:{i:04d}", f"c{c}", i, f"sentence {i}", LABELS[i % 5],
+                            source="manual" if c < 4 else "bert_assisted", reviewed=c < 4 or i % 2 == 0,
+                            annotator="a" if c < 4 or i % 2 == 0 else "model:m")
+            for c in range(6) for i in range(6)]
+    store.append_many(rows)
+    assert sum(is_human_checked(r) for r in rows) == 4 * 6 + 2 * 3
+    store.freeze("vt", split_ratios=(0.5, 0.17, 0.33), split_seed=1)
+    splits = [RRLDataset.from_version(store, "vt", name, tiny_classifier.tokenizer, LABELS, 64, context=True, human_only=True)
+              for name in ("train", "val", "test")]
+    trained_on = [e for ds in splits for e in ds.examples]
+    assert len(trained_on) == 30 and all(e.label is not None for e in trained_on)
+    assert not {"c4:0001", "c5:0003"} & {e.sentence_id for e in trained_on}  # unchecked: not a training label
+    everything = [e for name in ("train", "val", "test")
+                  for e in RRLDataset.from_version(store, "vt", name, tiny_classifier.tokenizer, LABELS).examples]
+    assert len(everything) == 36  # human_only=False keeps all labels (the old behaviour)
+
+
+def test_review_load_table() -> None:
+    from app.labeling_assistant.evaluator import review_load
+
+    rows = {r.bar: r for r in review_load([0.95, 0.9, 0.75, 0.6, 0.4], [True, True, False, True, False], bars=(0.5, 0.9))}
+    assert rows[0.5].skip_share == pytest.approx(0.8) and rows[0.5].skip_accuracy == pytest.approx(0.75)
+    assert rows[0.9].skip_share == pytest.approx(0.4) and rows[0.9].skip_accuracy == 1.0
+    assert rows[0.9].review_share == pytest.approx(0.6)
+
+
+def test_calibration_changes_confidence_not_labels_and_round_trips(tiny_classifier, tmp_path: Path) -> None:
+    from app.labeling_assistant.classifier import RRLClassifier
+
+    clf = tiny_classifier  # trained in test_classifier_trains_predicts_and_round_trips (same module)
+    ds = clf.dataset(_examples())
+    before = clf.predict(_examples())
+    clf.temperature = 1.0
+    t = clf.calibrate(ds)
+    after = clf.predict(_examples())
+    assert t > 0 and [p.label for p in before] == [p.label for p in after]
+    again = RRLClassifier.load(clf.save(tmp_path / "cal"), device="cpu")
+    assert again.temperature == pytest.approx(t) and again.context is False
+    clf.temperature = 1.0

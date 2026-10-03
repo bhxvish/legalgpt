@@ -242,6 +242,33 @@ legalgpt/
 - **Review UI race fixed:** fast keystrokes acted on a stale cursor and skipped sentences; key
   handling now reads synchronously updated refs. Sign-off stays disabled until every flagged
   sentence is checked, so a skip could never be promoted.
+- **Classifier v2 (2026-10-03): context + full fine-tuning + calibration**, to cut review load.
+  Changes: each sentence is read with its neighbours and its position in the judgment (BERT's
+  second segment); all 12 layers trained at 256 tokens for 5 epochs (bf16 on the RTX 3050 Ti,
+  ~4 min per model); only human-checked labels trained/evaluated on (unchecked assisted labels kept
+  as context only); temperature scaling fitted on validation cases so confidence tracks accuracy.
+  Same 5-fold case-grouped CV procedure for both (each fold holds out 3 training cases for epoch
+  choice and calibration), v0.1, 4,283 sentences:
+
+  | | accuracy | macro-F1 | must review at bar 0.70 | skipped labels right |
+  |---|---|---|---|---|
+  | A: old setup (8 layers frozen, 128 tokens, 3 epochs) | 0.708 ± 0.033 | 0.659 ± 0.030 | 44.2% | 84.7% |
+  | C: context + full fine-tune | **0.781 ± 0.038** | **0.744 ± 0.040** | **18.7%** | 83.8% |
+
+  C beat A on every fold (macro-F1 +0.06 to +0.12). Single split (v0.1 test case09/10/22): A 0.686 /
+  0.653, + full fine-tune 0.740 / 0.718, + context 0.767 / 0.753. The gain is at the default bar:
+  for skipped labels to be ~89% right, both need ~57% reviewed (A at bar 0.8, C at 0.9) — C is right
+  more often but its most confident tail is not more reliable. Results: `data/models/rrl_cv/
+  v0.1-cv5-{A-baseline,C-context-full}-20261003.json`.
+- **Production checkpoint `v0.2-20261003-135812`** (C, trained on v0.2's human-checked labels; T=2.83)
+  is now the newest, so `run_assisted_labeling.py` uses it. Its own test split (case10/17/22)
+  is weak — 0.594 / 0.629, vs 0.620 / 0.635 for A trained identically — because of **case17**
+  (Abdul Subhan, 2006): the team labelled the court's own evaluation of evidence as Ruling, and both
+  models call it Precedent (A 50% accuracy on the case, C 37%, with C's errors at 0.88–0.95
+  confidence). On case10/case22, unseen by both, C is better (73% vs 65%, 84% vs 80%). Kept C on the
+  strength of the CV; its failure mode is a whole case wrong with confidence, which the audit sample
+  is there to catch (case17 would be escalated) — keep audit_rate ≥ 10%. Worth checking with the
+  team how court reasoning is labelled across cases (Ruling vs Precedent).
 
 ### Phase 4 (Module 3)
 
@@ -436,7 +463,10 @@ legalgpt/
   is **unmeasured** and the guideline is not validated the way the LLD intends. The 79
   `bert_assisted` labels were reviewed by Claude, not the team.
 - Label skew: Facts 38%, Precedent 23%, Ruling 21%, Argument 10%, Law Applied 9%. Classifier
-  macro-F1 0.664 ± 0.031 (5-fold, case-grouped) on this small set.
+  macro-F1 0.664 ± 0.031 (5-fold, case-grouped) on this small set; 0.744 ± 0.040 with context and
+  full fine-tuning (Phase 3, classifier v2). A whole unusual case can be labelled wrong with high
+  confidence (case17: court reasoning labelled Ruling by the team, predicted Precedent); the audit
+  sample, not the confidence bar, is what catches it.
 - case18 and case21 skip 2 and 5 sentence ids in the team sheet; court and year are approximate for
   imported cases.
 
