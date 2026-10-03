@@ -31,6 +31,19 @@ toggle is only enabled once an adapter exists under `data/models/lora/` (see Mod
 downloading it inside Docker ran at ~0.2 MB/s here (hours). On CPU the first Tuned answer takes about
 2 minutes (model load), later ones about 20–30 seconds.
 
+### With the team's data
+
+Annotations, judgments and trained models are not in git. If you were given the team data zip,
+unzip it into the repo root (it adds `data/annotation_store`, `data/raw_judgments` and
+`data/models/...`), then start with the data overlay so the Annotate and Review tabs use it:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.data.yml up --build
+```
+
+Your labels and reviews are written to `data/annotation_store/` on your machine; they do not reach
+anyone else's copy unless you send that folder back.
+
 ## Run the demo
 
 With the stack up (Docker or the local backend below):

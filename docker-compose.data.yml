@@ -1,0 +1,11 @@
+# Use the team's data in ./data (from the shared data zip) instead of empty Docker volumes:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.data.yml up --build
+#
+# Annotations and reviews are then written to ./data/annotation_store on this machine, so they
+# survive `docker compose down -v` and can be zipped and sent back.
+services:
+  backend:
+    volumes:
+      - ./data/annotation_store:/app/data/annotation_store
+      - ./data/raw_judgments:/app/data/raw_judgments
