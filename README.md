@@ -58,8 +58,9 @@ also builds its search index from the IPC text in this repo (about a minute; the
 
 **What works out of the box:** Chat (Legal and General modes), citations, the Why panel, fact
 checking and the Verify tab. The annotation data and trained models are not in this repository,
-so the **Review** and **Annotate** tabs start empty and the **Tuned (LoRA)** model is disabled until
-you train one (see the [full guide](docs/GUIDE.md)).
+so the **Review** and **Annotate** tabs start empty, uploading judgments in the Review tab needs a
+trained sentence-role classifier, and the **Tuned (LoRA)** model is disabled until you train one (see
+the [full guide](docs/GUIDE.md)).
 
 Try asking:
 - *What is the punishment for causing death by negligence?*
@@ -72,7 +73,7 @@ Try asking:
 | Tab | Who it's for | What you do there |
 |---|---|---|
 | **Chat** | Everyone | Ask questions. *Legal* mode answers only from the IPC with citations; *General* mode is an ordinary chatbot answer. |
-| **Review** | Annotators | Check the computer's suggested sentence roles. Only uncertain sentences and a random sample of confident ones need you. Press Enter to accept or 1–5 to change, then *Sign off*. |
+| **Review** | Annotators | Upload judgments (.txt or .pdf) and the computer suggests a role for every sentence. You check only the uncertain sentences and a random sample of confident ones: Enter to accept or 1–5 to change, then *Sign off*. |
 | **Annotate** | Annotators | Label a judgment fully by hand: cases the Review step sent back, and a small "gold" sample used to keep measuring the model. |
 | **Verify** | Everyone | Paste case facts and check them against one of 7 encoded sections (279, 304A, 304B, 323, 337, 338, 379). |
 

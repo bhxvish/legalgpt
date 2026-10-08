@@ -24,6 +24,7 @@ from app.core.vector_store import VectorStore
 from app.explainability.attribution_analyzer import AttributionAnalyzer
 from app.explainability.confidence_scorer import ConfidenceScorer
 from app.explainability.explanation_builder import ExplanationBuilder
+from app.labeling_assistant.intake import JudgmentIntake
 from app.labeling_assistant.review_queue import HumanReviewQueue
 from app.labeling_assistant.router import ReviewRouter
 from app.verification.router import VerifyRouter
@@ -110,8 +111,13 @@ def build_annotation_router(settings: Settings) -> AnnotationRouter:
 
 
 def build_review_router(settings: Settings) -> ReviewRouter:
-    queue = HumanReviewQueue(AnnotationStore(settings.annotation_store_dir), settings.review_max_audit_error)
-    return ReviewRouter(queue, JudgmentCollector(settings.raw_judgments_dir))
+    store = AnnotationStore(settings.annotation_store_dir)
+    queue = HumanReviewQueue(store, settings.review_max_audit_error)
+    collector = JudgmentCollector(settings.raw_judgments_dir)
+    # Uploaded judgments are labelled by the newest InLegalBERT checkpoint (loaded on first upload).
+    intake = JudgmentIntake(collector, store, queue, settings.rrl_model_dir,
+                            tau_conf=settings.review_tau_conf, audit_rate=settings.review_audit_rate)
+    return ReviewRouter(queue, collector, intake)
 
 
 def create_app(chat_router: ChatRouter | None = None, annotation_router: AnnotationRouter | None = None) -> FastAPI:

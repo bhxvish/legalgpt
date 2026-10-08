@@ -270,6 +270,17 @@ legalgpt/
   is there to catch (case17 would be escalated) — keep audit_rate ≥ 10%. Worth checking with the
   team how court reasoning is labelled across cases (Ruling vs Precedent).
 
+- **Upload in the Review tab (2026-10-08):** JudgmentIntake runs the assisted-labelling pipeline
+  for an uploaded .txt / text-based .pdf: screening (JudgmentCollector), AssistedSegmenter, the newest
+  classifier, ReviewSelector, HumanReviewQueue. One background worker processes uploads in order
+  (the classifier is CPU-heavy and not thread-safe); the panel polls job status. Every sentence gets a
+  suggested role, but nothing is promoted without a reviewer's sign-off, as before. Re-uploading text
+  collected earlier but never queued reuses that case; text already queued or labelled is refused.
+  Measured on a 12-page PDF: 205 sentences annotated and queued in 49 s on CPU, model load included.
+  PDF clean-up (ligatures, page numbers, running headers) moved from fetch_sc_judgments.py into
+  labeling_assistant/pdf_text.py so both use it. Upload jobs are kept in memory: after a restart the
+  status list is empty, but the queued cases remain.
+
 ### Phase 4 (Module 3)
 
 - **No existing fine-tuning notebook** in the repo to adapt; the pipeline was written fresh.

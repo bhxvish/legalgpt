@@ -2,10 +2,11 @@
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.annotation.collector import JudgmentCollector
+from app.labeling_assistant.intake import MAX_BYTES, JudgmentIntake, UploadRejected
 from app.labeling_assistant.review_queue import HumanReviewQueue, QueueCase, ReviewIncomplete
 from app.labeling_assistant.titles import detect_title
 
@@ -19,14 +20,18 @@ class CorrectionBody(ReviewerBody):
 
 
 class ReviewRouter:
-    def __init__(self, queue: HumanReviewQueue, collector: JudgmentCollector) -> None:
+    def __init__(self, queue: HumanReviewQueue, collector: JudgmentCollector, intake: JudgmentIntake | None = None) -> None:
         self.queue = queue
         self.collector = collector
+        self.intake = intake
         self.router = APIRouter(prefix="/api/review", tags=["review"])
         self.router.add_api_route("/cases", self.list_cases, methods=["GET"])
         self.router.add_api_route("/cases/{case_id}", self.get_case, methods=["GET"])
         self.router.add_api_route("/cases/{case_id}/items/{sentence_id}", self.correct, methods=["PUT"])
         self.router.add_api_route("/cases/{case_id}/sign-off", self.sign_off, methods=["POST"])
+        self.router.add_api_route("/uploads", self.upload, methods=["POST"], status_code=202)
+        self.router.add_api_route("/uploads", self.list_uploads, methods=["GET"])
+        self.router.add_api_route("/uploads/{job_id}", self.get_upload, methods=["GET"])
 
     def _load(self, case_id: str) -> QueueCase:
         try:
@@ -103,3 +108,30 @@ class ReviewRouter:
             raise HTTPException(409, str(e)) from None
         return {"promoted": result.promoted, "status": result.status,
                 "audit_error_rate": result.audit_error_rate, "reason": result.reason}
+
+    # ------------------------------------------------------------ uploads (JudgmentIntake)
+
+    def _intake(self) -> JudgmentIntake:
+        if self.intake is None:
+            raise HTTPException(503, "uploads are not available on this server")
+        return self.intake
+
+    async def upload(self, request: Request, filename: str, uploader: str = "") -> dict[str, Any]:
+        """The request body is the file itself (no multipart): the browser sends the File object."""
+        intake = self._intake()
+        if int(request.headers.get("content-length") or 0) > MAX_BYTES:
+            raise HTTPException(413, f"{filename}: larger than {MAX_BYTES // (1024 * 1024)} MB")
+        data = await request.body()
+        try:
+            return intake.submit(filename, data, uploader).to_dict()
+        except UploadRejected as e:
+            raise HTTPException(422, str(e)) from None
+
+    def list_uploads(self) -> list[dict[str, Any]]:
+        return [j.to_dict() for j in self._intake().jobs()]
+
+    def get_upload(self, job_id: str) -> dict[str, Any]:
+        try:
+            return self._intake().job(job_id).to_dict()
+        except KeyError:
+            raise HTTPException(404, f"no upload {job_id!r}") from None

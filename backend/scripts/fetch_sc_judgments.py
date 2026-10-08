@@ -22,18 +22,17 @@ import json
 import re
 import sys
 import urllib.request
-from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import REPO_ROOT  # noqa: E402
+from app.labeling_assistant.pdf_text import clean_judgment_text, looks_garbled  # noqa: E402
 
 DATASET = "https://huggingface.co/datasets/labofsahil/Indian-Supreme-Court-Judgments/resolve/main"
 UA = {"User-Agent": "legaltech-research"}
 _PARTY_STATE = re.compile(r"\bSTATE\b|\bUNION TERRITORY\b|C\.?B\.?I\b|\bN\.?C\.?T\b", re.I)
 _NON_CRIMINAL = re.compile(r"TAX|REVENUE|BANK|LIMITED|LTD|INSURANCE|ELECTRICITY|MUNICIPAL|AUTHORITY|UNIVERSITY|COMMISSIONER|CORPORATION", re.I)
-_BODY_START = re.compile(r"^\s*(?:JUDGMENT|JUDGEMENT|ORDER)\s*$|The Judgment of the Court was delivered by", re.I)
 
 
 def fetch(url: str, start: int | None = None, length: int | None = None) -> bytes:
@@ -67,30 +66,6 @@ def tar_locations(tar_url: str, wanted: set[str]) -> dict[str, tuple[int, int]]:
     return found
 
 
-def clean_scr_text(text: str) -> str:
-    text = re.sub(r"([ﬀ-ﬆ])\s+(?=[a-z])", r"\1", text)  # "ﬁ led" -> "ﬁled" (NFKC later -> "filed")
-    lines = text.split("\n")
-    start = next((i + 1 for i, line in enumerate(lines) if _BODY_START.search(line)), 0)
-    body = lines[start:]
-    counts = Counter(line.strip() for line in body if line.strip())
-
-    def running_header(line: str) -> bool:
-        s = line.strip()
-        if counts[s] >= 3 and len(s) <= 90:
-            return True
-        # case-title / coram headers repeat on alternate pages, so twice is enough for them
-        return counts[s] >= 2 and bool(re.fullmatch(r"\[[^\]]*\]|[^a-z]{3,90}\bv\.[^a-z]{3,90}", s))
-
-    kept = [line for line in body if not re.fullmatch(r"\s*\d{1,4}\s*", line) and not running_header(line)]
-    return "\n".join(kept).strip()
-
-
-def looks_garbled(text: str) -> bool:
-    """Text layers that lost their spaces produce very long 'words' ("ofdeceased", "convictedby")."""
-    words = re.findall(r"[A-Za-z]+", text)
-    return not words or sum(len(w) > 20 for w in words) / len(words) > 0.01
-
-
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--year", type=int, required=True)
@@ -119,7 +94,7 @@ def main() -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     for name, (start, size) in tar_locations(tar_url, set(args.files)).items():
         m = meta[name.replace("_EN.pdf", "")]
-        text = clean_scr_text(extract_text(io.BytesIO(fetch(tar_url, start, size))))
+        text = clean_judgment_text(extract_text(io.BytesIO(fetch(tar_url, start, size))))
         if looks_garbled(text):
             print(f"SKIP   {name}: PDF text layer is garbled (words run together)")
             continue

@@ -22,16 +22,10 @@ from app.annotation.store import AnnotationStore  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.labeling_assistant.classifier import RRLClassifier  # noqa: E402
 from app.labeling_assistant.dataset import RRLExample  # noqa: E402
+from app.labeling_assistant.intake import latest_checkpoint  # noqa: E402
 from app.labeling_assistant.segmenter import AssistedSegmenter  # noqa: E402
 from app.labeling_assistant.review_queue import HumanReviewQueue  # noqa: E402
 from app.labeling_assistant.review_selector import ReviewSelector  # noqa: E402
-
-
-def latest_checkpoint(model_dir: Path) -> Path:
-    runs = sorted((p for p in model_dir.glob("*") if (p / "rrl_meta.json").exists()), key=lambda p: p.stat().st_mtime)
-    if not runs:
-        raise SystemExit(f"no trained checkpoint in {model_dir}; run backend/scripts/train_rrl_classifier.py first")
-    return runs[-1]
 
 
 def main() -> int:
@@ -53,6 +47,8 @@ def main() -> int:
         return 0
 
     checkpoint = args.model or latest_checkpoint(s.rrl_model_dir)
+    if checkpoint is None:
+        raise SystemExit(f"no trained checkpoint in {s.rrl_model_dir}; run backend/scripts/train_rrl_classifier.py first")
     clf = RRLClassifier.load(checkpoint)
     selector = ReviewSelector(tau_conf=args.tau, audit_rate=args.audit_rate, seed=args.seed)
     segmenter = AssistedSegmenter()

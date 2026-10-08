@@ -86,6 +86,14 @@ export const reviewApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reviewer }),
     }).then(json),
+  // The file itself is the request body; the server queues it for InLegalBERT and returns a job.
+  upload: (file, uploader) =>
+    fetch(`${API_BASE_URL}/api/review/uploads?filename=${enc(file.name)}&uploader=${enc(uploader)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: file,
+    }).then(json),
+  uploads: () => fetch(`${API_BASE_URL}/api/review/uploads`).then(json),
 }
 
 export const verifyApi = {

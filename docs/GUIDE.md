@@ -185,6 +185,14 @@ guideline: `python backend/scripts/build_guideline.py`. A test fails if the two 
    python backend/scripts/run_assisted_labeling.py
    ```
 
+   **Or skip steps 2–3 and upload from the app:** in the Review tab, drop `.txt` or text-based `.pdf`
+   judgments on **Add judgments**. Each file is screened like `collect_judgments.py` does (duplicates,
+   non-English and non-criminal texts are refused with the reason), segmented, labelled by the newest
+   checkpoint in `data/models/rrl/` and queued; the panel shows progress and an **Open** link (about a
+   minute per judgment on CPU, most of it loading the model the first time). Scanned PDFs without a text
+   layer are refused. `POST /api/review/uploads?filename=…&uploader=…` with the file as the request body;
+   `GET /api/review/uploads[/{job_id}]` for status.
+
 4. Reviewers open <http://localhost:5173/#review>, check the highlighted sentences (Enter accepts,
    1–5 picks a role) and click **Sign off**. If more than `REVIEW_MAX_AUDIT_ERROR` of the audited
    confident predictions needed correction, the case is sent to full manual annotation instead;

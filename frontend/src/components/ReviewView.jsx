@@ -42,6 +42,134 @@ function Pill({ label, colour }) {
   return <span className={`rounded px-1.5 py-0.5 text-xs font-medium ring-1 ${colour}`}>{label}</span>
 }
 
+const UPLOAD = {
+  queued: { text: 'Waiting', cls: 'bg-slate-50 text-slate-600 ring-slate-200', busy: true },
+  reading: { text: 'Reading', cls: 'bg-indigo-50 text-indigo-700 ring-indigo-200', busy: true },
+  classifying: { text: 'Annotating', cls: 'bg-indigo-50 text-indigo-700 ring-indigo-200', busy: true },
+  done: { text: 'Ready to review', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  rejected: { text: 'Not accepted', cls: 'bg-amber-50 text-amber-800 ring-amber-200' },
+  failed: { text: 'Failed', cls: 'bg-red-50 text-red-700 ring-red-200' },
+}
+
+/** Upload judgments (.txt / .pdf): the server screens each one, InLegalBERT suggests a role for every
+ * sentence, and the case joins the list below with the uncertain sentences highlighted. */
+function UploadPanel({ uploader, onFinished, onOpen }) {
+  const [jobs, setJobs] = useState([])
+  const [local, setLocal] = useState([]) // uploads the server refused outright (wrong type, too big)
+  const [dragging, setDragging] = useState(false)
+  const inputRef = useRef(null)
+  const seenDone = useRef(new Set())
+
+  const refresh = useCallback(() => {
+    reviewApi
+      .uploads()
+      .then((list) => {
+        setJobs(list)
+        const newlyDone = list.filter((j) => j.status === 'done' && !seenDone.current.has(j.job_id))
+        newlyDone.forEach((j) => seenDone.current.add(j.job_id))
+        if (newlyDone.length) onFinished()
+      })
+      .catch(() => {})
+  }, [onFinished])
+
+  useEffect(() => {
+    reviewApi
+      .uploads()
+      .then((list) => {
+        list.filter((j) => j.status === 'done').forEach((j) => seenDone.current.add(j.job_id))
+        setJobs(list)
+      })
+      .catch(() => {})
+  }, [])
+
+  const busy = jobs.some((j) => UPLOAD[j.status]?.busy)
+  useEffect(() => {
+    if (!busy) return
+    const t = setInterval(refresh, 1500)
+    return () => clearInterval(t)
+  }, [busy, refresh])
+
+  const send = async (files) => {
+    for (const file of files) {
+      try {
+        await reviewApi.upload(file, uploader)
+      } catch (e) {
+        setLocal((l) => [{ job_id: `local-${Date.now()}-${file.name}`, filename: file.name, status: 'rejected',
+                           message: e.message.replace(/^HTTP \d+: /, '') }, ...l])
+      }
+    }
+    refresh()
+  }
+
+  const shown = [...local, ...jobs].slice(0, 8)
+  return (
+    <section className="rounded-lg bg-white p-4 ring-1 ring-slate-200" data-testid="upload-panel">
+      <div
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragging(true)
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragging(false)
+          send([...e.dataTransfer.files])
+        }}
+        className={`flex flex-wrap items-center gap-3 rounded-lg border-2 border-dashed px-4 py-3 ${
+          dragging ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200'
+        }`}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-slate-800">Add judgments</p>
+          <p className="text-xs text-slate-500">
+            Drop .txt or .pdf files here. Each one is checked, annotated by the computer, and added below for you to
+            review; nothing enters the corpus until someone signs it off.
+          </p>
+        </div>
+        <button
+          onClick={() => inputRef.current?.click()}
+          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+        >
+          Choose files
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".txt,.pdf"
+          multiple
+          className="hidden"
+          data-testid="upload-input"
+          onChange={(e) => {
+            send([...e.target.files])
+            e.target.value = ''
+          }}
+        />
+      </div>
+      {shown.length > 0 && (
+        <ul className="mt-3 space-y-1.5" data-testid="upload-list">
+          {shown.map((j) => {
+            const st = UPLOAD[j.status] || UPLOAD.failed
+            return (
+              <li key={j.job_id} className="flex flex-wrap items-center gap-2 text-sm" data-testid="upload-job" data-status={j.status}>
+                <Pill label={st.text} colour={st.cls} />
+                <span className="font-medium text-slate-800">{j.filename}</span>
+                <span className={`min-w-0 flex-1 text-xs ${st.busy ? 'animate-pulse text-slate-500' : 'text-slate-600'}`}>
+                  {j.message}
+                </span>
+                {j.status === 'done' && (
+                  <button onClick={() => onOpen(j.case_id)} className="text-xs font-medium text-indigo-600 hover:underline">
+                    Open
+                  </button>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
+  )
+}
+
 function CaseReview({ caseId, reviewer, scheme, onBack }) {
   const [detail, setDetail] = useState(null)
   const [showAll, setShowAll] = useState(false)
@@ -317,9 +445,13 @@ export default function ReviewView() {
     annotationApi.scheme().then(setScheme).catch((e) => setError(e.message))
   }, [])
 
+  const loadCases = useCallback(() => {
+    reviewApi.cases().then(setCases).catch((e) => setError(e.message))
+  }, [])
+
   useEffect(() => {
-    if (!open) reviewApi.cases().then(setCases).catch((e) => setError(e.message))
-  }, [open])
+    if (!open) loadCases()
+  }, [open, loadCases])
 
   if (!reviewer) {
     return (
@@ -378,12 +510,13 @@ export default function ReviewView() {
         <p className="text-sm text-slate-600">
           The computer suggested roles for these judgments. You only need to check the sentences it highlights.
         </p>
+        <UploadPanel uploader={reviewer} onFinished={loadCases} onOpen={setOpen} />
         {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{error}</p>}
         {cases === null ? (
           <p className="text-sm text-slate-500">Loading…</p>
         ) : cases.length === 0 ? (
           <p className="rounded-lg bg-white px-4 py-6 text-sm text-slate-600 ring-1 ring-slate-200">
-            Nothing to review yet. An engineer runs <code>backend/scripts/run_assisted_labeling.py</code> to add judgments here.
+            Nothing to review yet. Upload a judgment above to get started.
           </p>
         ) : (
           <ul className="divide-y divide-slate-100 rounded-lg bg-white ring-1 ring-slate-200" data-testid="review-case-list">
