@@ -18,6 +18,7 @@ from typing import Any
 import numpy as np
 
 from app.core.models import Chunk, SourceEvidence
+from app.core.lay_terms import statutory_terms
 from app.core.retriever import Candidate, Retriever
 
 SCALE = 12
@@ -32,32 +33,53 @@ def chunk_matrix(store) -> tuple[list[Chunk], np.ndarray]:
 
 
 def query_vector(retriever: Retriever, question: str) -> list[float]:
+    """The embedding the retrieval circuit proves scores for (the search query)."""
+    return [float(v) for v in retriever.embedder.embed([retriever.expander.search_query(question)])[0]]
+
+
+def scope_vector(retriever: Retriever, question: str) -> list[float]:
+    """The embedding the scope check reads (the plain question). Not proven: recomputed by verifiers."""
     return [float(v) for v in retriever.embedder.embed([retriever.expander.expand(question)])[0]]
 
 
-def select(retriever: Retriever, question: str, chunks: Sequence[Chunk], sims: Sequence[float]) -> list[SourceEvidence]:
+def select(retriever: Retriever, question: str, chunks: Sequence[Chunk], sims: Sequence[float],
+           scope_embedding: Sequence[float] | None = None) -> list[SourceEvidence]:
     """Retriever.retrieve_with_diagnostics for one question, with exact similarities over all
-    chunks instead of the approximate index: the same candidate rules, rerank and assembly."""
+    chunks instead of the approximate index: the same candidate rules, floor (including the scope
+    check, from the plain question's embedding), rerank and assembly."""
     order = sorted(range(len(chunks)), key=lambda i: sims[i], reverse=True)
     cands = [Candidate(chunks[i], float(sims[i])) for i in order[: retriever.top_k]]
     for section in retriever.expander.section_refs(question):
         same = [i for i in order if chunks[i].section == section][:3]
         cands += [Candidate(chunks[i], float(sims[i]), explicit=True) for i in same]
     ranked = retriever.rerank(cands)
-    return retriever.assemble_context(ranked, retriever.max_chunks, retriever.max_context_chars)
+    floor = retriever.min_similarity
+    if scope_embedding is not None:
+        floor, _ = retriever.floor_for(retriever.best_substantive(ranked), scope_embedding,
+                                       lexicon=bool(statutory_terms(question)))
+    return retriever.assemble_context(ranked, retriever.max_chunks, retriever.max_context_chars, floor=floor)
 
 
 def retrieval_rules(retriever: Retriever) -> dict[str, Any]:
     """The selection parameters a verifier must use to re-run the rules (published in the manifest)."""
+    scope = retriever.scope
     return {"top_k": retriever.top_k, "min_similarity": retriever.min_similarity, "role_pref": retriever.role_pref,
-            "max_chunks": retriever.max_chunks, "max_context_chars": retriever.max_context_chars,
-            "explicit_section_matches": 3}
+            "boilerplate_pref": retriever.boilerplate_pref, "max_chunks": retriever.max_chunks,
+            "max_context_chars": retriever.max_context_chars, "explicit_section_matches": 3,
+            "scope_floor": retriever.scope_floor, "scope_model": scope.to_dict() if scope is not None else None}
 
 
 def retriever_from_rules(rules: dict[str, Any], embedder=None) -> Retriever:
     """A Retriever with no index, for re-running the selection on proven scores."""
+    import numpy as np
+
+    from app.core.scope import ScopeCheck
+
+    sm = rules.get("scope_model")
+    scope = ScopeCheck(np.asarray(sm["weights"]), sm["bias"], sm["threshold"], sm.get("embedding_model", "")) if sm else None
     return Retriever(embedder, None, top_k=rules["top_k"], min_similarity=rules["min_similarity"],
-                     role_pref=rules["role_pref"], max_chunks=rules["max_chunks"], max_context_chars=rules["max_context_chars"])
+                     role_pref=rules["role_pref"], max_chunks=rules["max_chunks"], max_context_chars=rules["max_context_chars"],
+                     scope=scope, scope_floor=rules.get("scope_floor", 0.40), boilerplate_pref=rules.get("boilerplate_pref", {}))
 
 
 def torch_module(E: np.ndarray):

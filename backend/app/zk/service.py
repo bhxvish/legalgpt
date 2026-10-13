@@ -133,17 +133,19 @@ class ZkService:
 
     # --------------------------------------------------------------- retrieval
     def prove_retrieval(self, question: str, live_chunk_ids: list[str] | None = None) -> dict[str, Any]:
-        from app.zk.retrieval_circuit import compare, query_vector, select
+        from app.zk.retrieval_circuit import compare, query_vector, scope_vector, select
 
         if self.retriever is None:
             raise ZkUnavailable("retrieval proofs need the retriever")
         q = query_vector(self.retriever, question)
+        scope_q = scope_vector(self.retriever, question)
         out = self.retrieval.prove(q)
         sims = self.retrieval.public_values(out["proof"])["outputs"]
-        selected = select(self.retriever, question, self.chunks, sims)
+        selected = select(self.retriever, question, self.chunks, sims, scope_q)
         live = live_chunk_ids if live_chunk_ids is not None else [s.chunk_id for s in self.retriever.retrieve(question)]
         return {"kind": "retrieval", "version": BUNDLE_VERSION, "question": question,
                 "sources": [s.chunk_id for s in selected], "live_comparison": compare(selected, live),
+                "scope_embedding": [round(v, 6) for v in scope_q],  # unproven; verifiers recompute it
                 "corpus_root": self.tree.root, "vk_sha256": self.retrieval.describe()["vk_sha256"],
                 "prove_seconds": out["prove_seconds"], "proof": out["proof"]}
 
@@ -160,7 +162,12 @@ class ZkService:
         pub = self.retrieval_v.public_values(bundle["proof"])
         sims = pub["outputs"]
         checks.append({"name": "one proven score per committed chunk", "ok": len(sims) == len(self.chunks)})
-        selected = select(self.retriever, bundle["question"], self.chunks, sims)
+        scope_q = bundle.get("scope_embedding")
+        if getattr(self.retriever, "embedder", None) is not None:
+            from app.zk.retrieval_circuit import scope_vector
+
+            scope_q = scope_vector(self.retriever, bundle["question"])
+        selected = select(self.retriever, bundle["question"], self.chunks, sims, scope_q)
         ids = [s.chunk_id for s in selected]
         checks.append({"name": "the retrieval rules applied to the proven scores give exactly these sources",
                        "ok": ids == bundle.get("sources")})

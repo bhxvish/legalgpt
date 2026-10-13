@@ -29,7 +29,7 @@ from app.config import REPO_ROOT, get_settings  # noqa: E402
 from app.core.corpus import load_chunks  # noqa: E402
 from app.core.embeddings import EmbeddingService  # noqa: E402
 from app.core.llm_client import latest_adapter  # noqa: E402
-from app.core.retriever import Retriever  # noqa: E402
+from app.core.retriever import build_retriever  # noqa: E402
 from app.core.vector_store import VectorStore  # noqa: E402
 from app.verification.prolog_engine import PrologEngine  # noqa: E402
 from app.zk import retrieval_circuit, verdict_circuit  # noqa: E402
@@ -85,7 +85,7 @@ def main() -> int:
         t = rc.build(retrieval_circuit.torch_module(E), [[0.0] * E.shape[1]], "public", scale=retrieval_circuit.SCALE)
         manifest["retrieval"] = {"chunks": len(chunks), "dims": int(E.shape[1]), **rc.describe(), "build": t,
                                  "scope": "single questions; the query embedding is public, not proven",
-                                 "rules": retrieval_rules(Retriever(None, store, min_similarity=s.retrieval_min_similarity))}
+                                 "rules": retrieval_rules(build_retriever(s))}
         print(f"retrieval circuit: {len(chunks)} x {E.shape[1]}, logrows {manifest['retrieval']['logrows']}, {t}")
 
     # 4. publish -------------------------------------------------------------
@@ -102,7 +102,7 @@ def main() -> int:
     (pub / "manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
 
     # 5. self-test -----------------------------------------------------------
-    retriever = Retriever(EmbeddingService(s.embedding_model), store, min_similarity=s.retrieval_min_similarity)
+    retriever = build_retriever(s)
     svc = ZkService(zk, pub, retriever=retriever, chunks=chunks, attestor=attestor)
     facts = {"caused_death": "true", "act_type": "rash", "intent_to_kill": "false", "knowledge_likely_death": "false"}
     b = svc.prove_verdict(facts, "304A")

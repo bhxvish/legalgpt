@@ -19,7 +19,7 @@ from app.core.chat_router import ChatRouter
 from app.core.corpus import ensure_index
 from app.core.embeddings import EmbeddingService
 from app.core.llm_client import AdapterClient, GroqClient, LLMClient, LLMClientError, latest_adapter
-from app.core.retriever import Retriever
+from app.core.retriever import Retriever, build_retriever
 from app.core.vector_store import VectorStore
 from app.explainability.attribution_analyzer import AttributionAnalyzer
 from app.explainability.confidence_scorer import ConfidenceScorer
@@ -94,11 +94,7 @@ def build_verification_service(settings: Settings) -> "VerificationService | Non
 
 def build_chat_router(settings: Settings, verifier: "VerificationService | None" = None) -> ChatRouter:
     embedder = EmbeddingService(settings.embedding_model)
-    retriever = Retriever(
-        embedder=embedder,
-        store=VectorStore(settings.chroma_persist_dir, settings.chroma_collection),
-        min_similarity=settings.retrieval_min_similarity,
-    )
+    retriever = build_retriever(settings, embedder)
     explainer = ExplanationBuilder(
         AttributionAnalyzer(embedder, settings.explain_support_threshold),
         ConfidenceScorer(high=settings.explain_band_high, medium=settings.explain_band_medium),

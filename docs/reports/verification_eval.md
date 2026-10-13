@@ -48,3 +48,33 @@ test set; a fresh set of cases should measure any such fix.
 **Who labelled:** the fact patterns and their expected verdicts were written by Claude (AI, not a
 lawyer) from the encoded element definitions. This is a check that the pipeline does what the
 rules say, not a validation of the rules by a legal expert.
+
+## After the fix (2026-10-14)
+
+The extractor prompt now says that a fact derived from two places in the text must be quoted as
+exact pieces in text order, joined by "...", which the quote guard already accepts. The few-shot
+dowry example shows it. To measure this fairly, 8 new cases (v16–v23) were written **before**
+running the fixed extractor: five dowry-death cases built around dates and durations, and three
+regression cases on other sections.
+
+| cases | result |
+|---|---|
+| v14, v15 (the two earlier misses) | 2/2 correct |
+| v16–v23 (fresh) | 8/8 correct |
+| v01–v05 (regression check) | 5/5 correct |
+| v06 (regression check) | **wrong: INCONSISTENT instead of INSUFFICIENT** (see below) |
+| v07–v13 | not re-run yet: the Groq free tier's daily limit was reached again |
+
+**v06 regression.** For "Neha was driving her car… when it hit a compound wall", the extractor
+answered `act_type = accidental` in both runs. That reads more into the text than it says: a
+collision alone does not show there was no rashness or negligence, so `unknown` is correct. The
+rules then (correctly) treat "accidental" as contradicting "rash or negligent". It passed before the
+quoting fix, and the fix doesn't touch act type, so this may be run-to-run variance in the hosted
+model. Either way it is the first *wrong verdict* (not just "insufficient") in this test set. A
+possible fix is to say in the act_type question that a collision or injury alone is not an accident
+unless the text says no one was at fault. That should be measured on new cases, not tuned on v06.
+
+Fresh cases: v16 (married March 2020, died July 2023) CONSISTENT; v17 (married 2005, died 2016)
+INCONSISTENT; v18 ("five years after her wedding") CONSISTENT; v19 (no marriage date) INSUFFICIENT;
+v20 (death from dengue) INCONSISTENT; v21 (s.279) CONSISTENT; v22 (s.379) CONSISTENT; v23 (s.323,
+attacker unknown) INSUFFICIENT. All are in `docs/eval/verification_cases.json`.

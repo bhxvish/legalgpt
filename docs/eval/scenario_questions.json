@@ -1,0 +1,403 @@
+{
+ "_about": "Everyday fact-pattern questions for retrieval (backend/scripts/eval_scenario_retrieval.py). Written by Claude (AI, not a lawyer) on 2026-10-13. 'expected' lists IPC sections any of which counts as a hit in the retrieved sources. 'dev' questions were used while designing the scenario-retrieval fix; 'test' questions were held out and scored only once, at the end. 'oos' questions are civil / non-IPC narratives that must be refused (with the short out-of-scope questions of scripts/calibrate_retrieval.py).",
+ "questions": [
+  {
+   "split": "dev",
+   "q": "A man took his neighbour's bicycle without permission and sold it. Which offence has he committed?",
+   "expected": [
+    "378",
+    "379"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "A surgeon's careless mistake during an operation caused the patient's death. Which IPC section applies?",
+   "expected": [
+    "304A"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "My landlord threatened to break my legs if I don't vacate the flat. What can he be charged with?",
+   "expected": [
+    "503",
+    "506"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "Someone slapped me during an argument at the bus stop. Is that a crime?",
+   "expected": [
+    "319",
+    "321",
+    "323",
+    "352"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "A shopkeeper sold me a fake gold ring claiming it was real gold and took my money.",
+   "expected": [
+    "415",
+    "417",
+    "420"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "My employer kept the money I gave him to deposit in the bank and spent it on himself.",
+   "expected": [
+    "405",
+    "406",
+    "408"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "A drunk driver hit a pedestrian on the road and the pedestrian died.",
+   "expected": [
+    "304A",
+    "279"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "My husband's family keeps beating me and demanding more dowry money.",
+   "expected": [
+    "498A"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "Some boys broke into a house at night through the window to steal valuables.",
+   "expected": [
+    "445",
+    "446",
+    "456",
+    "457",
+    "380"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "A man locked his employee inside the storeroom for two days and would not let her leave.",
+   "expected": [
+    "339",
+    "340",
+    "342",
+    "343"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "A stranger took a seven-year-old child from outside her school without her parents' consent.",
+   "expected": [
+    "359",
+    "361",
+    "363"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "Someone posted false claims on social media that my brother is a thief, ruining his reputation.",
+   "expected": [
+    "499",
+    "500"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "Two men snatched a woman's purse at knifepoint on a dark street.",
+   "expected": [
+    "390",
+    "392",
+    "397"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "A man stabbed his rival in the chest intending to kill him, but the rival survived.",
+   "expected": [
+    "307"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "A gang demanded money from a trader, threatening to burn his shop if he refused.",
+   "expected": [
+    "383",
+    "384",
+    "385",
+    "386"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "A man followed a woman home every day and kept messaging her even after she told him to stop.",
+   "expected": [
+    "354D"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "During a fight a man hit another with an iron rod and broke his arm.",
+   "expected": [
+    "320",
+    "322",
+    "325",
+    "326"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "A person forged his father's signature on a property document.",
+   "expected": [
+    "463",
+    "465",
+    "467",
+    "468"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "A young wife died of burns three years after marriage and her in-laws had been harassing her for dowry.",
+   "expected": [
+    "304B"
+   ]
+  },
+  {
+   "split": "dev",
+   "q": "A man entered his neighbour's field without permission to annoy him and refused to leave.",
+   "expected": [
+    "441",
+    "447"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "My phone was taken from my bag by a co-passenger while I was asleep on the train.",
+   "expected": [
+    "378",
+    "379"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "A doctor gave the wrong injection carelessly and the child died in hospital.",
+   "expected": [
+    "304A"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "My neighbour said he would kill me and my family if I complained to the police.",
+   "expected": [
+    "503",
+    "506"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "A boy punched his classmate in the face during a quarrel, causing a bleeding nose.",
+   "expected": [
+    "319",
+    "321",
+    "323"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "An online seller took my payment for a laptop and never delivered it, then blocked my number.",
+   "expected": [
+    "415",
+    "417",
+    "420"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "A bank manager transferred customers' deposits into his own account.",
+   "expected": [
+    "405",
+    "406",
+    "409"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "A bus driver was overtaking recklessly on the highway and crashed into a car, killing its driver.",
+   "expected": [
+    "304A",
+    "279"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "My sister's husband tortures her mentally and physically and has pushed her to the point of attempting suicide.",
+   "expected": [
+    "498A",
+    "306"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "Thieves broke the lock of a closed shop at midnight and carried away goods.",
+   "expected": [
+    "445",
+    "446",
+    "454",
+    "457",
+    "380"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "A moneylender kept a farmer tied up in his house for a week until his family paid the loan.",
+   "expected": [
+    "339",
+    "340",
+    "342",
+    "344",
+    "347"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "A woman took a toddler from a park and ran away with him.",
+   "expected": [
+    "359",
+    "361",
+    "363"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "A newspaper published a false report saying a local doctor was a fraud.",
+   "expected": [
+    "499",
+    "500",
+    "501"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "Armed men stopped a truck on the highway at night and robbed the driver of cash.",
+   "expected": [
+    "390",
+    "392",
+    "395",
+    "397"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "A man fired a gun at his enemy, who escaped with only a minor wound.",
+   "expected": [
+    "307"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "A goon told a shopkeeper he would kidnap his son unless he paid ten thousand rupees.",
+   "expected": [
+    "383",
+    "384",
+    "385",
+    "386",
+    "387"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "A man repeatedly watched and followed a college girl and tracked her online despite her refusals.",
+   "expected": [
+    "354D"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "A man threw acid on a woman's face, causing permanent disfigurement.",
+   "expected": [
+    "326A",
+    "320"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "A clerk made a fake government certificate to get a job.",
+   "expected": [
+    "463",
+    "464",
+    "465",
+    "468",
+    "471"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "A woman died under suspicious circumstances two years after her wedding after her husband demanded a car as dowry.",
+   "expected": [
+    "304B"
+   ]
+  },
+  {
+   "split": "test",
+   "q": "Someone entered my house without permission while I was away and refused to leave when I returned.",
+   "expected": [
+    "441",
+    "442",
+    "448"
+   ]
+  },
+  {
+   "split": "oos",
+   "q": "My landlord refuses to return my security deposit after I vacated the flat. What can I do?",
+   "expected": []
+  },
+  {
+   "split": "oos",
+   "q": "My employer has not paid my salary for three months.",
+   "expected": []
+  },
+  {
+   "split": "oos",
+   "q": "My neighbour's tree branches keep falling into my garden and damaging my plants.",
+   "expected": []
+  },
+  {
+   "split": "oos",
+   "q": "My car insurance claim was rejected without any reason.",
+   "expected": []
+  },
+  {
+   "split": "oos",
+   "q": "I want to legally adopt my late brother's daughter. How do I start?",
+   "expected": []
+  },
+  {
+   "split": "oos",
+   "q": "My company terminated my contract early; can I claim compensation?",
+   "expected": []
+  },
+  {
+   "split": "oos",
+   "q": "The builder delayed handing over my flat by two years.",
+   "expected": []
+  },
+  {
+   "split": "oos",
+   "q": "My father died without a will; how is his property divided among us?",
+   "expected": []
+  },
+  {
+   "split": "oos",
+   "q": "My online order arrived damaged and the seller refuses a refund.",
+   "expected": []
+  },
+  {
+   "split": "oos",
+   "q": "My wife and I want a mutual consent divorce. What is the process?",
+   "expected": []
+  }
+ ]
+}

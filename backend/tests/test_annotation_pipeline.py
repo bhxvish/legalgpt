@@ -104,6 +104,23 @@ def test_section_detection_variants() -> None:
     assert JudgmentCollector.detect_sections(text) == ["34", "120B", "302", "304B", "307", "498A"]
 
 
+@pytest.mark.parametrize(
+    "text, sections",
+    [
+        ("convicted under Section 302, IPC and sentenced", ["302"]),  # comma before IPC
+        ("under Section 379 read with Section 34 IPC", ["34", "379"]),  # keyword repeated in the list
+        ("Sections 302 r/w 34, IPC", ["34", "302"]),
+        ("Section 304-B IPC and Section 498-A of the Indian Penal Code", ["304B", "498A"]),  # hyphenated
+        ("Section 302 read with Sections 120-B and 34, IPC", ["34", "120B", "302"]),
+        ("offences under Sections 279, 337and 304A of the Indian Penal Code", ["279", "304A", "337"]),  # missing space
+        ("Naresh Giri (2008) 1 SCC 791, Section 304A IPC applies", ["304A"]),  # a page number is not a section
+        ("Section 313 Cr.P.C. was recorded; Section 25 of the Arms Act", []),  # other enactments
+    ],
+)
+def test_section_detection_citation_styles(text: str, sections: list[str]) -> None:
+    assert JudgmentCollector.detect_sections(text) == sections
+
+
 def test_normalize_text_unifies_whitespace() -> None:
     assert normalize_text("a  b\r\n\r\n\r\n\r\nc  ") == "a b\n\nc"
 

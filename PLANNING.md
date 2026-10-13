@@ -527,6 +527,40 @@ Code in `backend/app/zk/`; published files and the full explanation in [docs/zk]
   are follow-up retrieval or the MiniLM query embedding. Keys come from EZKL's public SRS, and
   setup was run by us.
 
+## Fixes after evaluation (2026-10-14)
+
+The weaknesses found by the evaluation, fixed and re-measured:
+
+- **Follow-up context leak.** `QueryExpander.is_follow_up` searches the previous question only for
+  dependent questions (a pronoun, a connective opener such as "and if…" or "within…", or 5 words
+  or fewer). Narratives over 12 words are self-contained. The income-tax example is now refused, and
+  "What is the maximum sentence for it?" still uses context. Tests in `test_retriever.py`.
+- **Dowry-death dates.** The extractor prompt now asks for facts derived from two places to be
+  quoted as exact pieces joined by "...", which the quote guard accepts. The two misses (v14, v15)
+  now pass, and so do 8 **fresh** cases written after the fix (v16–v23, five of them date and
+  duration cases): 10/10. In the regression re-run, v01–v05 pass but **v06 got a wrong verdict**:
+  "the car hit a compound wall" was read as a pure accident. v07–v13 are pending because of the
+  Groq daily limit.
+- **Collector section detection** (Module 1 code, changed with the owner's approval). It now handles
+  "Section 302, IPC", "379 read with Section 34", "304-B" / "498-A", and "337and". It no longer
+  reads a citation page ("(2008) 1 SCC 791, Section 304A IPC") as a section. On the 36 collected
+  judgments the only section lost was a junk "337AN"; s.304A was newly found in 5 cases.
+- **Scenario retrieval:** lexicon, scope check and boilerplate penalty; 5% → 80% on held-out
+  scenarios, with no out-of-scope question answered. Full ablation in
+  [docs/reports/scenario_retrieval.md](docs/reports/scenario_retrieval.md).
+- **Classifier retrained on v0.3** (36 cases; checkpoint `v0.3-20261013-234503`, now used for
+  uploads). 5-fold cross-validation grouped by case gives macro-F1 **0.745 ± 0.021**. The previous
+  model scored 0.744 ± 0.040, so the mean is the same and the spread is halved. At the 0.70 review
+  bar it sends more sentences to a human (26.7% vs 18.7%), but the labels it accepts unreviewed are
+  more accurate (86.7% vs 83.8%): it is less overconfident. That trade favours dataset quality, so
+  v0.3 was kept.
+- **LoRA v0.4** (plain-language answers, now the default Tuned model). Offence sections get
+  explanatory training answers (the punishment in plain words, then who it applies to), produced
+  mechanically from the statute. On 41 held-out questions: 100% answered and 98% right citation
+  (as v0.3), plain wording 13/41 (v0.3: 0), and punishment terms 12/12 correct. Blind rating vs
+  v0.3 (AI judge, partial blinding): 4.52 vs 4.30, a modest and not significant difference. v0.4
+  ran 3 epochs vs v0.3's 2. [Report](docs/reports/lora_v0.4_eval.md)
+
 ## Known limitations
 
 **Scope**
@@ -537,16 +571,15 @@ Code in `backend/app/zk/`; published files and the full explanation in [docs/zk]
 - Not legal advice. The UI and the demo say so; the evidence-match band is not answer correctness.
 
 **Retrieval**
-- **Fact-pattern questions:** the 0.55 floor was calibrated on short questions. Narratives pull
-  generic chunks (§1/§2, state-amendment boilerplate) above the floor, so an off-scope narrative can
-  reach the model with irrelevant sources; and the relevant punishment section can be missed — in the
-  demo, the bicycle-theft narrative retrieved §378's illustrations and §381 but not §379, and the
-  answer (correctly) said the punishment was not in its sources. Needs a fact-pattern calibration set
-  and down-weighting of definitional / state-amendment chunks.
-- **Follow-up context leaks into unrelated questions:** in a conversation, "How do I file my income
-  tax return online?" after a question on s.304 retrieved s.304/302/304A at 0.62 instead of being
-  refused (alone it scores 0.24 and is refused). The model still answered "I don't know", but the
-  refusal should not depend on the model.
+- **Fact-pattern questions (improved 2026-10-14):** everyday narratives used to be refused (5% of
+  held-out scenarios found the right section). Lay-to-statutory query expansion plus a scope check
+  brought it to 80% on held-out questions, with 0 of 24 out-of-scope questions answered (see
+  "Fixes after evaluation"). Remaining gaps: passive phrasing ("my phone was taken"), offences the
+  20 lexicon rules don't cover, and a hand-written lexicon that a lawyer should review.
+- **Follow-up detection is heuristic (fixed leak, 2026-10-14):** a question uses the previous one as
+  context only if it looks dependent (a pronoun, a connective opener, or a fragment of 5 words or
+  fewer). A very short unrelated question after a legal one ("file tax online?") can still be
+  treated as a follow-up.
 - MiniLM is a general-purpose embedder; no legal-domain embedding model or re-ranker was evaluated.
 
 **Answers and explanation**
@@ -556,10 +589,12 @@ Code in `backend/app/zk/`; published files and the full explanation in [docs/zk]
 
 **Tuned model**
 - v0.2 (124 judgment-based examples) over-refused: it had never seen IPC sections as sources.
-  v0.3 (2026-10-13, retrained with IPC Q&A) answers and cites correctly on held-out sections, but its
-  answers quote the provision rather than explain or apply it, and it was not evaluated on fact
-  patterns. In a blind rating (AI judge) it scored 4.53 vs Groq's 4.75, with occasional wrong-section or
-  off-question answers. Still not a replacement for the hosted model for reasoning.
+  v0.3 (2026-10-13, retrained with IPC Q&A) answers and cites correctly on held-out sections, but
+  quoted the provision. In a blind rating (AI judge) it scored 4.53 vs Groq's 4.75. v0.4
+  (2026-10-14) states punishments in plain words, but still quotes most "what does Section X
+  provide" answers. It doesn't apply the law to facts, and still makes occasional wrong-section or
+  citation slips. Not a replacement for the hosted model for reasoning; its targets are generated
+  from the statute, not written by people.
 - Speed: float32 on CPU needs ~6 GB RAM; machines under 12 GB (including Docker's default VM) fall
   back to bfloat16, where reading the prompt takes ~30 s on CPUs without native bfloat16. Its 3 GB
   base model downloads at ~0.2 MB/s inside Docker here, so `HF_CACHE_DIR` mounts the host cache.

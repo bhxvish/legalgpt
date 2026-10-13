@@ -96,6 +96,31 @@ def test_follow_up_uses_previous_question_as_context(retriever: Retriever) -> No
     assert ev and ev[0].section == "304A"
 
 
+@pytest.mark.parametrize(
+    "question, follow_up",
+    [
+        ("Within how many years of marriage?", True),  # fragment opening with a preposition
+        ("What is the punishment for it?", True),  # pronoun
+        ("And if he was drunk?", True),  # connective opener
+        ("Is bail available in such a case?", True),
+        ("How long can sentence be?", True),  # short
+        ("How do I file my income tax return online?", False),  # self-contained, unrelated topic
+        ("What is the punishment for theft?", False),
+        ("What about Section 304B?", False),  # names its own section
+        ("A man stole his neighbour's bicycle and sold it. Which offence is this?", False),  # narrative
+    ],
+)
+def test_is_follow_up(question: str, follow_up: bool) -> None:
+    assert QueryExpander.is_follow_up(question) is follow_up
+
+
+def test_unrelated_question_is_not_searched_with_previous_context(retriever: Retriever) -> None:
+    """A self-contained question after a legal one must not inherit the previous topic's sections."""
+    res = retriever.retrieve_with_diagnostics("How do I file my income tax return online?",
+                                              context="Whoever causes death by a rash or negligent act")
+    assert not res.used_context and res.sources == []
+
+
 def test_context_does_not_hide_a_change_of_topic(retriever: Retriever) -> None:
     ev = retriever.retrieve("Whoever intending to take dishonestly movable property commits theft", context="negligent death")
     assert ev[0].section == "378"

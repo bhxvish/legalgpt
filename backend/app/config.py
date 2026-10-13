@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     corpus_chunks_path: Path = Field(default=REPO_ROOT / "data" / "corpus" / "ipc_chunks.jsonl", alias="CORPUS_CHUNKS_PATH")
     # Cosine-similarity floor below which retrieved chunks are discarded (all discarded -> refusal).
     retrieval_min_similarity: float = Field(default=0.55, alias="RETRIEVAL_MIN_SIMILARITY")
+    # floor for questions below RETRIEVAL_MIN_SIMILARITY that the scope check says are about an
+    # IPC offence (everyday fact patterns; app/core/scope.py)
+    retrieval_scope_floor: float = Field(default=0.40, alias="RETRIEVAL_SCOPE_FLOOR")
 
     # Module 2 — BERT-assisted annotation
     rrl_model_dir: Path = Field(default=REPO_ROOT / "data" / "models" / "rrl", alias="RRL_MODEL_DIR")

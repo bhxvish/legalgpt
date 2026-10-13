@@ -51,12 +51,13 @@ FEW_SHOTS: tuple[tuple[str, str], ...] = (
         ),
     ),
     (
-        "The deceased was married to the accused in 2019 and died of burn injuries in 2021 at the matrimonial "
-        "home. Her father deposed that a month before her death the husband and his mother beat her for not "
-        "bringing a motorcycle and cash from her parents.",
+        "The deceased was married to the accused in 2019. Her father deposed that a month before her death the "
+        "husband and his mother beat her for not bringing a motorcycle and cash from her parents. In 2021 she "
+        "died of burn injuries at the matrimonial home.",
         _facts(
             woman_unnatural_death=("true", "died of burn injuries"),
-            within_seven_years_of_marriage=("true", "married to the accused in 2019 and died of burn injuries in 2021"),
+            # derived from two places in the text: both pieces quoted exactly, in text order, joined by "..."
+            within_seven_years_of_marriage=("true", "married to the accused in 2019 ... In 2021 she died of burn injuries"),
             cruelty_by_husband_or_relative=("true", "the husband and his mother beat her"),
             cruelty_soon_before_death=("true", "a month before her death"),
             dowry_demand=("true", "for not bringing a motorcycle and cash from her parents"),
@@ -82,6 +83,9 @@ def _system_prompt() -> str:
         "For every predicate below, answer with its value and a short evidence quote copied word for word",
         "from the case text. Use \"unknown\" (with an empty evidence quote) whenever the text does not clearly",
         "settle the question — never guess, and never use outside knowledge about the case.",
+        "When a value follows from two separate places in the text (for example a date of marriage and a date of",
+        "death), quote each piece exactly as written, in the order they appear in the text, joined by \" ... \".",
+        "Never reword, reorder or combine words into a quote that is not in the text.",
         "",
         "Predicates (name: allowed values — question):",
     ]

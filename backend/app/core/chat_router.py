@@ -157,7 +157,7 @@ class ChatRouter:
             yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": True})
             yield sse("token", {"text": SCOPE_REFUSAL})
             yield from self._explanation(question, result, SCOPE_REFUSAL, True, llm.model_id)
-            yield from self._attestation(question, [], SCOPE_REFUSAL, [], llm.model_id, True, previous is not None)
+            yield from self._attestation(question, [], SCOPE_REFUSAL, [], llm.model_id, True, result.used_context)
             return
         yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": False})
         yield sse("sources", [s.model_dump() for s in sources])
@@ -167,7 +167,7 @@ class ChatRouter:
             answer.append(text)
             yield sse("token", {"text": text})
         yield from self._explanation(question, result, "".join(answer), False, llm.model_id)
-        yield from self._attestation(question, messages, "".join(answer), sources, llm.model_id, False, previous is not None)
+        yield from self._attestation(question, messages, "".join(answer), sources, llm.model_id, False, result.used_context)
 
     def _attestation(self, question: str, prompt: Any, answer: str, sources: list, model_id: str, refused: bool,
                      follow_up: bool) -> Iterator[str]:

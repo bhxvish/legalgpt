@@ -44,13 +44,51 @@ def body_of(chunk: Chunk, max_chars: int = 520) -> str:
     return (cut[: ends[-1]] if ends else cut.rsplit(" ", 1)[0]).rstrip(" ;,") + " …"
 
 
+_OFFENCE = re.compile(r"^Whoever(?P<comma>,?)\s+(?P<conduct>.+?),?\s+shall be punished with (?P<punishment>[^.;]+)", re.S)
+_PLAIN = (  # statutory punishment wording -> plain English, applied in order
+    (r"imprisonment of either description", "imprisonment (simple or rigorous)"),
+    (r"for a term which shall not be less than ([\w ]+?) but which may extend to", r"of at least \1 and up to"),
+    (r"for a term which may extend to", "of up to"),
+    (r"for a term of not less than", "of at least"),
+    (r",? and shall also be liable to fine", ", and a fine"),
+    (r",? and shall be liable to fine", ", and a fine"),
+    (r"or with fine which may extend to", "or a fine of up to"),
+    (r"or with fine", "or a fine"),
+    (r"or with both", "or both"),
+    (r"or with imprisonment", "or imprisonment"),
+    (r"with death", "death"),
+)
+
+
+def plain_punishment(text: str) -> str:
+    out = re.sub(r"\s+", " ", text).strip().rstrip(",")
+    for pattern, repl in _PLAIN:
+        out = re.sub(pattern, repl, out)
+    return out
+
+
+def offence_parts(chunk: Chunk, max_conduct: int = 420) -> tuple[str, str] | None:
+    """(conduct, plain punishment) for sections of the form "Whoever <conduct>, shall be punished
+    with <punishment>", else None."""
+    m = _OFFENCE.match(body_of(chunk, max_chars=4000))
+    if not m:
+        return None
+    conduct = (", " if m.group("comma") else " ") + re.sub(r"\s+", " ", m.group("conduct")).strip()  # "who, being ..."
+    if len(conduct) > max_conduct:
+        conduct = conduct[:max_conduct].rsplit(" ", 1)[0].rstrip(",;") + " …"
+    return conduct, plain_punishment(m.group("punishment"))
+
+
 def lower_first(s: str) -> str:
     return s[:1].lower() + s[1:] if s[:1].isupper() and not s[1:2].isupper() else s
 
 
 class IpcQaBuilder:
-    def __init__(self, retriever, chunks: Sequence[Chunk], seed: int = 13, refusal_share: float = 0.1) -> None:
+    def __init__(self, retriever, chunks: Sequence[Chunk], seed: int = 13, refusal_share: float = 0.1,
+                 plain: bool = True) -> None:
+        """`plain`: explain offence sections in plain words (v0.4); False reproduces v0.3's quoting."""
         self.retriever = retriever
+        self.plain = plain
         self.chunks = list(chunks)
         self.rng = random.Random(seed)
         self.refusal_share = refusal_share
@@ -70,10 +108,21 @@ class IpcQaBuilder:
         ]), "provision"
 
     @staticmethod
-    def answer(section: str, title: str, body: str, marker: int, kind: str) -> str:
+    def answer(section: str, title: str, body: str, marker: int, kind: str, parts: tuple[str, str] | None = None) -> str:
+        """Plain-language answer built from the section's own text (correct by construction).
+        Offence sections ("Whoever ..., shall be punished with ...") are explained: who commits the
+        offence and the punishment in plain words, each cited. Other sections are quoted."""
+        t = title.strip().rstrip(".")
+        if parts is not None:
+            conduct, punishment = parts
+            if kind == "punishment":
+                return (f"Under Section {section} of the IPC ({t}) [{marker}], the punishment is {punishment}.\n"
+                        f"It applies to anyone who{conduct} [{marker}].")
+            return (f"Section {section} of the IPC ({t}) [{marker}] makes it an offence for anyone who{conduct}.\n"
+                    f"Punishment: {punishment} [{marker}].")
         if kind == "punishment" and body.lower().startswith("whoever"):
             return f"Under Section {section} of the IPC [{marker}], {lower_first(body)}"
-        return f"Section {section} of the IPC ({title.strip().rstrip('.')}) provides: {body} [{marker}]"
+        return f"Section {section} of the IPC ({t}) provides: {body} [{marker}]"
 
     def build(self, sections: Sequence[str]) -> list[InstructionExample]:
         held_out = set(EVAL_SECTIONS)
@@ -94,7 +143,8 @@ class IpcQaBuilder:
             if hit is None:  # the retriever would not give the model the right section: skip
                 continue
             cases.append((section, q, sources))
-            out.append(self._example(section, q, sources, self.answer(section, chunk.title, body, hit.marker, kind),
+            parts = offence_parts(chunk) if self.plain else None
+            out.append(self._example(section, q, sources, self.answer(section, chunk.title, body, hit.marker, kind, parts),
                                      "ipc_answer"))
         n_refusals = round(len(out) * self.refusal_share / (1 - self.refusal_share))
         for section, q, _ in self.rng.sample(cases, min(n_refusals, len(cases))):

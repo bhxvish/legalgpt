@@ -21,14 +21,23 @@ CRIMINAL_TERMS = (
 MIN_CRIMINAL_TERMS = 3
 MIN_CHARS = 500
 
-_SECTION_LIST = r"\d{1,3}[A-Z]{0,2}(?:\s*\(\d+\))?(?:\s*(?:,|/|&|and|r/w|read\s+with)\s*\d{1,3}[A-Z]{0,2}(?:\s*\(\d+\))?)*"
+# one section: "302", "304B", "304-B", "376(2)"
+_SECTION_NUM = r"\d{1,3}(?:-?[A-Z]{1,2}(?![A-Z]))?(?:\s*\(\d+\))?"  # "337and": 337, not 337AN
+# between sections: ", " "/" "&" "and" "r/w" "read with", optionally repeating the keyword ("read with Section 34")
+_PLAIN_SEP = r"\s*(?:,|/|&|and\b|r/w|read\s+with)\s*"
+_SECTION_SEP = rf"{_PLAIN_SEP}(?:(?:sections?|secs?\.?|ss?\.)\s*)?"
+_SECTION_LIST = rf"{_SECTION_NUM}(?:{_SECTION_SEP}{_SECTION_NUM})*"
+# without a leading keyword the list may not repeat one, or "(2008) 1 SCC 791, Section 304A IPC" would
+# start the list at the page number 791
+_BARE_LIST = rf"{_SECTION_NUM}(?:{_PLAIN_SEP}{_SECTION_NUM})*"
 _IPC = r"(?:I\.\s?P\.\s?C\.?|IPC|Indian\s+Penal\s+Code|Penal\s+Code)"
-# "Sections 302, 307 and 34 of the IPC", "u/s 498A IPC", "S. 304A I.P.C."
+# "Sections 302, 307 and 34 of the IPC", "u/s 498A IPC", "S. 304A I.P.C.", "Section 302, IPC",
+# "Section 379 read with Section 34 IPC", "Section 304-B IPC"
 _CITED_WITH_KEYWORD = re.compile(
-    rf"(?:\bsections?|\bsecs?\.?|\bss?\.|\bu/s\.?)\s*({_SECTION_LIST})\s*(?:of\s+(?:the\s+)?)?{_IPC}", re.I
+    rf"(?:\bsections?|\bsecs?\.?|\bss?\.|\bu/s\.?)\s*({_SECTION_LIST})\s*,?\s*(?:of\s+(?:the\s+)?)?{_IPC}", re.I
 )
 # "302/34 IPC", "304B IPC"
-_CITED_BARE = re.compile(rf"\b({_SECTION_LIST})\s+{_IPC}", re.I)
+_CITED_BARE = re.compile(rf"\b({_BARE_LIST})\s*,?\s+{_IPC}", re.I)
 # Court names, searched in the header only (the body mentions other courts).
 _COURTS = (
     re.compile(r"supreme court of india", re.I),
@@ -102,7 +111,8 @@ class JudgmentCollector:
         found: set[str] = set()
         for pattern in (_CITED_WITH_KEYWORD, _CITED_BARE):
             for m in pattern.finditer(text):
-                for num in re.findall(r"\d{1,3}[A-Za-z]{0,2}", re.sub(r"\(\d+\)", "", m.group(1))):
+                cited = re.sub(r"(\d)-([A-Za-z])", r"\1\2", re.sub(r"\(\d+\)", "", m.group(1)))  # 304-B -> 304B
+                for num in re.findall(r"\d{1,3}(?:[A-Za-z]{1,2}(?![A-Za-z]))?", cited):
                     found.add(num.upper())
         return sorted(found, key=lambda s: (int(re.match(r"\d+", s).group()), s))  # type: ignore[union-attr]
 

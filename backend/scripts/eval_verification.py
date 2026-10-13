@@ -57,7 +57,7 @@ def main() -> int:
              f"{len(rows)} fact patterns from `{args.cases.relative_to(REPO_ROOT).as_posix()}` "
              f"({dict(Counter(r['expected'] for r in rows))}); fact extraction by "
              f"{get_settings().groq_model}, two runs, checked in Prolog.", "",
-             f"**Agreement: {agree}/{len(scored)} = {agree / len(scored):.0%}**"
+             (f"**Agreement: {agree}/{len(scored)} = {agree / len(scored):.0%}**" if scored else "**No case could be run.**")
              + (f" ({len(rows) - len(scored)} case(s) failed to run)" if len(scored) < len(rows) else ""), "",
              "| expected \\ got | " + " | ".join(VERDICTS) + " |", "|---|---|---|---|"]
     for exp in VERDICTS:
