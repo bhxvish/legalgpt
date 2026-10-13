@@ -72,7 +72,7 @@ Try asking:
 
 | Tab | Who it's for | What you do there |
 |---|---|---|
-| **Chat** | Everyone | Ask questions. *Legal* mode answers only from the IPC with citations; *General* mode is an ordinary chatbot answer. |
+| **Chat** | Everyone | Ask questions. *Legal* mode answers only from the IPC with citations; *General* mode is an ordinary chatbot answer. Past conversations are kept in a history sidebar (saved in your browser) where you can start a new chat or delete old ones. |
 | **Review** | Annotators | Upload judgments (.txt or .pdf) and the computer suggests a role for every sentence. You check only the uncertain sentences and a random sample of confident ones: Enter to accept or 1–5 to change, then *Sign off*. |
 | **Annotate** | Annotators | Label a judgment fully by hand: cases the Review step sent back, and a small "gold" sample used to keep measuring the model. |
 | **Verify** | Everyone | Paste case facts and check them against one of 7 encoded sections (279, 304A, 304B, 323, 337, 338, 379). |

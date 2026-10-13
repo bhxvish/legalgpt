@@ -107,6 +107,11 @@ export default function App() {
         </div>
         <Nav view={view} className="-mx-1 mt-2 flex overflow-x-auto sm:hidden" />
       </header>
+      {/* The chat stays mounted on other tabs (only hidden), so the conversation and an answer that
+          is still streaming survive switching to Review or Verify and back. */}
+      <div className={view === 'chat' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
+        <ChatWindow />
+      </div>
       {view === 'annotate' ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <AnnotateNote />
@@ -116,9 +121,7 @@ export default function App() {
         <ReviewView />
       ) : view === 'verify' ? (
         <VerifyPanel />
-      ) : (
-        <ChatWindow />
-      )}
+      ) : null}
     </div>
   )
 }
