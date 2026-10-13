@@ -55,7 +55,7 @@ def build_llm_client(settings: Settings) -> LLMClient:
         path = settings.adapter_path or latest_adapter(settings.lora_dir)
         if path is None:
             raise LLMClientError(f"LLM_BACKEND=adapter but no adapter in {settings.lora_dir}; train one first")
-        return AdapterClient(path)
+        return AdapterClient(path, dtype=settings.local_llm_dtype)
     return GroqClient(api_key=settings.groq_api_key, model=settings.groq_model)
 
 
@@ -65,7 +65,7 @@ def build_models(settings: Settings) -> tuple[dict[str, LLMClient], dict[str, st
     notes = {"groq": "hosted base model"}
     adapter = settings.adapter_path or latest_adapter(settings.lora_dir)
     if adapter is not None:
-        models["adapter"] = AdapterClient(adapter)
+        models["adapter"] = AdapterClient(adapter, dtype=settings.local_llm_dtype)
         notes["adapter"] = "LoRA-tuned Qwen2.5-1.5B, runs on this machine (GPU if available, otherwise slow on CPU)"
     else:
         notes["adapter"] = f"no LoRA adapter found in {settings.lora_dir} (train one with backend/scripts/train_lora.py)"

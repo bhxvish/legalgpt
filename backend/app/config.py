@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     llm_backend: str = Field(default="groq", alias="LLM_BACKEND", pattern="^(groq|adapter)$")
     lora_dir: Path = Field(default=REPO_ROOT / "data" / "models" / "lora", alias="LORA_DIR")
     adapter_path: Path | None = Field(default=None, alias="ADAPTER_PATH")  # default: newest under LORA_DIR
+    # How the local (LoRA) model is loaded: auto | float32 | bfloat16 | 4bit. auto = bfloat16 on a GPU
+    # (4-bit if it does not fit), float32 on a CPU with >= 12 GB RAM, else bfloat16.
+    local_llm_dtype: str = Field(default="auto", alias="LOCAL_LLM_DTYPE", pattern="^(auto|float32|bfloat16|4bit)$")
 
     # Module 4 — explainability. Bands describe how well the evidence matched the question,
     # NOT whether the answer is correct. Defaults calibrated on this corpus (PLANNING.md, Phase 5).

@@ -159,3 +159,12 @@ def test_llm_backend_switch(tmp_path: Path) -> None:
 def test_adapter_client_requires_metadata(tmp_path: Path) -> None:
     with pytest.raises(LLMClientError):
         AdapterClient(tmp_path)
+
+
+def test_local_model_precision_choice() -> None:
+    from app.core.llm_client import choose_dtype
+
+    assert choose_dtype("cuda") == "bfloat16"  # merged 16-bit; falls back to 4-bit on out-of-memory
+    assert choose_dtype("cpu", ram_gb=16) == "float32"  # AVX2 CPUs read prompts ~5x faster in float32
+    assert choose_dtype("cpu", ram_gb=7.6) == "bfloat16"  # float32 needs ~6 GB: keep small machines safe
+    assert choose_dtype("cpu", "4bit") == "4bit" and choose_dtype("cuda", "float32") == "float32"

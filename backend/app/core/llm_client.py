@@ -5,6 +5,7 @@ open model locally, optionally with a LoRA adapter. Callers depend on LLMClient 
 """
 
 import json
+import os
 import re
 import threading
 from abc import ABC, abstractmethod
@@ -121,20 +122,50 @@ class GroqClient(LLMClient):
                 yield delta
 
 
-class LocalHFClient(LLMClient):
-    """A Hugging Face causal LM run in-process: 4-bit on a CUDA GPU when available, otherwise
-    bfloat16 on CPU (slow, but works without bitsandbytes). Loads lazily on first use.
+def total_ram_gb() -> float:
+    try:
+        import psutil
 
-    With `adapter_path`, a PEFT LoRA adapter is applied on top of the frozen base model."""
+        return psutil.virtual_memory().total / 1e9
+    except ImportError:
+        try:
+            return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 1e9
+        except (AttributeError, ValueError, OSError):
+            return 0.0
+
+
+def choose_dtype(device: str, setting: str = "auto", ram_gb: float | None = None) -> str:
+    """How to load a local model: "4bit" | "bfloat16" | "float32".
+
+    Measured with the 1.5B LoRA model on an RTX 3050 Ti / i7-12700H (781-token legal prompt):
+    GPU bfloat16 with the adapter merged answers 2.4x faster than 4-bit (1.2 s vs 2.9 s). On a CPU
+    without native bfloat16 (AVX2 only), reading the prompt takes 32 s in bfloat16 but 6 s in
+    float32 with identical output; float32 needs ~6 GB of RAM, so smaller machines (e.g. Docker's
+    default VM) keep bfloat16."""
+    if setting != "auto":
+        return setting
+    if device == "cuda":
+        return "bfloat16"
+    ram = total_ram_gb() if ram_gb is None else ram_gb
+    return "float32" if ram >= 12 else "bfloat16"
+
+
+class LocalHFClient(LLMClient):
+    """A Hugging Face causal LM run in-process. Loads lazily on first use; see choose_dtype() for
+    the precision (LOCAL_LLM_DTYPE overrides it). With `adapter_path`, a PEFT LoRA adapter is
+    applied and, unless the model is 4-bit, merged into the weights (no per-layer adapter cost)."""
 
     def __init__(
         self,
         base_model: str,
         adapter_path: str | Path | None = None,
-        max_new_tokens: int = 512,
+        max_new_tokens: int = 384,
         device: str | None = None,
+        dtype: str = "auto",
     ) -> None:
         self.base_model = base_model
+        self.dtype_setting = dtype
+        self.loaded_dtype: str | None = None
         self.adapter_path = Path(adapter_path) if adapter_path else None
         self.max_new_tokens = max_new_tokens
         self._device = device
@@ -147,29 +178,46 @@ class LocalHFClient(LLMClient):
         with self._lock:
             if self._model is None:
                 import torch
-                from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+                from transformers import AutoTokenizer
 
                 device = self._device or ("cuda" if torch.cuda.is_available() else "cpu")
-                kwargs: dict[str, Any] = {}
-                if device == "cuda":
-                    kwargs["quantization_config"] = BitsAndBytesConfig(
-                        load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True,
-                        bnb_4bit_compute_dtype=torch.bfloat16,
-                    )
-                    kwargs["device_map"] = {"": 0}
-                else:
-                    # bf16 is Qwen's native precision: half of float32's memory (~3 GB, fits Docker's VM)
-                    # at the same CPU speed (measured 5.0 vs 5.5 tokens/s on the dev laptop).
-                    kwargs["dtype"] = torch.bfloat16
+                dtype = choose_dtype(device, self.dtype_setting)
                 self._tokenizer = AutoTokenizer.from_pretrained(self.adapter_path or self.base_model)
-                model = AutoModelForCausalLM.from_pretrained(self.base_model, **kwargs)
-                if self.adapter_path:
-                    from peft import PeftModel
-
-                    model = PeftModel.from_pretrained(model, str(self.adapter_path))
+                try:
+                    model = self._build(device, dtype)
+                except torch.cuda.OutOfMemoryError:
+                    if device != "cuda" or dtype == "4bit":
+                        raise
+                    torch.cuda.empty_cache()  # GPU too full for 16-bit weights: fall back to 4-bit
+                    dtype = "4bit"
+                    model = self._build(device, dtype)
                 model.eval()
-                self._model = model
+                self._model, self.loaded_dtype = model, dtype
         return self._model, self._tokenizer
+
+    def _build(self, device: str, dtype: str) -> Any:
+        import torch
+        from transformers import AutoModelForCausalLM, BitsAndBytesConfig
+
+        kwargs: dict[str, Any] = {}
+        if dtype == "4bit":
+            kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+            )
+            kwargs["device_map"] = {"": 0}
+        else:
+            kwargs["dtype"] = {"bfloat16": torch.bfloat16, "float32": torch.float32}[dtype]
+        model = AutoModelForCausalLM.from_pretrained(self.base_model, **kwargs)
+        if dtype != "4bit" and device == "cuda":
+            model.to("cuda")
+        if self.adapter_path:
+            from peft import PeftModel
+
+            model = PeftModel.from_pretrained(model, str(self.adapter_path))
+            if dtype != "4bit":
+                model = model.merge_and_unload()  # same outputs, no adapter matmuls per layer
+        return model
 
     def _inputs(self, messages: list[Message]) -> Any:
         model, tok = self._load()
@@ -221,13 +269,14 @@ class AdapterClient(LocalHFClient):
     """The LoRA-tuned model from Phase 4: base model + adapter, base model read from the
     adapter's metadata (adapter_meta.json written by LoRATrainer)."""
 
-    def __init__(self, adapter_path: str | Path, max_new_tokens: int = 512, device: str | None = None) -> None:
+    def __init__(self, adapter_path: str | Path, max_new_tokens: int = 384, device: str | None = None,
+                 dtype: str = "auto") -> None:
         adapter_path = Path(adapter_path)
         meta_file = adapter_path / "adapter_meta.json"
         if not meta_file.exists():
             raise LLMClientError(f"{adapter_path} is not a LoRA adapter checkpoint (no adapter_meta.json)")
         base = json.loads(meta_file.read_text(encoding="utf-8"))["base_model"]
-        super().__init__(base, adapter_path, max_new_tokens=max_new_tokens, device=device)
+        super().__init__(base, adapter_path, max_new_tokens=max_new_tokens, device=device, dtype=dtype)
 
 
 def latest_adapter(adapters_dir: str | Path) -> Path | None:

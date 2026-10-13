@@ -31,7 +31,8 @@ services:
       - ${HF_CACHE_DIR:-hf_cache}:/root/.cache/huggingface
       - ./data/corpus:/app/data/corpus:ro
       # LoRA adapters trained on the host (empty on a clean checkout: the "Tuned" toggle is then
-      # disabled). In the CPU image the adapter runs in bfloat16 (~3 GB RAM) — expect ~1 min per answer.
+      # disabled). On CPU it loads in float32 (fast, ~6 GB RAM) if the Docker VM has >= 12 GB of memory,
+      # otherwise bfloat16 (~3 GB, about 5x slower to start answering); LOCAL_LLM_DTYPE in .env overrides.
       - ./data/models:/app/data/models:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
