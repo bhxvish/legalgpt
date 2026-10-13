@@ -1,0 +1,8 @@
+{
+ "_note": "Blind second annotation by Claude (AI annotator, reviewer id 'claude'), made from sentence text only without viewing the team's labels, following docs/annotation_guideline.md as of 2026-10-13. Used only to measure agreement; not merged into the corpus.",
+ "case04": "F A A A A A A A A A F F F F F F R P P P P P R R R R",
+ "case06": "F F F F F F F F F F F F F F F F F F A A A A A A A A A R R R R R R R L R R P P P P P R R R F P R R R R R R R R",
+ "case07": "F F F F F F F F F A A A R R R F F A R A R R F R P P P P P P P P P P P R R R A A R R R",
+ "case19": "F F F F F F F F F F A A A A A A A F R R R R P P F F F F R R R R R",
+ "case20": "F F F F F F F F F F A A A A A A R R R R R R F R R R R R R R"
+}

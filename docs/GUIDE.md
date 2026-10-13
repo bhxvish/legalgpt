@@ -220,6 +220,17 @@ questions through the same retriever:
 The adapter (~37 MB, base model not copied), `examples.jsonl` (every training example with its
 split) and `comparison.json` / `comparison.md` go to `data/models/lora/<version>-<time>/`.
 
+For a blind rating of the two chat models, `blind_eval_answers.py` answers a question list with
+both, writes a rating sheet with the answers shuffled into A/B (the key goes to a separate file), and
+unblinds the scores once the sheet is filled in:
+
+```bash
+.venv-gpu\Scripts\python backend/scripts/blind_eval_answers.py generate --questions docs/eval/blind_questions.txt
+.venv-gpu\Scripts\python backend/scripts/blind_eval_answers.py sheet
+# fill in "ratings" (1-5 per criterion) in data/reports/blind_eval.sheet.json, without opening the key
+.venv-gpu\Scripts\python backend/scripts/blind_eval_answers.py score --rater "your name"
+```
+
 The chat app offers the newest adapter next to the hosted model (the **Base / Tuned** toggle;
 `LLM_BACKEND=adapter` makes it the default). For GPU inference start the backend from the GPU
 environment:
@@ -247,6 +258,13 @@ To produce a sanity-check report on real annotated cases (written to `data/repor
 
 ```bash
 python backend/scripts/verify_case.py case20:304A case01:279 case31:323
+```
+
+To measure agreement with a labelled test set (15 fact patterns with expected verdicts in
+`docs/eval/verification_cases.json`; about 8k Groq tokens per case):
+
+```bash
+python backend/scripts/eval_verification.py
 ```
 
 ## Run the backend

@@ -1,0 +1,50 @@
+# Fact check against a labelled test set
+
+15 fact patterns from `docs/eval/verification_cases.json` ({'CONSISTENT': 7, 'INCONSISTENT': 5, 'INSUFFICIENT': 3}); fact extraction by openai/gpt-oss-120b, two runs, checked in Prolog.
+
+**Agreement: 13/15 = 87%**
+
+| expected \ got | CONSISTENT | INCONSISTENT | INSUFFICIENT |
+|---|---|---|---|
+| CONSISTENT | 6 | 0 | 1 |
+| INCONSISTENT | 0 | 4 | 1 |
+| INSUFFICIENT | 0 | 0 | 3 |
+
+| case | section | expected | got | element results |
+|---|---|---|---|---|
+| v01 | 304A | CONSISTENT | CONSISTENT | caused_death: satisfied, act_type: satisfied, intent_to_kill: satisfied, knowledge_likely_death: satisfied |
+| v02 | 304A | INCONSISTENT | INCONSISTENT | caused_death: satisfied, act_type: violated, intent_to_kill: violated, knowledge_likely_death: violated |
+| v03 | 304A | INSUFFICIENT | INSUFFICIENT | caused_death: satisfied, act_type: missing, intent_to_kill: missing, knowledge_likely_death: missing |
+| v04 | 279 | CONSISTENT | CONSISTENT | drove_vehicle: satisfied, on_public_way: satisfied, act_type: satisfied, endangered_safety: satisfied |
+| v05 | 279 | INCONSISTENT | INCONSISTENT | drove_vehicle: satisfied, on_public_way: violated, act_type: satisfied, endangered_safety: satisfied |
+| v06 | 279 | INSUFFICIENT | INSUFFICIENT | drove_vehicle: satisfied, on_public_way: missing, act_type: missing, endangered_safety: missing |
+| v07 | 337 | CONSISTENT | CONSISTENT | caused_hurt: satisfied, act_type: satisfied, endangered_safety: satisfied |
+| v08 | 338 | CONSISTENT | CONSISTENT | caused_grievous_hurt: satisfied, act_type: satisfied, endangered_safety: satisfied |
+| v09 | 323 | CONSISTENT | CONSISTENT | caused_hurt: satisfied, act_type: satisfied |
+| v10 | 323 | INCONSISTENT | INCONSISTENT | caused_hurt: satisfied, act_type: violated |
+| v11 | 379 | CONSISTENT | CONSISTENT | movable_property: satisfied, taken_from_possession: satisfied, without_consent: satisfied, dishonest_intention: satisfied, property_moved: satisfied |
+| v12 | 379 | INCONSISTENT | INCONSISTENT | movable_property: satisfied, taken_from_possession: violated, without_consent: violated, dishonest_intention: violated, property_moved: satisfied |
+| v13 | 379 | INSUFFICIENT | INSUFFICIENT | movable_property: satisfied, taken_from_possession: satisfied, without_consent: satisfied, dishonest_intention: missing, property_moved: satisfied |
+| v14 | 304B | CONSISTENT | INSUFFICIENT ✗ | woman_unnatural_death: satisfied, within_seven_years_of_marriage: missing, cruelty_by_husband_or_relative: satisfied, cruelty_soon_before_death: satisfied, dowry_demand: satisfied |
+| v15 | 304B | INCONSISTENT | INSUFFICIENT ✗ | woman_unnatural_death: satisfied, within_seven_years_of_marriage: missing, cruelty_by_husband_or_relative: satisfied, cruelty_soon_before_death: satisfied, dowry_demand: satisfied |
+
+## Disagreements
+
+- **v14** (expected CONSISTENT: all five dowry-death elements stated); got INSUFFICIENT. Elements: woman_unnatural_death=satisfied, within_seven_years_of_marriage=missing, cruelty_by_husband_or_relative=satisfied, cruelty_soon_before_death=satisfied, dowry_demand=satisfied
+- **v15** (expected INCONSISTENT: the death was twelve years after the marriage, so within_seven_years_of_marriage is false); got INSUFFICIENT. Elements: woman_unnatural_death=satisfied, within_seven_years_of_marriage=missing, cruelty_by_husband_or_relative=satisfied, cruelty_soon_before_death=satisfied, dowry_demand=satisfied
+
+## Why the two dowry-death cases missed
+
+In both v14 and v15 the extractor answered `within_seven_years_of_marriage` correctly (true in
+v14: married May 2019, died February 2022; false in v15: "twelve years after the marriage"). But
+the quote it gave as evidence was not verbatim in the text (it combined the two dates), so the
+evidence guard (`FactSchema.validate`) downgraded the answer to *unknown*. One run quoting and one
+not also counts as a disagreement, which gives *unknown* as well. The system failed on the safe
+side: INSUFFICIENT, never a wrong CONSISTENT or INCONSISTENT. The likely fix is to tell the
+extractor that facts derived from two places, such as dates, must quote both pieces joined with
+"...", which the guard already accepts. It was not applied here, to avoid tuning the prompt on the
+test set; a fresh set of cases should measure any such fix.
+
+**Who labelled:** the fact patterns and their expected verdicts were written by Claude (AI, not a
+lawyer) from the encoded element definitions. This is a check that the pipeline does what the
+rules say, not a validation of the rules by a legal expert.

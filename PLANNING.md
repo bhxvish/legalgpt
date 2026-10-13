@@ -441,6 +441,51 @@ legalgpt/
   GitHub at first (no remote yet); since the repo was pushed (2026-10-03) every push runs it on
   GitHub Actions, and the first runs passed (backend tests with SWI-Prolog, frontend build).
 
+## Evaluation and corpus v0.3 (2026-10-13)
+
+The five "must do" items from the completion review. The team was unavailable, so all five were
+done by Claude (Opus 5.5) and are labelled that way: an AI annotator or judge, not a lawyer or a
+second human annotator.
+
+- **Guideline: Ruling vs Precedent.** Decision: ask *whose conclusion* the sentence states. If it
+  is the earlier court's, it is Precedent; if it is this court's finding on the evidence or the
+  parties, it is Ruling, even when a case is cited. Weighing evidence is Ruling. This confirms the
+  team's labels in case17, where the classifier was wrong. Added to `label_scheme.py` guidance (text
+  only; the labels, shortcuts and UI are unchanged) and regenerated `docs/annotation_guideline.md`.
+- **Queued cases reviewed, corpus v0.3 frozen.** The 3 open SC 2023 cases were re-queued with
+  classifier v2 on the same pinned sentences, which flagged 361 sentences instead of 491; Bhavish's
+  2 decisions were carried over. Every flagged sentence was reviewed by `claude` and signed off:
+  - mukesh-singh: promoted; 167 reviewed; audit error 9%.
+  - prakash-nishad: promoted; 107 reviewed; audit error 9%.
+  - rajo: escalated by the audit rule (4 of 16 confident spot checks wrong, 25% > 20%, mostly
+    quoted precedent read as Law Applied). It was then annotated in full by `claude`
+    (source `manual`; 69 of 225 model labels changed).
+
+  Corpus **v0.3**: 36 cases, 5,602 sentences (sha256 `37f69ae4…`). Old queue files are in
+  `review_queue_backup_v0.1/`.
+- **Agreement:** a blind second annotation of 5 team cases (187 sentences) gives
+  **κ = 0.911** (93.6% raw). 10 of the 12 disagreements are Facts vs Ruling on restated evidence.
+  See [report](docs/reports/annotation_agreement_v0.3.md).
+- **Blind answer rating** (`backend/scripts/blind_eval_answers.py`, 20 questions in
+  `docs/eval/blind_questions.txt`): answers shuffled to A/B with their sources, rated 1–5, then
+  unblinded. Results:
+  - Groq gpt-oss-120b **4.75** vs LoRA v0.3 **4.53** (relevance 5.00/4.60, groundedness
+    4.90/4.75, completeness 4.35/4.25).
+  - LoRA scored higher on 8 questions, Groq on 4, with 8 ties. LoRA's wins are small (it names
+    the section); its losses are serious: a wrong culpable homicide vs murder answer, a wrong
+    section, and a punishment question it didn't answer.
+  - Blinding was partial: the two answer styles are recognisable.
+  - Both everyday scenarios (bicycle theft, surgeon's negligence) were refused because retrieval
+    missed the section, which confirms the fact-pattern retrieval limitation.
+
+  See [report](docs/reports/blind_eval_v0.3.md).
+- **Fact-check test set** (`docs/eval/verification_cases.json`: 15 fact patterns across all 7
+  sections with expected verdicts; `backend/scripts/eval_verification.py`): **13/15 = 87%**
+  agreement, with no wrong CONSISTENT or INCONSISTENT verdict. The 2 misses (both s.304B)
+  returned INSUFFICIENT: "within seven years of marriage" is derived from two dates, and the
+  extractor's non-verbatim quote was rejected by the evidence guard. See
+  [report](docs/reports/verification_eval.md).
+
 ## Known limitations
 
 **Scope**
@@ -472,7 +517,8 @@ legalgpt/
 - v0.2 (124 judgment-based examples) over-refused: it had never seen IPC sections as sources.
   v0.3 (2026-10-13, retrained with IPC Q&A) answers and cites correctly on held-out sections, but its
   answers quote the provision rather than explain or apply it, and it was not evaluated on fact
-  patterns or by blind reviewers. Still not a replacement for the hosted model for reasoning.
+  patterns. In a blind rating (AI judge) it scored 4.53 vs Groq's 4.75, with occasional wrong-section or
+  off-question answers. Still not a replacement for the hosted model for reasoning.
 - Speed: float32 on CPU needs ~6 GB RAM; machines under 12 GB (including Docker's default VM) fall
   back to bfloat16, where reading the prompt takes ~30 s on CPUs without native bfloat16. Its 3 GB
   base model downloads at ~0.2 MB/s inside Docker here, so `HF_CACHE_DIR` mounts the host cache.
@@ -483,13 +529,16 @@ legalgpt/
 - The verdict is only as good as the extracted facts; the quote check proves a quote exists, not
   that it supports the value (case01's first run used the father's hearsay as evidence of driving).
   Extraction is legal judgement in disguise (case07: "accidental fire" classed as not negligent).
+- Facts derived from two places (dates for "within seven years") can fail the verbatim-quote guard and
+  become unknown (2 of 15 test cases, both s.304B, gave INSUFFICIENT instead of a verdict).
 - Each verification costs two hosted-model calls; on the Groq free tier several in a row hit the
   per-minute token limit (retried, but slow).
 
 **Dataset and annotation**
-- 31 seed cases plus 1 BERT-assisted case (3 more queued for the team); single annotation pass, so inter-annotator agreement on real data
-  is **unmeasured** and the guideline is not validated the way the LLD intends. The 79
-  `bert_assisted` labels were reviewed by Claude, not the team.
+- Corpus v0.3: 31 team-labelled seed cases, 4 BERT-assisted cases and 1 escalated case annotated
+  in full. Most assisted-case reviews (and the escalated case) were done by Claude, not the team.
+  Agreement was measured against an AI second annotator (κ = 0.911 on 5 short cases), not
+  between two human annotators; long SC judgments with nested quotations are likely harder.
 - Label skew: Facts 38%, Precedent 23%, Ruling 21%, Argument 10%, Law Applied 9%. Classifier
   macro-F1 0.664 ± 0.031 (5-fold, case-grouped) on this small set; 0.744 ± 0.040 with context and
   full fine-tuning (Phase 3, classifier v2). A whole unusual case can be labelled wrong with high
@@ -509,7 +558,8 @@ legalgpt/
   is still orders of magnitude too slow and memory-hungry for a 1.5B+ model on this hardware, and it
   would prove *which* model ran, not that the legal answer is right.
 - BNS/BNSS corpus and IPC↔BNS section mapping; judgments as a second retrieval source.
-- Double annotation with measured kappa; human-written answer targets for LoRA training.
+- Human double annotation and human / expert ratings (the 2026-10-13 measurements used an AI
+  annotator and judge); human-written answer targets for LoRA training.
 - More Prolog sections, exceptions and Chapter IV defences.
 
 ## Final acceptance (checked 2026-10-03)

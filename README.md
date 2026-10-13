@@ -79,14 +79,18 @@ Try asking:
 
 ## Results
 
-All numbers are measured on held-out data; the details are in [PLANNING.md](PLANNING.md).
+All numbers are measured on held-out data; the details are in [PLANNING.md](PLANNING.md). The second
+annotation, the answer ratings and the fact-check test set were made by an AI (Claude), not by
+lawyers. The reports say exactly what was measured.
 
 | Part | Result |
 |---|---|
 | **Retrieval** | All 574 sections of the India Code IPC parsed into 685 chunks. The refusal threshold (0.55 cosine similarity) was calibrated on in-scope vs out-of-scope questions. |
 | **Sentence-role classifier** (InLegalBERT) | Accuracy **78%**, macro-F1 **0.74 ± 0.04** (5-fold cross-validation over 31 annotated judgments, up from 71% and 0.66 after adding sentence context). At the default confidence bar, **19%** of sentences need a human check (was 44%). |
 | **LoRA fine-tuning** (Qwen2.5-1.5B, 4-bit QLoRA) | Adapter v0.3, retrained on grounded questions built from the IPC itself: on 41 questions about 29 IPC sections held out of training it answers **100%** and cites the right section **98%** of the time (v0.2: 39% / 39%; it mostly said "I don't know"). Answers quote the provision rather than explain it. Runs locally: under a second per answer on the GPU, first words in 6–10 s on CPU. [Report](docs/reports/lora_v0.3_ipc_eval.md) |
-| **Fact verification** | 7 IPC sections encoded as element checklists in Prolog; each extracted fact must quote the user's text, and extraction runs twice to keep only stable answers. |
+| **Fact verification** | 7 IPC sections encoded as element checklists in Prolog; each extracted fact must quote the user's text, and extraction runs twice to keep only stable answers. On 15 test fact patterns it gives the expected verdict **13/15** times; the 2 misses say "insufficient facts" rather than giving a wrong verdict. [Report](docs/reports/verification_eval.md) |
+| **Blind answer rating** | 20 questions, each answer rated 1–5 for relevance, groundedness and completeness without knowing which model wrote it: hosted model **4.75**, tuned LoRA **4.53**. [Report](docs/reports/blind_eval_v0.3.md) |
+| **Dataset** | Corpus v0.3: 36 judgments, 5,602 labelled sentences. Labelling agreement with an independent second annotation **κ = 0.91** (5 cases). [Report](docs/reports/annotation_agreement_v0.3.md) |
 
 ## Run without Docker
 
@@ -131,8 +135,8 @@ docs/                             full guide, annotation guideline, reports
   2024 fall under the BNS, which is not covered.
 - **"Evidence match" is not correctness.** It says how well the retrieved law matches the question,
   not whether the answer is right.
-- **Small dataset:** 31 hand-labelled judgments plus one assisted case; agreement between
-  annotators has not been measured yet.
+- **Small dataset:** 36 judgments. Agreement was measured against an AI second annotator, not
+  between two people.
 - **The fact check is only as good as the extracted facts**, and covers 7 sections without
   exceptions or general defences.
 - **No login or rate limiting:** run it locally or behind your own access control.
@@ -143,7 +147,8 @@ The full list is in [PLANNING.md → Known limitations](PLANNING.md#known-limita
 
 - **BNS coverage**, with a mapping from IPC to BNS sections; judgments as a second source.
 - **More Prolog sections**, including exceptions and general defences.
-- **Double annotation** to measure inter-annotator agreement; human-written answers for LoRA training.
+- **Human double annotation and expert ratings** (the current agreement and answer ratings use an
+  AI annotator and judge); human-written answers for LoRA training.
 - **ZKML (zero-knowledge proofs of model inference): deliberately not implemented.** Proving a
   transformer's forward pass in zero knowledge is still orders of magnitude too slow for a 1.5B+
   model on this hardware, and it would prove *which model ran*, not that the legal answer is right.
@@ -153,7 +158,11 @@ The full list is in [PLANNING.md → Known limitations](PLANNING.md#known-limita
 - [Full guide](docs/GUIDE.md): every module, script, setting and API endpoint
 - [PLANNING.md](PLANNING.md): design decisions, measured results and known limitations, phase by phase
 - [Annotation guideline](docs/annotation_guideline.md): how to label sentence roles
-- [LoRA comparison report](docs/reports/lora_v0.2_comparison.md)
+- Reports: [LoRA v0.3 on held-out sections](docs/reports/lora_v0.3_ipc_eval.md),
+  [blind answer rating](docs/reports/blind_eval_v0.3.md),
+  [fact-check test set](docs/reports/verification_eval.md),
+  [annotation agreement](docs/reports/annotation_agreement_v0.3.md),
+  [LoRA v0.2 comparison](docs/reports/lora_v0.2_comparison.md)
 
 ## Acknowledgements
 

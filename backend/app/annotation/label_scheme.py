@@ -77,7 +77,10 @@ _LABELS: tuple[LabelDef, ...] = (
         ),
         guidance=(
             "Any sentence whose main content is what another court held. A sentence that only names "
-            "a case in passing while stating this court's conclusion is Ruling."
+            "a case in passing while stating this court's conclusion is Ruling. Ruling vs Precedent: "
+            "ask whose conclusion the sentence states. If it is the earlier court's (what was held, "
+            "and why it does or does not fit), it is Precedent; if it is this court's finding on the "
+            "evidence or the parties before it, it is Ruling, even when a case is cited as support."
         ),
         examples=(
             "In Virsa Singh v. State of Punjab, AIR 1958 SC 465, this Court explained what the "
@@ -119,7 +122,9 @@ _LABELS: tuple[LabelDef, ...] = (
         guidance=(
             "Includes appreciation of evidence ('we find the testimony of PW-2 trustworthy'), "
             "conclusions on each issue, and the final order (conviction, acquittal, sentence, appeal "
-            "allowed or dismissed)."
+            "allowed or dismissed). Weighing evidence is Ruling even when the court cites a case for "
+            "the test it applies ('applying that test, the dying declaration here is reliable'). "
+            "See Precedent for the tie-break."
         ),
         examples=(
             "We find that the evidence of the eyewitnesses is consistent and is corroborated by the "

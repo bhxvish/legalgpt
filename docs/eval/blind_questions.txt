@@ -1,0 +1,23 @@
+# Questions for the blind answer rating (backend/scripts/blind_eval_answers.py).
+# Mix of plain questions, everyday scenarios and one out-of-scope question; most sections are
+# among those held out of LoRA training (app/finetuning/ipc_qa.py EVAL_SECTIONS).
+What is the punishment for causing death by negligence?
+What is the difference between culpable homicide and murder?
+What is the punishment for theft?
+A man took his neighbour's bicycle without permission and sold it. Which offence has he committed?
+What is dowry death under the IPC?
+What is the punishment for voluntarily causing hurt?
+What is cheating and dishonestly inducing delivery of property under Section 420?
+What is the punishment for criminal intimidation?
+What is the punishment for rash driving on a public way?
+What does Section 498A of the IPC provide?
+What is the punishment for criminal breach of trust?
+What is the punishment for defamation?
+When does the right of private defence of the body extend to causing death?
+What is the punishment for kidnapping?
+What is the punishment for wrongful confinement?
+What is the offence of assault or criminal force to a woman with intent to outrage her modesty?
+A surgeon's careless mistake during an operation caused the patient's death. Which IPC section applies?
+What is the punishment for robbery?
+What is the punishment for house-trespass by night?
+What is the procedure to file for divorce in India?

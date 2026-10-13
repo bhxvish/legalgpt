@@ -82,7 +82,7 @@ sentence becomes the gold label, so adjudication is simply re-labelling the sent
 
 **Definition.** References to earlier judgments: the case cited, the principle it laid down, or the court's reason for following or distinguishing it.
 
-**How to apply.** Any sentence whose main content is what another court held. A sentence that only names a case in passing while stating this court's conclusion is Ruling.
+**How to apply.** Any sentence whose main content is what another court held. A sentence that only names a case in passing while stating this court's conclusion is Ruling. Ruling vs Precedent: ask whose conclusion the sentence states. If it is the earlier court's (what was held, and why it does or does not fit), it is Precedent; if it is this court's finding on the evidence or the parties before it, it is Ruling, even when a case is cited as support.
 
 **Examples** (representative sentences, not quotations):
 
@@ -108,7 +108,7 @@ sentence becomes the gold label, so adjudication is simply re-labelling the sent
 
 **Definition.** The present court's own reasoning, findings and decision: how it evaluates the evidence, applies the law to these facts, and disposes of the case.
 
-**How to apply.** Includes appreciation of evidence ('we find the testimony of PW-2 trustworthy'), conclusions on each issue, and the final order (conviction, acquittal, sentence, appeal allowed or dismissed).
+**How to apply.** Includes appreciation of evidence ('we find the testimony of PW-2 trustworthy'), conclusions on each issue, and the final order (conviction, acquittal, sentence, appeal allowed or dismissed). Weighing evidence is Ruling even when the court cites a case for the test it applies ('applying that test, the dying declaration here is reliable'). See Precedent for the tie-break.
 
 **Examples** (representative sentences, not quotations):
 
