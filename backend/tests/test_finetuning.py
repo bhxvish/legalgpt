@@ -168,3 +168,37 @@ def test_local_model_precision_choice() -> None:
     assert choose_dtype("cpu", ram_gb=16) == "float32"  # AVX2 CPUs read prompts ~5x faster in float32
     assert choose_dtype("cpu", ram_gb=7.6) == "bfloat16"  # float32 needs ~6 GB: keep small machines safe
     assert choose_dtype("cpu", "4bit") == "4bit" and choose_dtype("cuda", "float32") == "float32"
+
+
+def test_ipc_qa_examples_mirror_the_chat_and_hold_out_eval_sections() -> None:
+    from app.core.models import Chunk, SourceEvidence
+    from app.core.prompt_builder import NOT_COVERED_REPLY
+    from app.finetuning.ipc_qa import EVAL_SECTIONS, IpcQaBuilder
+
+    def chunk(sec: str, title: str, body: str) -> Chunk:
+        return Chunk(f"IPC:{sec}:x", "IPC", f"Section {sec}. {title}\n{body}", f"IPC > Chapter XVII > Section {sec}",
+                     "XVII", sec, title)
+
+    chunks = [chunk("378", "Theft", "Whoever, intending to take dishonestly any movable property, commits theft."),
+              chunk("379", "Punishment for theft", "Whoever commits theft shall be punished with imprisonment."),
+              chunk("381", "Theft by clerk or servant", "Whoever, being a clerk, commits theft shall be punished."),
+              chunk("390", "Robbery", "In all robbery there is either theft or extortion."),
+              chunk("411", "Dishonestly receiving stolen property", "Whoever dishonestly receives stolen property.")]
+
+    class FakeRetriever:  # returns the asked section first, then two neighbours
+        def retrieve(self, q):
+            hits = [c for c in chunks if c.section in q or c.title.lower() in q.lower()] or chunks[:1]
+            picked = (hits + [c for c in chunks if c not in hits])[:3]
+            return [SourceEvidence(marker=i, chunk_id=c.chunk_id, doc_id="IPC", citation_path=c.citation_path,
+                                   text=c.text, similarity=0.8, score=0.8, role="Law", section=c.section, title=c.title)
+                    for i, c in enumerate(picked, 1)]
+
+    examples = IpcQaBuilder(FakeRetriever(), chunks, seed=1, refusal_share=0.25).build([c.section for c in chunks])
+    assert "379" in EVAL_SECTIONS and "ipc:379" not in {e.source_case_id for e in examples}  # held out
+    answers = [e for e in examples if e.task == "ipc_answer"]
+    assert answers and all(e.instruction.startswith("SOURCES:\n[1]") and "\n\nQUESTION: " in e.instruction for e in answers)
+    assert all("[1]" in e.output for e in answers)  # cites the asked section's marker
+    refusals = [e for e in examples if e.task == "ipc_refusal"]
+    assert all(e.output == NOT_COVERED_REPLY for e in refusals)
+    for e in refusals:  # the asked section is genuinely absent from the sources
+        assert f"Section {e.source_case_id[4:]}\n" not in e.instruction

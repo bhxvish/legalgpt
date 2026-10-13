@@ -37,12 +37,31 @@ def main() -> int:
     ap.add_argument("--max-steps", type=int, default=-1)
     ap.add_argument("--seed", type=int, default=d.seed)
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--ipc-qa", action="store_true",
+                    help="add grounded Q&A examples built from the IPC with the real retriever (app/finetuning/ipc_qa.py)")
+    ap.add_argument("--no-case-refusals", action="store_true",
+                    help="drop the judgment-based refusal examples (they taught v0.2 to refuse IPC sources)")
     args = ap.parse_args()
 
     s = get_settings()
     manifest, sentences = AnnotationStore(s.annotation_store_dir).load_version(args.version, verify=True)
     builder = InstructionBuilder(seed=args.seed)
     examples = builder.build_corpus(sentences)
+    if args.no_case_refusals:
+        examples = [e for e in examples if e.task != "grounded_refusal"]
+    if args.ipc_qa:
+        from app.core.corpus import load_chunks
+        from app.core.embeddings import EmbeddingService
+        from app.core.retriever import Retriever
+        from app.core.vector_store import VectorStore
+        from app.finetuning.ipc_qa import EVAL_SECTIONS, IpcQaBuilder
+
+        chunks = load_chunks(s.corpus_chunks_path)
+        retriever = Retriever(EmbeddingService(s.embedding_model), VectorStore(s.chroma_persist_dir, s.chroma_collection),
+                              min_similarity=s.retrieval_min_similarity)
+        ipc = IpcQaBuilder(retriever, chunks, seed=args.seed).build(sorted({c.section for c in chunks if c.section}))
+        print(f"IPC Q&A: {len(ipc)} examples; {len(EVAL_SECTIONS)} sections held out for evaluation")
+        examples += ipc
     splits = builder.split_by_case(examples, seed=args.seed)
     case_sets = {k: {e.source_case_id for e in v} for k, v in splits.items()}
     assert not (case_sets["train"] & case_sets["val"] or case_sets["train"] & case_sets["test"] or case_sets["val"] & case_sets["test"])

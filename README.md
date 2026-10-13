@@ -85,7 +85,7 @@ All numbers are measured on held-out data; the details are in [PLANNING.md](PLAN
 |---|---|
 | **Retrieval** | All 574 sections of the India Code IPC parsed into 685 chunks. The refusal threshold (0.55 cosine similarity) was calibrated on in-scope vs out-of-scope questions. |
 | **Sentence-role classifier** (InLegalBERT) | Accuracy **78%**, macro-F1 **0.74 ± 0.04** (5-fold cross-validation over 31 annotated judgments, up from 71% and 0.66 after adding sentence context). At the default confidence bar, **19%** of sentences need a human check (was 44%). |
-| **LoRA fine-tuning** (Qwen2.5-1.5B, 4-bit) | Learned the required citation format (5 of 6 answers vs 0 of 6 for the untuned model) but copies sources and refuses too often. Useful as a study, not a replacement for the hosted model. |
+| **LoRA fine-tuning** (Qwen2.5-1.5B, 4-bit QLoRA) | Adapter v0.3, retrained on grounded questions built from the IPC itself: on 41 questions about 29 IPC sections held out of training it answers **100%** and cites the right section **98%** of the time (v0.2: 39% / 39%; it mostly said "I don't know"). Answers quote the provision rather than explain it. Runs locally: under a second per answer on the GPU, first words in 6–10 s on CPU. [Report](docs/reports/lora_v0.3_ipc_eval.md) |
 | **Fact verification** | 7 IPC sections encoded as element checklists in Prolog; each extracted fact must quote the user's text, and extraction runs twice to keep only stable answers. |
 
 ## Run without Docker

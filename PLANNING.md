@@ -324,6 +324,22 @@ legalgpt/
 - **Serving:** `LLM_BACKEND=adapter` switches ChatRouter to AdapterClient with no code change
   (verified end to end through `/api/chat`); run the backend from `.venv-gpu` for GPU inference.
 
+- **Speed and retraining (2026-10-13).** *Speed:* the tuned model took 30–49 s per answer on CPU
+  because it ran in bfloat16 on a CPU without native bfloat16 (i7-12700H, AVX2): reading a 0.8k-token
+  prompt alone took ~32 s. Now float32 on CPUs with >= 12 GB RAM (first words in 5–8 s, identical
+  output) and bfloat16 instead of 4-bit on the GPU (<1 s per answer); the adapter is merged into the
+  weights. int8 dynamic quantization was faster still but changed the answers, so it was rejected.
+  Training does not change speed. *Quality:* v0.2 answered "I don't know" to most IPC questions: all
+  its cited-answer examples used judgment sentences as sources, and 29 of its 61 prompt-format examples
+  were refusals. v0.3 adds 570 examples built from the IPC with the real retriever (514 answers quoting
+  the asked section with its [n] marker, 56 refusals where that section is genuinely absent) and drops
+  the judgment refusals; 30 sections (279, 302, 304, 304A, 379, 498A, …) are held out entirely. Trained
+  2 epochs in 30 min on the RTX 3050 Ti (validation loss 0.519 → 0.184). On 41 questions about the 29
+  held-out sections found by the retriever (scripts/eval_ipc_qa.py): answered 39% → 100%, right
+  section cited 39% → 98%, all citations valid 39% → 100%
+  (docs/reports/lora_v0.3_ipc_eval.md). The one miss quoted s.503 (definition) for the punishment
+  for criminal intimidation (s.506).
+
 ### Phase 5 (Module 4)
 
 - **Evidence-centric, no SHAP/LIME:** everything comes from retrieval similarities, the answer
@@ -453,12 +469,13 @@ legalgpt/
 - `citation_accuracy` (Phase 4) measures grounding, not relevance or correctness.
 
 **Tuned model**
-- Trained on 124 examples from 26 cases: it cites in the required format but copies sources and
-  over-refuses (Phase 4) — in Docker it answered "I don't know" to s.304A and s.379 questions with the
-  right section as source [1] (the Why panel flags it). Not a drop-in replacement for the hosted model.
-  In the CPU Docker image it runs in bfloat16 (~3 GB; same speed as float32 on this CPU, 5 tokens/s):
-  first answer ~2 min including the model load, then ~20–30 s. Its 3 GB base model downloads at
-  ~0.2 MB/s inside Docker here, so `HF_CACHE_DIR` mounts the host's Hugging Face cache instead.
+- v0.2 (124 judgment-based examples) over-refused: it had never seen IPC sections as sources.
+  v0.3 (2026-10-13, retrained with IPC Q&A) answers and cites correctly on held-out sections, but its
+  answers quote the provision rather than explain or apply it, and it was not evaluated on fact
+  patterns or by blind reviewers. Still not a replacement for the hosted model for reasoning.
+- Speed: float32 on CPU needs ~6 GB RAM; machines under 12 GB (including Docker's default VM) fall
+  back to bfloat16, where reading the prompt takes ~30 s on CPUs without native bfloat16. Its 3 GB
+  base model downloads at ~0.2 MB/s inside Docker here, so `HF_CACHE_DIR` mounts the host cache.
 
 **Verification**
 - 7 sections (by design). s.337/338 do not exclude cases where the victim died; s.323 ignores the
