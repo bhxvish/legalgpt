@@ -1,0 +1,4 @@
+# Optional: zero-knowledge proofs of the fact check and retrieval (app/zk/).
+# pip install -r backend/requirements-zk.txt, then python backend/scripts/zk_setup.py
+ezkl==23.0.5
+onnx==1.19.1

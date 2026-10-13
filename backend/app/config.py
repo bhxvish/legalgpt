@@ -71,6 +71,12 @@ class Settings(BaseSettings):
     # Comma-separated list of origins allowed by CORS (Vite dev server by default).
     cors_origins: str = Field(default="http://localhost:5173", alias="CORS_ORIGINS")
 
+    # ZKML (app/zk/): circuits + proving keys + signing key (git-ignored), and the published
+    # manifest / verification keys (committed). Build them with scripts/zk_setup.py.
+    zk_dir: Path = Field(default=REPO_ROOT / "data" / "zk", alias="ZK_DIR")
+    zk_published_dir: Path = Field(default=REPO_ROOT / "docs" / "zk", alias="ZK_PUBLISHED_DIR")
+    attest_answers: bool = Field(default=True, alias="ATTEST_ANSWERS")
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

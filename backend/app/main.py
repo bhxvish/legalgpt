@@ -28,6 +28,8 @@ from app.labeling_assistant.intake import JudgmentIntake
 from app.labeling_assistant.review_queue import HumanReviewQueue
 from app.labeling_assistant.router import ReviewRouter
 from app.verification.router import VerifyRouter
+from app.zk.router import ZkRouter
+from app.zk.service import ZkService
 
 if TYPE_CHECKING:
     from app.verification.verification_service import VerificationService
@@ -106,6 +108,22 @@ def build_chat_router(settings: Settings, verifier: "VerificationService | None"
                       model_notes=notes, verifier=verifier)
 
 
+def build_zk_service(settings: Settings, chat_router: ChatRouter) -> "ZkService | None":
+    """Proofs need EZKL and the circuits from scripts/zk_setup.py; verification needs only the
+    published keys; answer signing needs neither. None only if even that fails."""
+    try:
+        attestor = None
+        if settings.attest_answers:
+            from app.zk.attest import Attestor
+
+            attestor = Attestor(settings.zk_dir / "signing_key.pem")
+        retriever = chat_router.retriever if isinstance(chat_router.retriever, Retriever) else None
+        return ZkService(settings.zk_dir, settings.zk_published_dir, retriever=retriever, attestor=attestor)
+    except Exception:
+        logger.exception("zero-knowledge proofs and answer signing disabled")
+        return None
+
+
 def build_annotation_router(settings: Settings) -> AnnotationRouter:
     return AnnotationRouter(JudgmentCollector(settings.raw_judgments_dir), AnnotationStore(settings.annotation_store_dir))
 
@@ -161,8 +179,13 @@ def create_app(chat_router: ChatRouter | None = None, annotation_router: Annotat
     app.include_router(chat_router.router)
     app.include_router((annotation_router or build_annotation_router(settings)).router)
     app.include_router(build_review_router(settings).router)
+    zk = build_zk_service(settings, chat_router)
+    if zk is not None:
+        app.include_router(ZkRouter(zk).router)
+        if zk.attestor is not None and zk.retriever is not None:
+            chat_router.attest = zk.attest_answer
     if verifier is not None:
-        app.include_router(VerifyRouter(verifier).router)
+        app.include_router(VerifyRouter(verifier, zk).router)
     return app
 
 

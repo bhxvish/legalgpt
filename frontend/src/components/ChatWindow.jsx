@@ -4,6 +4,7 @@ import { chatTitle, loadChats, newId, relativeTime, saveChats } from '../chatSto
 import SourceModal from './SourceModal.jsx'
 import { VerificationResultView } from './VerifyPanel.jsx'
 import WhyPanel from './WhyPanel.jsx'
+import { AnswerProof } from './ZkProof.jsx'
 
 const HISTORY_MESSAGES = 6
 
@@ -138,6 +139,7 @@ function AssistantMessage({ msg, onCite }) {
         </div>
       )}
       {msg.explanation && <WhyPanel explanation={msg.explanation} sources={msg.sources} onOpenSource={onCite} />}
+      <AnswerProof msg={msg} />
       {msg.verifySection && !msg.verification && !msg.error && (
         <p className="mt-3 animate-pulse text-xs text-slate-500">Checking the facts against s.{msg.verifySection}…</p>
       )}
@@ -283,7 +285,7 @@ export default function ChatWindow() {
       const verify = mode === 'legal' && verifySection ? verifySection : null
       const added = [
         { id: newId(), role: 'user', content: question, mode },
-        { id: botId, role: 'assistant', content: '', mode, sources: [], verifySection: verify },
+        { id: botId, role: 'assistant', content: '', mode, question, sources: [], verifySection: verify },
       ]
       const chatId = activeId || newId()
       const now = Date.now()
@@ -308,6 +310,7 @@ export default function ChatWindow() {
             else if (event === 'token') upd((m) => ({ ...m, content: m.content + data.text }))
             else if (event === 'explanation') upd((m) => ({ ...m, explanation: data }))
             else if (event === 'verification') upd((m) => ({ ...m, verification: data }))
+            else if (event === 'attestation') upd((m) => ({ ...m, attestation: data }))
             else if (event === 'error') upd((m) => ({ ...m, error: data.message }))
           },
           controller.signal,

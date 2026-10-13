@@ -105,3 +105,18 @@ export const verifyApi = {
       body: JSON.stringify({ case_text: caseText, cited_section: citedSection }),
     }).then(json),
 }
+
+const post = (path, body) =>
+  fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(json)
+
+/** Zero-knowledge proofs (app/zk): fact-check verdicts, retrieval, and signed answers. */
+export const zkApi = {
+  manifest: () => fetch(`${API_BASE_URL}/api/zk/manifest`).then(json),
+  proveVerdict: (facts, section) => post('/api/zk/prove/verdict', { facts, section }),
+  proveRetrieval: (question) => post('/api/zk/prove/retrieval', { question }),
+  verify: (bundle, extra = {}) => post('/api/zk/verify', { bundle, ...extra }),
+}

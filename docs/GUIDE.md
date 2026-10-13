@@ -72,7 +72,7 @@ illustrative facts, not real cases.
 | 3 Fine-tuning | 4-bit LoRA on Qwen2.5-1.5B, instruction builder, base-vs-tuned comparison, in-app toggle | Human-written answer targets (the adapter copies sources and over-refuses) |
 | 4 Explainability | Evidence-match band, citation checks, sentence attribution, warnings on every legal answer | Detecting subtle legal errors, not just unsupported sentences |
 | 5 Verification | Prolog element checklists for 7 sections (279, 304A, 304B, 323, 337, 338, 379), quote-checked two-run fact extraction | More sections, exceptions and Chapter IV defences |
-| — | — | **ZKML proofs of inference: not implemented** — proving a transformer forward pass in zero knowledge is still orders of magnitude too slow for a 1.5B+ model on this hardware, and it would prove which model ran, not that the answer is legally right. |
+| ZKML | Zero-knowledge proofs (EZKL) of fact-check verdicts (facts hidden) and of retrieval over all chunks; commitments manifest; Ed25519-signed answers; offline verifier ([docs/zk](zk/README.md)) | Proving the LLMs themselves: a 1.5B+ transformer is still orders of magnitude too slow to prove on this hardware, and it would prove which model ran, not that the answer is legally right |
 
 Known limitations are consolidated in [PLANNING.md](../PLANNING.md#known-limitations).
 
@@ -266,6 +266,24 @@ To measure agreement with a labelled test set (15 fact patterns with expected ve
 ```bash
 python backend/scripts/eval_verification.py
 ```
+
+## Verifiable results (ZKML)
+
+Optional. Install EZKL and build the circuits once (about a minute; needs SWI-Prolog and the search
+index; writes about 1.3 GB of proving keys to `data/zk/`, which is git-ignored):
+
+```bash
+pip install -r backend/requirements-zk.txt
+python backend/scripts/zk_setup.py
+```
+
+The **Verify** tab then offers *Generate proof*, a zero-knowledge proof that the verdict follows
+from the published rules, with the facts hidden. Each chat answer gets a **Signed** panel with
+*Check signature* and *Prove the sources*. To check a downloaded proof offline from the published
+files, run `python backend/scripts/zk_verify.py <file>`. Re-run `zk_setup.py` after changing the
+corpus, the rules or the retrieval settings. Settings: `ZK_DIR` (default `data/zk`) and
+`ATTEST_ANSWERS` (default `true`). Details, the API and what is *not* proved:
+[docs/zk/README.md](zk/README.md).
 
 ## Run the backend
 

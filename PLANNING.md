@@ -105,7 +105,8 @@ legalgpt/
   marked, skippable integration tests.
 - Keep the LLD's class boundaries; flag any redesign explicitly.
 - Scope: IPC criminal law only. Prolog KB: 5–10 sections. Fine-tuning: 4-bit + LoRA only.
-- ZKML is out of scope for all phases (documented future work).
+- ZKML was out of scope for the original phases; it was added afterwards for the fact check and retrieval
+  (see "ZKML: verifiable fact check and retrieval"). Proving the LLMs themselves remains future work.
 - No fabricated metrics — anything needing a real run is computed live.
 - One commit per phase (or logical sub-step), e.g. `feat(module-1): add JudgmentCollector`.
 - Each phase ends with a pass/fail report against its acceptance checklist.
@@ -486,6 +487,46 @@ second human annotator.
   extractor's non-verbatim quote was rejected by the evidence guard. See
   [report](docs/reports/verification_eval.md).
 
+## ZKML: verifiable fact check and retrieval (2026-10-13)
+
+Code in `backend/app/zk/`; published files and the full explanation in [docs/zk](docs/zk/README.md).
+
+- **Commitments:** SHA-256 Merkle root over the 685 chunks (leaf = canonical JSON, in chunk_id
+  order), a hash of the embedding matrix, the rules files (hashed with LF line endings) and the
+  LoRA adapter. All are in `docs/zk/manifest.json`. A test fails if the rules change without
+  rebuilding the circuits.
+- **Verdict circuit (zero knowledge):**
+  - The facts are encoded as 23 integers (booleans ±1/0; act type as known + one-hot). The
+    element statuses are W·x, with W (26 × 23) built from the Prolog element definitions. This
+    exactly reproduces `core.pl`, and was checked against Prolog on 15 extracted and 300 random
+    fact sets.
+  - Input visibility is *hashed* (Poseidon), so the facts stay private.
+  - Because the input is private, the circuit must reject malformed encodings itself: an extra
+    output is a penalty that is 0 only for valid encodings, and the verifier requires 0. Found
+    while designing it; without it, a prover could claim two act types at once.
+  - Scale 0, 2^13 rows: about 1 s to prove, 0.03 s to verify, 33 KB proof.
+- **Retrieval circuit:**
+  - q (public) → E·q over all 685 chunks, with E as circuit constants, at fixed-point scale 12
+    (error ≈ 0.0005).
+  - The verifier re-runs `Retriever.rerank`/`assemble_context` (exact top-k, explicit section
+    matches, role weights, floor, budget) on the proven scores, using the rules published in the
+    manifest.
+  - About 8 s to prove, 0.1 s to verify, 196 KB proof. The 906 MB proving key is git-ignored.
+  - The live index is approximate (HNSW); the proof uses exact scores, and the UI says if they
+    differ. Building this found one stale chunk in the local index (s.354D), now re-indexed.
+- **Answers:** Ed25519-signed record per legal answer (`attestation` SSE event). It holds hashes of
+  the question, prompt and answer, the cited chunks' Merkle leaves, the model and adapter, and the
+  corpus root. This is attestation, not a proof of LLM inference.
+- **Decisions:**
+  - EZKL (Python, Halo2/KZG) rather than a zkVM: both computations are linear algebra, and EZKL
+    proves them directly from PyTorch.
+  - Public values are decoded from the proof's bound `instances`, never `pretty_public_inputs`.
+  - EZKL is optional (`requirements-zk.txt`), so the app and CI run without it.
+  - EZKL panics without `HOME` (unset for Windows services), so the prover sets it.
+- **Limits:** see docs/zk ("What is NOT proved"). The extraction and the LLMs are not proved, nor
+  are follow-up retrieval or the MiniLM query embedding. Keys come from EZKL's public SRS, and
+  setup was run by us.
+
 ## Known limitations
 
 **Scope**
@@ -554,9 +595,9 @@ second human annotator.
   internet access to Groq.
 
 **Future work (not implemented)**
-- **ZKML proofs of inference** — out of scope: proving a transformer forward pass in zero knowledge
-  is still orders of magnitude too slow and memory-hungry for a 1.5B+ model on this hardware, and it
-  would prove *which* model ran, not that the legal answer is right.
+- **ZKML for the LLMs themselves**: the fact check and retrieval are proved and answers are signed
+  (see above), but proving a 1.5B+ transformer's forward pass is still orders of magnitude too slow
+  on this hardware, and it would prove *which* model ran, not that the legal answer is right.
 - BNS/BNSS corpus and IPC↔BNS section mapping; judgments as a second retrieval source.
 - Human double annotation and human / expert ratings (the 2026-10-13 measurements used an AI
   annotator and judge); human-written answer targets for LoRA training.

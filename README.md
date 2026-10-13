@@ -21,6 +21,7 @@ check the facts you describe against the legal elements of an offence.
 | 🔍 | **"Why this answer?"** | Shows how closely the retrieved law matched your question, which source supports each sentence of the answer, and warns about anything unsupported. |
 | ✅ | **Fact check with rules** | Describe a case and pick a section (e.g. 304A). An AI pulls out the facts, each with a quote from your text, and a Prolog rule engine checks them against the section's elements: *consistent*, *inconsistent* or *insufficient facts*. |
 | 🏷️ | **Faster dataset building** | An InLegalBERT model suggests the role of every sentence in a judgment (Facts, Argument, Ruling…). People check only the uncertain ones plus random spot checks. |
+| 🔐 | **Verifiable results** | Zero-knowledge proofs (EZKL / Halo2) that a fact-check verdict follows from the published rules (the facts stay hidden) and that an answer's sources are exactly what the retrieval rules pick from all 685 sections. Every answer is also signed. [How it works](docs/zk/README.md) |
 | 🧪 | **Fine-tuned model comparison** | Switch between a hosted model and a small model fine-tuned on our data (LoRA) to compare their answers side by side. |
 
 ## How it works
@@ -89,6 +90,7 @@ lawyers. The reports say exactly what was measured.
 | **Sentence-role classifier** (InLegalBERT) | Accuracy **78%**, macro-F1 **0.74 ± 0.04** (5-fold cross-validation over 31 annotated judgments, up from 71% and 0.66 after adding sentence context). At the default confidence bar, **19%** of sentences need a human check (was 44%). |
 | **LoRA fine-tuning** (Qwen2.5-1.5B, 4-bit QLoRA) | Adapter v0.3, retrained on grounded questions built from the IPC itself: on 41 questions about 29 IPC sections held out of training it answers **100%** and cites the right section **98%** of the time (v0.2: 39% / 39%; it mostly said "I don't know"). Answers quote the provision rather than explain it. Runs locally: under a second per answer on the GPU, first words in 6–10 s on CPU. [Report](docs/reports/lora_v0.3_ipc_eval.md) |
 | **Fact verification** | 7 IPC sections encoded as element checklists in Prolog; each extracted fact must quote the user's text, and extraction runs twice to keep only stable answers. On 15 test fact patterns it gives the expected verdict **13/15** times; the 2 misses say "insufficient facts" rather than giving a wrong verdict. [Report](docs/reports/verification_eval.md) |
+| **Zero-knowledge proofs** | Verdict proof in about **1 s** (33 KB, verifies in 0.03 s); retrieval proof over all 685 chunks in about **8 s** (196 KB, verifies in 0.1 s). On 315 fact sets the proof circuit gives exactly the Prolog engine's verdicts. [Details](docs/zk/README.md) |
 | **Blind answer rating** | 20 questions, each answer rated 1–5 for relevance, groundedness and completeness without knowing which model wrote it: hosted model **4.75**, tuned LoRA **4.53**. [Report](docs/reports/blind_eval_v0.3.md) |
 | **Dataset** | Corpus v0.3: 36 judgments, 5,602 labelled sentences. Labelling agreement with an independent second annotation **κ = 0.91** (5 cases). [Report](docs/reports/annotation_agreement_v0.3.md) |
 
@@ -110,6 +112,10 @@ npm --prefix frontend install
 npm --prefix frontend run dev
 ```
 
+**Zero-knowledge proofs (optional):** `pip install -r backend/requirements-zk.txt`, then
+`python backend/scripts/zk_setup.py` once (about a minute; writes 1.3 GB of proving keys to `data/zk/`).
+Without it, answers are still signed but the proof buttons stay hidden. See [docs/zk](docs/zk/README.md).
+
 **Tests:** `pytest -m "not integration"` (the same command CI runs; no network or API key needed).
 **Demo:** with the app running, `python backend/scripts/demo.py` sends five questions through the
 whole pipeline and prints a summary.
@@ -123,6 +129,7 @@ backend/app/labeling_assistant/   InLegalBERT classifier, review queue
 backend/app/finetuning/           LoRA training data, trainer, model comparison
 backend/app/explainability/       evidence match, citation checks, sentence attribution
 backend/app/verification/         fact extraction + Prolog rules (rules/*.pl)
+backend/app/zk/                   zero-knowledge proofs (EZKL), commitments, signed answers
 backend/scripts/                  command-line tools (ingest, train, review, demo…)
 frontend/                         React + Tailwind web app
 data/corpus/ipc_chunks.jsonl      the parsed IPC (public domain)
@@ -149,15 +156,16 @@ The full list is in [PLANNING.md → Known limitations](PLANNING.md#known-limita
 - **More Prolog sections**, including exceptions and general defences.
 - **Human double annotation and expert ratings** (the current agreement and answer ratings use an
   AI annotator and judge); human-written answers for LoRA training.
-- **ZKML (zero-knowledge proofs of model inference): deliberately not implemented.** Proving a
-  transformer's forward pass in zero knowledge is still orders of magnitude too slow for a 1.5B+
-  model on this hardware, and it would prove *which model ran*, not that the legal answer is right.
+- **ZKML for the language models themselves.** The fact check and retrieval are proved, and
+  answers are signed. Proving a 1.5B+ model's forward pass is still far too slow on this hardware,
+  and it would prove *which model ran*, not that the legal answer is right.
 
 ## Documentation
 
 - [Full guide](docs/GUIDE.md): every module, script, setting and API endpoint
 - [PLANNING.md](PLANNING.md): design decisions, measured results and known limitations, phase by phase
 - [Annotation guideline](docs/annotation_guideline.md): how to label sentence roles
+- [Verifiable results (ZKML)](docs/zk/README.md): what is proved, what is not, and how to check a proof
 - Reports: [LoRA v0.3 on held-out sections](docs/reports/lora_v0.3_ipc_eval.md),
   [blind answer rating](docs/reports/blind_eval_v0.3.md),
   [fact-check test set](docs/reports/verification_eval.md),

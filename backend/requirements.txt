@@ -30,3 +30,4 @@ pyswip==0.3.3
 pytest==9.1.1
 pytest-asyncio==1.4.0
 httpx2==2.13.1  # TestClient transport (starlette deprecated plain httpx for this)
+cryptography>=42  # Ed25519 signatures on answers (app/zk/attest.py)

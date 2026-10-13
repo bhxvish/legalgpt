@@ -16,8 +16,9 @@ class VerifyRequest(BaseModel):
 
 
 class VerifyRouter:
-    def __init__(self, service: VerificationService) -> None:
+    def __init__(self, service: VerificationService, zk=None) -> None:
         self.service = service
+        self.zk = zk  # optional ZkService: ?prove=true adds a zero-knowledge proof of the verdict
         self.router = APIRouter(prefix="/api/verify", tags=["verify"])
         self.router.add_api_route("", self.verify, methods=["POST"])
         self.router.add_api_route("/sections", self.sections, methods=["GET"])
@@ -32,12 +33,21 @@ class VerifyRouter:
             ],
         }
 
-    def verify(self, req: VerifyRequest) -> dict[str, Any]:
+    def verify(self, req: VerifyRequest, prove: bool = False) -> dict[str, Any]:
         try:
-            return self.service.verify(req.case_text, req.cited_section).to_dict()
+            result = self.service.verify(req.case_text, req.cited_section).to_dict()
         except ValueError as e:
             if isinstance(e, ExtractionError):
                 raise HTTPException(502, str(e)) from None
             raise HTTPException(422, str(e)) from None
         except LLMClientError as e:
             raise HTTPException(503, str(e)) from None
+        if prove:
+            if self.zk is None:
+                result["proof_error"] = "zero-knowledge proofs are not available on this server"
+            else:
+                try:
+                    result["proof"] = self.zk.prove_verdict(result["facts"], result["cited_section"])
+                except Exception as e:  # the verdict is still useful without a proof
+                    result["proof_error"] = str(e) or type(e).__name__
+        return result

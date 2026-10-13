@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { verifyApi } from '../api.js'
+import { VerdictProof } from './ZkProof.jsx'
 
 const STATUS = {
   CONSISTENT: {
@@ -233,6 +234,7 @@ export default function VerifyPanel() {
         {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{error}</p>}
 
         {result && <VerificationResultView result={result} />}
+        {result && <VerdictProof result={result} />}
       </div>
     </div>
   )

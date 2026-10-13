@@ -1,0 +1,94 @@
+{
+ "created_at": "2026-10-13T16:48:25+00:00",
+ "ezkl_version": "23.0.5",
+ "proof_system": "Halo2 (KZG), via EZKL",
+ "corpus": {
+  "chunks": 685,
+  "merkle_root": "1918ac588b7e72ab46ccd8c3bd430972f6672a15ee0804842431a1add120cd2e",
+  "leaf": "sha256(0x00 || canonical JSON of the chunk)",
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "embeddings_sha256": "2a6b6bd37ef62fd8ad83ba986294ee5000e3920d8a41c8e95c00d4e141a237f2"
+ },
+ "rules": {
+  "files": {
+   "core.pl": "5ff68b24892e0da44237df84ea2bc23d0bb0e6ce8cc07fe9f9bf9db6c4e60468",
+   "hurt_property_dowry.pl": "bc7ecf55c4906068f5703ad4236e4119bef9e41a09b59e4562713cde93dc4ab3",
+   "negligence.pl": "9a66bb697474749abd14cfd303fe4e6f313cc0e2e3aa71b12f1dd5532284f0c6"
+  },
+  "sha256": "227c9aed091ec578ffc067aff5c4e38a863998a21dc63c3654bf80f313e71a07"
+ },
+ "adapter": {
+  "files": {
+   "adapter_config.json": "803e2ccd7622bf9f0b98a9b40746fccee1dc9c022378ca4b4c88eff22c64004b",
+   "adapter_model.safetensors": "2586f6888b6fe69ecad4684c80ef3cca1defed5e7f60311d9157d7e665514b70"
+  },
+  "sha256": "8d22cd43200a42f0b231fe8dc56eb5852ad4d2c42b3beb62ce5267d997895b8b",
+  "name": "v0.3-ipcqa"
+ },
+ "verdict": {
+  "elements": 26,
+  "slots": 23,
+  "sections": [
+   "279",
+   "304A",
+   "304B",
+   "323",
+   "337",
+   "338",
+   "379"
+  ],
+  "layout_sha256": "10e8fac4f4e957561c3d2fcbf4789e1860e511677773d4f81f75d2558375ac36",
+  "logrows": 13,
+  "input_scale": 0,
+  "param_scale": 0,
+  "input_visibility": {
+   "Hashed": {
+    "hash_is_public": true,
+    "outlets": []
+   }
+  },
+  "vk_sha256": "a48318f5aa8af23406588a807ad8f0276007cb5e7b204a8995b5844603ddf3e3",
+  "settings_sha256": "f8e039b2308887732a346301e89111e2e47951549e66fb664ee4d593180bd67b",
+  "build": {
+   "compile_s": 0.1,
+   "setup_s": 0.7
+  }
+ },
+ "retrieval": {
+  "chunks": 685,
+  "dims": 384,
+  "logrows": 17,
+  "input_scale": 12,
+  "param_scale": 12,
+  "input_visibility": "Public",
+  "vk_sha256": "b36bd485ba7a94bc23c3e5a9d81c5a4b66ab4893694635cf57599e4ed237fd3c",
+  "settings_sha256": "7f3bb5a8425ec5a9aca82ce3c8cc8f42172b7e9a6d24aa6a019b6a0306b05338",
+  "build": {
+   "compile_s": 0.3,
+   "setup_s": 8.7
+  },
+  "scope": "single questions; the query embedding is public, not proven",
+  "rules": {
+   "top_k": 8,
+   "min_similarity": 0.55,
+   "role_pref": {
+    "Law": 1.2,
+    "Ruling": 1.1
+   },
+   "max_chunks": 6,
+   "max_context_chars": 6000,
+   "explicit_section_matches": 3
+  }
+ },
+ "signing_public_key": "/q04scbFd9PdsMw17bl3ilHzE5y4L+OBq723oggFI7g=",
+ "benchmarks": {
+  "verdict_prove_s": 1.05,
+  "verdict_verify_s": 0.03,
+  "verdict_proof_kb": 33,
+  "retrieval_prove_s": 8.1,
+  "retrieval_verify_s": 0.1,
+  "retrieval_proof_kb": 196,
+  "retrieval_matches_live": true,
+  "machine": "measured by zk_setup.py on the machine that built the circuits"
+ }
+}

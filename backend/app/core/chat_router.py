@@ -7,12 +7,13 @@ Event stream (each `data:` line is JSON):
   explanation   ExplanationRecord               legal mode, after the answer (incl. refusals)
   verification  VerificationResult | {"error"}  legal mode, only when the request names verify_section
   error         {"message"}                     generation/retrieval failure (stream then ends)
+  attestation   signed answer record (app/zk)  legal mode, when the server signs answers
   done          {}                              always last
 """
 
 import json
 import logging
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING, Any, Literal
 
 from fastapi import APIRouter
@@ -86,6 +87,8 @@ class ChatRouter:
         `model` (the base-vs-tuned toggle); `model_notes` explains slow or unavailable ones."""
         self.retriever = retriever
         self.llm = llm
+        # optional: (question, prompt, answer, sources, model_id, refused, follow_up) -> signed record
+        self.attest: Callable[..., dict] | None = None
         self.models: dict[str, LLMClient] = dict(models or {})
         self.default_model = default_model or next((k for k, v in self.models.items() if v is llm), "default")
         self.models.setdefault(self.default_model, llm)
@@ -154,6 +157,7 @@ class ChatRouter:
             yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": True})
             yield sse("token", {"text": SCOPE_REFUSAL})
             yield from self._explanation(question, result, SCOPE_REFUSAL, True, llm.model_id)
+            yield from self._attestation(question, [], SCOPE_REFUSAL, [], llm.model_id, True, previous is not None)
             return
         yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": False})
         yield sse("sources", [s.model_dump() for s in sources])
@@ -163,6 +167,19 @@ class ChatRouter:
             answer.append(text)
             yield sse("token", {"text": text})
         yield from self._explanation(question, result, "".join(answer), False, llm.model_id)
+        yield from self._attestation(question, messages, "".join(answer), sources, llm.model_id, False, previous is not None)
+
+    def _attestation(self, question: str, prompt: Any, answer: str, sources: list, model_id: str, refused: bool,
+                     follow_up: bool) -> Iterator[str]:
+        """Signed record of this answer (after everything else; a failure is logged and skipped)."""
+        if self.attest is None:
+            return
+        try:
+            payload = [{"role": m.role, "content": m.content} for m in prompt] if prompt else []
+            yield sse("attestation", self.attest(question=question, prompt=payload, answer=answer, sources=sources,
+                                                 model_id=model_id, refused=refused, follow_up=follow_up))
+        except Exception:
+            logger.exception("could not sign the answer")
 
     def _explanation(self, question: str, result: RetrievalResult, answer: str, refused: bool, model_id: str) -> Iterator[str]:
         """Emitted after the last token, so it never delays the answer. A failure here is
