@@ -133,8 +133,7 @@ def make_system(spec: str, route: str | None = None):
             if not sources:
                 return NOT_COVERED_REPLY, []
             answer = llm.generate(PromptBuilder().build(q, sources, "legal", []))
-            by_marker = {x.marker: x.section for x in sources}
-            return answer, [by_marker[int(m)] for m in MARKER.findall(answer) if int(m) in by_marker and by_marker[int(m)]]
+            return answer, cited_sections(answer, sources)
         run.llm = llm
         return run
     if kind == "closed":
@@ -151,6 +150,41 @@ def make_system(spec: str, route: str | None = None):
         client = HttpChat(kind, model)
         return lambda q: (client.ask(q), [])
     raise SystemExit(f"unknown system {spec!r}")
+
+
+def cited_sections(answer: str, sources) -> list[str]:
+    """Sections behind the answer's [n] markers, after the app's canonicalization (gpt-oss writes
+    【1】 and [1†L2-L4]; the chat stream shows them as [1], so they count here too)."""
+    from app.core.citations import normalize_stream
+
+    by_marker = {x.marker: x.section for x in sources}
+    text = "".join(normalize_stream([answer]))
+    return [by_marker[int(m)] for m in MARKER.findall(text) if int(m) in by_marker and by_marker[int(m)]]
+
+
+def recite(args) -> None:
+    """Re-derive extra_cited for cached LegalGPT answers whose markers are not plain [n]. Retrieval is
+    local and deterministic, so the sources are the ones the model saw. Keeps a .bak of each file changed."""
+    from app.core.retriever import build_retriever
+
+    items = {it["id"]: it for it in sample(args.seed, *args.sample)}
+    retriever = None
+    for path in sorted(OUT.glob("legalgpt*.jsonl")):
+        rows = load_jsonl(path)
+        changed = 0
+        for r in rows:
+            if r["answer"].startswith("ERROR") or r["id"] not in items:
+                continue
+            if not re.search("[\u3010\uff3b]|\[\d+[\u2020\u2021]", r["answer"]):
+                continue  # plain [n] only: already scored correctly
+            retriever = retriever or build_retriever(get_settings())
+            new = cited_sections(r["answer"], retriever.retrieve(items[r["id"]]["question"]))
+            if new != r["extra_cited"]:
+                r["extra_cited"], changed = new, changed + 1
+        print(f"{path.name}: {changed} answers re-cited")
+        if changed:
+            path.with_suffix(".jsonl.bak").write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+            path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
 
 
 def slug(spec: str) -> str:
@@ -259,7 +293,7 @@ def score(args) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("step", choices=["run", "score"])
+    ap.add_argument("step", choices=["run", "score", "recite"])
     ap.add_argument("--systems", nargs="*", default=[])
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--patient", action="store_true", help="wait out daily limits instead of stopping")
@@ -275,7 +309,7 @@ def main() -> int:
     ap.add_argument("--sample", type=int, nargs=4, default=[40, 20, 60, 30], metavar=("PUN", "DEF", "SCEN", "OOS"))
     args = ap.parse_args()
     sys.stdout.reconfigure(errors="replace")  # Windows consoles cannot print every Unicode answer
-    {"run": run, "score": score}[args.step](args)
+    {"run": run, "score": score, "recite": recite}[args.step](args)
     return 0
 
 
