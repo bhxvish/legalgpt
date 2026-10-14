@@ -77,6 +77,7 @@ class OpenAICompatClient(LLMClient):
         self.max_tokens, self.temperature, self.timeout = max_tokens, temperature, timeout
         self._transport = transport  # tests pass an httpx.MockTransport
         self.retry_waits = (5.0, 15.0, 45.0)  # after "overloaded" (500/502/503/504) replies
+        self.usage = {"in": 0, "out": 0}  # billed tokens so far (generate only; out includes reasoning)
 
     # ------------------------------------------------------------------ HTTP
     def _client(self):
@@ -129,9 +130,13 @@ class OpenAICompatClient(LLMClient):
         if r.status_code != 200:
             raise self._error(r.status_code, r.text)
         try:
-            choice = r.json()["choices"][0]
+            reply = r.json()
+            choice = reply["choices"][0]
         except (ValueError, KeyError, IndexError):
             raise LLMClientError(f"{self.model_id}: unexpected reply (not a chat completion): {r.text[:120]!r}")
+        used = reply.get("usage") or {}
+        self.usage["in"] += used.get("prompt_tokens") or 0
+        self.usage["out"] += used.get("completion_tokens") or 0
         return choice["message"].get("content") or ""
 
     def stream(self, messages: list[Message]) -> Iterator[str]:

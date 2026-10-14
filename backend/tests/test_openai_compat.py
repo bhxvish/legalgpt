@@ -100,3 +100,11 @@ def test_openai_reasoning_models_get_their_parameters() -> None:
     new = OpenAICompatClient("openai", "gpt-5.4-mini", api_key="k")._body(MSGS, False)
     assert "max_tokens" in old and "temperature" in old
     assert "max_tokens" not in new and "temperature" not in new and new["max_completion_tokens"] == 2048
+
+
+def test_token_usage_is_counted() -> None:
+    reply = {"choices": [{"message": {"content": "x"}}], "usage": {"prompt_tokens": 120, "completion_tokens": 30}}
+    client = _client(lambda req: httpx.Response(200, json=reply))
+    client.generate(MSGS)
+    client.generate(MSGS)
+    assert client.usage == {"in": 240, "out": 60}

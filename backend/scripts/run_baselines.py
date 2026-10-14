@@ -13,6 +13,8 @@ Systems (any number, each answers the same seeded sample; answers are cached and
                              e.g. legalgpt+gemini:gemini-3.5-flash-lite
   anthropic:<model>          Claude closed-book (ANTHROPIC_API_KEY)
   --smoke                    4 questions per system first, to check keys and model names
+  --budget-usd 1 --price 0.75 4.5
+                             stop before a paid run can exceed $1 (prices per million tokens)
 
 Scored automatically (app/benchmark/metrics.py): correct section, correct punishment terms, wrong
 punishment, invented sections, IPC/BNS confusion, scenario hits, and civil questions treated as
@@ -131,6 +133,7 @@ def make_system(spec: str):
             answer = llm.generate(PromptBuilder().build(q, sources, "legal", []))
             by_marker = {x.marker: x.section for x in sources}
             return answer, [by_marker[int(m)] for m in MARKER.findall(answer) if int(m) in by_marker and by_marker[int(m)]]
+        run.llm = llm
         return run
     if kind == "closed":
         model, _, effort = model.partition("@")  # closed:openai/gpt-oss-20b@low -> reasoning_effort="low" (Groq)
@@ -140,6 +143,7 @@ def make_system(spec: str):
         def ask(q: str):
             msgs = [Message("system", CLOSED_SYSTEM), Message("user", q)]
             return (llm._create(msgs, **extra).choices[0].message.content or "") if extra else llm.generate(msgs), []
+        ask.llm = llm
         return ask
     if kind == "anthropic":
         client = HttpChat(kind, model)
@@ -163,6 +167,9 @@ def run(args) -> None:
         for f in out.glob("*.jsonl"):
             f.unlink()
     out.mkdir(parents=True, exist_ok=True)
+    spent = 0.0  # USD in this invocation, from the providers' token counts and --price
+    cost = lambda u: (u["in"] * args.price[0] + u["out"] * args.price[1]) / 1e6
+    worst = cost({"in": 6000, "out": MAX_TOKENS})  # the most one answer can cost
     for spec in args.systems:
         path = out / f"{slug(spec)}.jsonl"
         done = {json.loads(line)["id"] for line in path.read_text(encoding="utf-8").splitlines()} if path.exists() else set()
@@ -171,8 +178,13 @@ def run(args) -> None:
         if not todo:
             continue
         system = make_system(spec)
+        usage = getattr(getattr(system, "llm", None), "usage", None)
         with path.open("a", encoding="utf-8") as f:
             for it in todo:
+                if args.budget_usd is not None and spent + worst > args.budget_usd:
+                    print(f"  stopped: ${spent:.3f} spent; one more answer could pass the ${args.budget_usd} budget")
+                    return
+                before = dict(usage) if usage else None
                 t = time.perf_counter()
                 answer = None
                 attempt = 0
@@ -193,12 +205,18 @@ def run(args) -> None:
                         break
                 if answer is None:
                     break
-                f.write(json.dumps({"id": it["id"], "set": it["set"], "answer": answer, "extra_cited": extra,
-                                    "seconds": round(time.perf_counter() - t, 2)}, ensure_ascii=False) + "\n")
+                row = {"id": it["id"], "set": it["set"], "answer": answer, "extra_cited": extra,
+                       "seconds": round(time.perf_counter() - t, 2)}
+                if usage:
+                    row["tokens"] = {k: usage[k] - before[k] for k in usage}
+                    spent += cost(row["tokens"])
+                f.write(json.dumps(row, ensure_ascii=False) + "\n")
                 f.flush()
                 if args.smoke:
                     ok = "FAILED" if answer.startswith("ERROR") or not answer.strip() else "ok"
                     print(f"  [{ok}] {it['set']}: {it['question'][:60]}\n        -> {answer[:160]!r}")
+            if usage:
+                print(f"  {spec}: {usage['in']} input + {usage['out']} output tokens; ${spent:.3f} spent so far")
 
 
 def score(args) -> None:
@@ -241,6 +259,9 @@ def main() -> int:
     ap.add_argument("--smoke", action="store_true",
                     help="answer just 4 questions per system (in a separate folder) to check keys and model names")
     ap.add_argument("--max-wait-hours", type=float, default=12.0)
+    ap.add_argument("--budget-usd", type=float, help="stop before spending more than this (needs --price)")
+    ap.add_argument("--price", type=float, nargs=2, default=[0.0, 0.0], metavar=("IN", "OUT"),
+                    help="USD per million input / output tokens, for --budget-usd and the cost printout")
     ap.add_argument("--sample", type=int, nargs=4, default=[40, 20, 60, 30], metavar=("PUN", "DEF", "SCEN", "OOS"))
     args = ap.parse_args()
     {"run": run, "score": score}[args.step](args)
