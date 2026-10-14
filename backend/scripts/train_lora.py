@@ -41,6 +41,8 @@ def main() -> int:
                     help="add grounded Q&A examples built from the IPC with the real retriever (app/finetuning/ipc_qa.py)")
     ap.add_argument("--scenarios", action="store_true",
                     help="add everyday fact-pattern examples (app/finetuning/scenario_qa.py); never the benchmark's held-out 60")
+    ap.add_argument("--scenario-refusals", type=float, default=0.0, metavar="SHARE",
+                    help="share of scenario examples that are refusals (sources without a labelled section), e.g. 0.25")
     ap.add_argument("--no-case-refusals", action="store_true",
                     help="drop the judgment-based refusal examples (they taught v0.2 to refuse IPC sources)")
     args = ap.parse_args()
@@ -84,7 +86,7 @@ def main() -> int:
         def rewrite_for(q: str):
             return next((parse(c[q]) for c in caches if q in c), None)
 
-        scen = ScenarioQaBuilder(build_retriever(s), load_chunks(s.corpus_chunks_path), seed=args.seed).build(train_scen, rewrite_for)
+        scen = ScenarioQaBuilder(build_retriever(s), load_chunks(s.corpus_chunks_path), seed=args.seed).build(train_scen, rewrite_for, refusal_share=args.scenario_refusals)
         print(f"scenarios: {len(scen)} examples from {len({e.source_case_id for e in scen})} of {len(train_scen)} questions "
               f"(held-out benchmark scenarios excluded: {len(held_out)})")
         examples += scen

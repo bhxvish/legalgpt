@@ -19,7 +19,7 @@ import random
 from collections.abc import Callable, Sequence
 
 from app.core.models import Chunk, SourceEvidence
-from app.core.prompt_builder import LEGAL_SYSTEM_PROMPT, PromptBuilder
+from app.core.prompt_builder import LEGAL_SYSTEM_PROMPT, NOT_COVERED_REPLY, PromptBuilder
 from app.finetuning.instruction_builder import InstructionExample
 from app.finetuning.ipc_qa import body_of, lower_first, offence_parts
 
@@ -67,10 +67,15 @@ class ScenarioQaBuilder:
             text += f"\nSee also Section {other.section}" + (f" ({other_t})" if other_t else "") + f" [{other.marker}]."
         return text
 
-    def build(self, scenarios: Sequence[dict], rewrite_for: Callable[[str], object] | None = None) -> list[InstructionExample]:
+    def build(self, scenarios: Sequence[dict], rewrite_for: Callable[[str], object] | None = None,
+              refusal_share: float = 0.0) -> list[InstructionExample]:
         """`scenarios`: {"id", "question", "acceptable"}. `rewrite_for(question)`: a cached LLM rewrite
-        or None; when it changes the sources, the rewritten setting is a second example."""
+        or None; when it changes the sources, the rewritten setting is a second example.
+        `refusal_share`: the share of scenario examples that are refusals - sources retrieved for the
+        scenario that contain none of its labelled sections. v0.5 had none and learned to force-fit the
+        nearest offence (chain snatching -> rash driving), so v0.6 uses about a quarter."""
         out: list[InstructionExample] = []
+        misses: list[InstructionExample] = []
         for sc in scenarios:
             settings = [None]
             rw = rewrite_for(sc["question"]) if rewrite_for else None
@@ -84,11 +89,13 @@ class ScenarioQaBuilder:
                     continue
                 seen.add(key)
                 text = self.answer(sources, sc["acceptable"])
-                if text is None:
-                    continue
-                out.append(InstructionExample(
+                ex = InstructionExample(
                     instruction=f"SOURCES:\n{PromptBuilder.format_sources(sources)}\n\nQUESTION: {sc['question']}",
-                    input="", output=text, source_case_id=f"scenario:{sc['id']}", task="scenario_answer",
-                    system=LEGAL_SYSTEM_PROMPT,
-                ))
+                    input="", output=text or NOT_COVERED_REPLY, source_case_id=f"scenario:{sc['id']}",
+                    task="scenario_answer" if text else "scenario_refusal", system=LEGAL_SYSTEM_PROMPT,
+                )
+                (out if text else misses).append(ex)
+        if refusal_share > 0 and misses:
+            n = round(len(out) * refusal_share / (1 - refusal_share))
+            out += self.rng.sample(misses, min(n, len(misses)))
         return out

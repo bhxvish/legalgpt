@@ -45,3 +45,23 @@ def test_build_uses_the_inference_prompt_and_tags_the_case() -> None:
                    rewrite_for=lambda q: object())  # same sources with the rewrite: one example, not two
     assert ex.source_case_id == "scenario:sc-9" and ex.task == "scenario_answer"
     assert "QUESTION: My phone was taken from my bag" in ex.instruction and "[1]" in ex.output
+
+
+def test_refusal_examples_use_sources_without_a_labelled_section() -> None:
+    from app.core.prompt_builder import NOT_COVERED_REPLY
+
+    b = ScenarioQaBuilder(_Retriever([_src(C323, 1)]), [C323])
+    scen = [{"id": f"m{i}", "question": f"q{i}", "acceptable": ["379"]} for i in range(4)]
+    assert b.build(scen) == []  # no refusals unless asked
+    b2 = ScenarioQaBuilder(_Retriever([_src(C379, 1)]), [C379])
+    hits = b2.build([{"id": f"h{i}", "question": f"h{i}", "acceptable": ["379"]} for i in range(3)])
+    assert len(hits) == 3
+
+    class _Mixed:  # questions starting "h" retrieve 379, the rest only 323
+        def retrieve(self, q, rewrite=None):
+            return [_src(C379, 1)] if q.startswith("h") else [_src(C323, 1)]
+
+    mixed = ScenarioQaBuilder(_Mixed(), [C379, C323]).build(
+        [{"id": f"h{i}", "question": f"h{i}", "acceptable": ["379"]} for i in range(3)] + scen, refusal_share=0.25)
+    refusals = [e for e in mixed if e.task == "scenario_refusal"]
+    assert len(refusals) == 1 and refusals[0].output == NOT_COVERED_REPLY
