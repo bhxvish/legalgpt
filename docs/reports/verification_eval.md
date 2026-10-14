@@ -61,18 +61,21 @@ regression cases on other sections.
 |---|---|
 | v14, v15 (the two earlier misses) | 2/2 correct |
 | v16–v23 (fresh) | 8/8 correct |
-| v01–v05 (regression check) | 5/5 correct |
+| v01–v05, v07–v13 (regression check) | 12/12 correct |
 | v06 (regression check) | **wrong: INCONSISTENT instead of INSUFFICIENT** (see below) |
-| v07–v13 | not re-run yet: the Groq free tier's daily limit was reached again |
+| **All 23 cases** | **22/23** |
 
 **v06 regression.** For "Neha was driving her car… when it hit a compound wall", the extractor
 answered `act_type = accidental` in both runs. That reads more into the text than it says: a
 collision alone does not show there was no rashness or negligence, so `unknown` is correct. The
 rules then (correctly) treat "accidental" as contradicting "rash or negligent". It passed before the
 quoting fix, and the fix doesn't touch act type, so this may be run-to-run variance in the hosted
-model. Either way it is the first *wrong verdict* (not just "insufficient") in this test set. A
-possible fix is to say in the act_type question that a collision or injury alone is not an accident
-unless the text says no one was at fault. That should be measured on new cases, not tuned on v06.
+model. **Checked on 2026-10-14:** v06 fails with the new prompt (twice) *and* with the previous
+prompt from before the fix (twice), so the fix did not cause it. The hosted model now reads "hit a
+compound wall" as a pure accident; on 2026-10-13 it did not. It is the only *wrong verdict* (not
+just "insufficient") in the 23 cases. A possible fix is to say in the act_type question that a
+collision or injury alone is not an accident unless the text says no one was at fault. That should
+be measured on new cases, not tuned on v06.
 
 Fresh cases: v16 (married March 2020, died July 2023) CONSISTENT; v17 (married 2005, died 2016)
 INCONSISTENT; v18 ("five years after her wedding") CONSISTENT; v19 (no marriage date) INSUFFICIENT;

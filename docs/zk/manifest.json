@@ -1,5 +1,5 @@
 {
- "created_at": "2026-10-13T20:04:24+00:00",
+ "created_at": "2026-10-14T09:47:03+00:00",
  "ezkl_version": "23.0.5",
  "proof_system": "Halo2 (KZG), via EZKL",
  "corpus": {
@@ -19,11 +19,11 @@
  },
  "adapter": {
   "files": {
-   "adapter_config.json": "5b5748f7a81affae7b908d56a5d528b1bda6931599701091f835aab58efb71d3",
-   "adapter_model.safetensors": "e3b3a6521403c7b47ca979d619b3580eedce87383fe8072e823e87dbe86f37e8"
+   "adapter_config.json": "a2b27f3f7b12c25c23098f691915ffbba0b5979bf8f826e71c2da43d35b6ea0f",
+   "adapter_model.safetensors": "60470155c90e2b674918b23fef539f0194767d156f281a4e15528160d29240ee"
   },
-  "sha256": "a616e4481e979f569867954626707463d822f7c540d2ab86bdce9f4b3777cc96",
-  "name": "v0.4-plain"
+  "sha256": "3e0939248c5085c40d12ad357b5ca65ad8b958a89de69883463a76fa81e7ec52",
+  "name": "v0.4-plain-2ep"
  },
  "verdict": {
   "elements": 26,
@@ -47,11 +47,11 @@
     "outlets": []
    }
   },
-  "vk_sha256": "a48318f5aa8af23406588a807ad8f0276007cb5e7b204a8995b5844603ddf3e3",
-  "settings_sha256": "f8bc825a82774d638278065a78f7dbfe0125b48daa6421f81918421c01e65d44",
+  "vk_sha256": "9ea445936b32cb91757864e0c7ab37b69422b80adbe17e17f130a8d7b993f8b3",
+  "settings_sha256": "63433ccca5d5ae109e034be9f379bc4d50bfacd3aab5b700fd511c6757bfd09c",
   "build": {
-   "compile_s": 0.1,
-   "setup_s": 0.7
+   "compile_s": 0.2,
+   "setup_s": 0.6
   }
  },
  "retrieval": {
@@ -62,10 +62,10 @@
   "param_scale": 12,
   "input_visibility": "Public",
   "vk_sha256": "31df7924754dcec9293a2fcb8efb82b535fd2e8766fc6fb4ca2641e1e5e7480f",
-  "settings_sha256": "997e5ecac3742f788ca66436a0c8716607621d922db477bcecc3a97dc4f351d7",
+  "settings_sha256": "e5d82384953a55fa92aa5457efa3449e9451b1ccd499e6a2baab8c54813e7adb",
   "build": {
    "compile_s": 0.4,
-   "setup_s": 14.5
+   "setup_s": 7.9
   },
   "scope": "single questions; the query embedding is public, not proven",
   "rules": {
@@ -478,10 +478,10 @@
  },
  "signing_public_key": "/q04scbFd9PdsMw17bl3ilHzE5y4L+OBq723oggFI7g=",
  "benchmarks": {
-  "verdict_prove_s": 1.0,
-  "verdict_verify_s": 0.04,
+  "verdict_prove_s": 0.77,
+  "verdict_verify_s": 0.05,
   "verdict_proof_kb": 33,
-  "retrieval_prove_s": 9.72,
+  "retrieval_prove_s": 8.27,
   "retrieval_verify_s": 0.14,
   "retrieval_proof_kb": 196,
   "retrieval_matches_live": true,

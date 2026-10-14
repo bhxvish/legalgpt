@@ -10,8 +10,30 @@ years, or a fine, or both", followed by who it applies to, each with its citatio
 the targets stay correct by construction. Other sections are still quoted.
 
 **Training.** The same as v0.3: corpus v0.2, `--ipc-qa --no-case-refusals`, the same IPC sections
-held out. One difference: v0.4 ran 3 epochs (the trainer default) and v0.3 ran 2, so the comparison
-mixes the answer-style change with one more epoch. A 2-epoch re-run would isolate it.
+held out, and the same 665 examples apart from the answer text. The first v0.4 run used 3 epochs
+(the trainer default) while v0.3 used 2, so v0.4 was re-trained with **2 epochs**
+(`data/models/lora/v0.4-plain-2ep`) to isolate the answer-style change. That is the clean
+comparison below, and it is the adapter the app uses.
+
+## Clean comparison (same data, same 2 epochs; only the answer style differs)
+
+| | v0.3 (quoting) | **v0.4, 2 epochs (plain)** | v0.4, 3 epochs |
+|---|---|---|---|
+| Eval loss (tuned) | 0.18* | 0.218 | 0.234 |
+| Answers / right section / valid citations | 100% / 98% / 100% | 100% / 98% / 100% | 100% / 98% / 100% |
+| Answers in plain wording | 0 / 41 | **11 / 41** | 13 / 41 |
+| Still in statutory wording | 39 / 41 | 30 / 41 | 28 / 41 |
+| Punishment terms match the statute | 11 / 12 | **12 / 12** | 12 / 12 |
+| Blind rating, mean of 3 criteria (vs v0.3) | 4.30 | **4.52** | 4.52 |
+| Blind: better / worse / tie vs v0.3 | | 4 / 2 / 14 | 4 / 2 / 14 |
+
+\*v0.3's eval loss is measured on its own (quoting) targets, so it is not directly comparable.
+
+**Conclusion:** the gain comes from the plain-language targets, not from the extra epoch, which
+added two more plain answers and a slightly higher eval loss (mild overfitting). The 2-epoch
+adapter is used. The original 3-epoch run is described below for completeness.
+
+## First v0.4 run (3 epochs)
 
 ## Held-out IPC sections (41 questions on 29 sections never seen in training)
 
@@ -51,4 +73,4 @@ not statistically significant.
 The rubric doesn't score readability, where the difference is largest. Full sheet, key and notes
 are in `blind_eval_v04/`.
 
-**Status:** v0.4 is the newest adapter, so the chat's *Tuned (LoRA)* option uses it.
+**Status:** the chat's *Tuned (LoRA)* option uses `v0.4-plain-2ep`. The blind sheets for both runs are in `blind_eval_v04/` (3 epochs) and `blind_eval_v04_2ep/` (2 epochs).

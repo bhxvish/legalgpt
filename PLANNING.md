@@ -538,9 +538,9 @@ The weaknesses found by the evaluation, fixed and re-measured:
 - **Dowry-death dates.** The extractor prompt now asks for facts derived from two places to be
   quoted as exact pieces joined by "...", which the quote guard accepts. The two misses (v14, v15)
   now pass, and so do 8 **fresh** cases written after the fix (v16–v23, five of them date and
-  duration cases): 10/10. In the regression re-run, v01–v05 pass but **v06 got a wrong verdict**:
-  "the car hit a compound wall" was read as a pure accident. v07–v13 are pending because of the
-  Groq daily limit.
+  duration cases): 10/10. All 23 cases: **22/23**. The miss, v06 ("the car hit a compound wall"),
+  is read as a pure accident with both the new and the previous prompt, so the hosted model's
+  behaviour changed rather than the fix causing it.
 - **Collector section detection** (Module 1 code, changed with the owner's approval). It now handles
   "Section 302, IPC", "379 read with Section 34", "304-B" / "498-A", and "337and". It no longer
   reads a citation page ("(2008) 1 SCC 791, Section 304A IPC") as a section. On the 36 collected
@@ -558,8 +558,10 @@ The weaknesses found by the evaluation, fixed and re-measured:
   explanatory training answers (the punishment in plain words, then who it applies to), produced
   mechanically from the statute. On 41 held-out questions: 100% answered and 98% right citation
   (as v0.3), plain wording 13/41 (v0.3: 0), and punishment terms 12/12 correct. Blind rating vs
-  v0.3 (AI judge, partial blinding): 4.52 vs 4.30, a modest and not significant difference. v0.4
-  ran 3 epochs vs v0.3's 2. [Report](docs/reports/lora_v0.4_eval.md)
+  v0.3 (AI judge, partial blinding): 4.52 vs 4.30, a modest and not significant difference. A
+  clean re-run with v0.3's 2 epochs (`v0.4-plain-2ep`, the adapter in use) gives the same results
+  (11/41 plain, 12/12 punishments correct, 4.52 vs 4.30), so the gain comes from the answer style,
+  not the extra epoch. [Report](docs/reports/lora_v0.4_eval.md)
 
 ## Known limitations
 
