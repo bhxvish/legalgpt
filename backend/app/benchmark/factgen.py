@@ -148,7 +148,8 @@ def _sections() -> dict[str, dict[str, Any]]:
             if outcome == "death":
                 els.append(Element("intent_to_kill", "false", ["{A} had no intention of killing or harming {V}.",
                                                                "Nothing suggests {A} wanted to hurt {V} in any way."],
-                                   "true", ["{A} had planned this, wanting {V} dead.", "{A} meant to kill {V}."]))
+                                   "true", ["{A} had planned this, wanting {V} dead.", "{A} meant to kill {V}."],
+                                   omittable=False))  # "never occurred to A that someone might die" implies no intent
                 els.append(Element("knowledge_likely_death", "false", ["{A} did not realise that this could kill anyone.",
                                                                         "It never occurred to {A} that someone might die."],
                                    "true", ["{A} knew that this was very likely to kill someone.",
@@ -183,7 +184,8 @@ def _sections() -> dict[str, dict[str, Any]]:
             Element("endangered_safety", "true", ["People nearby had to jump out of the way to avoid being hit; their lives were put in danger.",
                                                   "Several people were nearly run over and were put in real danger."],
                     "false", ["There was nobody else anywhere nearby, and no person was put at any risk.",
-                              "The area was completely empty, so no one's safety was ever at risk."]),
+                              "The area was completely empty, so no one's safety was ever at risk."],
+                    omittable=False),  # "drove at a dangerously high speed, weaving between vehicles" implies danger
         ]},
         "379": {"intro": "On {day}, {A} was at {place}.", "frames": THEFT_FRAMES, "elements": lambda fr: [
             Element("movable_property", "true", ["The {item} was the kind of thing one can carry away.", "It was an ordinary {item} that could be picked up and carried."],
@@ -191,7 +193,8 @@ def _sections() -> dict[str, dict[str, Any]]:
             Element("taken_from_possession", "true", ["The {item} belonged to {V} and was kept in {V}'s {spot}.",
                                                       "{V} owned the {item} and had left it in {V}'s {spot}."],
                     "false", ["The {item} had been thrown away by its owner and was lying abandoned, belonging to no one.",
-                              "Its owner had discarded the {item}; it lay abandoned and in no one's possession."]),
+                              "Its owner had discarded the {item}; it lay abandoned and in no one's possession."],
+                    omittable=False),  # "{V} had not given anyone permission to take it" implies it was {V}'s
             Element("property_moved", "true", ["{A} picked up the {item} and carried it away.", "{A} took the {item} and walked off with it."],
                     "false", ["{A} looked at the {item} but left it exactly where it was.", "{A} never touched the {item}; it stayed where it was."]),
             Element("without_consent", "true", ["{V} had not given anyone permission to take it.", "{V} had never agreed to anyone taking it."],

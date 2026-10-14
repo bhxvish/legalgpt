@@ -12,21 +12,21 @@
   "base": 42,
   "paraphrase": 42,
   "flip": 126,
-  "omit": 96,
+  "omit": 78,
   "natural": 23
  },
  "fact_pattern_verdicts": {
   "CONSISTENT": 95,
   "INCONSISTENT": 133,
-  "INSUFFICIENT": 101
+  "INSUFFICIENT": 83
  },
  "fact_pattern_sections": {
-  "304A": 57,
+  "304A": 51,
   "337": 31,
   "338": 31,
   "323": 33,
-  "279": 52,
-  "379": 64,
+  "279": 46,
+  "379": 58,
   "304B": 61
  }
 }
