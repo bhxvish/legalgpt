@@ -113,8 +113,11 @@ def build_chat_router(settings: Settings, verifier: "VerificationService | None"
         ConfidenceScorer(high=settings.explain_band_high, medium=settings.explain_band_medium),
     )
     models, notes, default = build_models(settings)
+    from app.core.query_rewriter import QueryRewriter
+
     return ChatRouter(retriever, models[default], explainer=explainer, models=models, default_model=default,
-                      model_notes=notes, verifier=verifier)
+                      model_notes=notes, verifier=verifier,
+                      rewriter=QueryRewriter() if settings.query_rewrite else None)
 
 
 def build_zk_service(settings: Settings, chat_router: ChatRouter) -> "ZkService | None":

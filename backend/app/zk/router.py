@@ -24,6 +24,7 @@ class ProveVerdictRequest(BaseModel):
 
 class ProveRetrievalRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
+    rewrite: str | None = Field(default=None, max_length=1000)  # the chat's retrieval rewrite, if one was used
 
 
 class VerifyBundleRequest(BaseModel):
@@ -64,7 +65,7 @@ class ZkRouter:
 
     def prove_retrieval(self, req: ProveRetrievalRequest) -> dict[str, Any]:
         try:
-            return self.service.prove_retrieval(req.question)
+            return self.service.prove_retrieval(req.question, rewrite=req.rewrite)
         except ZkUnavailable as e:
             raise HTTPException(503, str(e)) from None
         except ZkError as e:

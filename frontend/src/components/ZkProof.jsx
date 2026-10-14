@@ -171,7 +171,7 @@ export function AnswerProof({ msg }) {
     setBusy('retr')
     setError('')
     try {
-      const bundle = await zkApi.proveRetrieval(msg.question)
+      const bundle = await zkApi.proveRetrieval(msg.question, att.record?.retrieval_rewrite)
       const check = await zkApi.verify(bundle)
       const shown = (msg.sources || []).map((s) => s.chunk_id)
       setRetr({ bundle, check, same: JSON.stringify(shown) === JSON.stringify(bundle.sources) })

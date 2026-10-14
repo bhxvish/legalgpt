@@ -83,14 +83,15 @@ class ZkService:
                 "valid": verify_inclusion(leaf, path, self.tree.root)}
 
     # -------------------------------------------------------------- attestation
-    def attest_answer(self, *, question, prompt, answer, sources, model_id, refused, follow_up) -> dict[str, Any]:
+    def attest_answer(self, *, question, prompt, answer, sources, model_id, refused, follow_up, rewrite=None) -> dict[str, Any]:
         m = self.manifest
         record_context = {"corpus_merkle_root": m.get("corpus", {}).get("merkle_root") or self.tree.root}
         if "+lora" in model_id and m.get("adapter"):
             record_context["adapter_sha256"] = m["adapter"]["sha256"]
         self.attestor.context = record_context
         return self.attestor.answer_record(question=question, prompt=prompt, answer=answer, sources=sources,
-                                           model_id=model_id, refused=refused, follow_up=follow_up, leaf_of=self.leaf_of)
+                                           model_id=model_id, refused=refused, follow_up=follow_up, leaf_of=self.leaf_of,
+                                           rewrite=rewrite)
 
     # ----------------------------------------------------------------- verdict
     def prove_verdict(self, facts: dict[str, Any], section: str | None = None) -> dict[str, Any]:
@@ -132,18 +133,29 @@ class ZkService:
         return result
 
     # --------------------------------------------------------------- retrieval
-    def prove_retrieval(self, question: str, live_chunk_ids: list[str] | None = None) -> dict[str, Any]:
+    def prove_retrieval(self, question: str, live_chunk_ids: list[str] | None = None,
+                        rewrite: str | None = None) -> dict[str, Any]:
+        """`rewrite`: the LLM rewrite the chat used ("cheating (section 420); ..."), if any. The proof
+        then covers the search for question + rewrite; the rewrite itself is an unproven, disclosed
+        input (an LLM produced it)."""
         from app.zk.retrieval_circuit import compare, query_vector, scope_vector, select
 
         if self.retriever is None:
             raise ZkUnavailable("retrieval proofs need the retriever")
-        q = query_vector(self.retriever, question)
+        from app.core.query_rewriter import Rewrite
+
+        query = f"{question}\n{rewrite}" if rewrite else question
+        q = query_vector(self.retriever, query)
         scope_q = scope_vector(self.retriever, question)
         out = self.retrieval.prove(q)
         sims = self.retrieval.public_values(out["proof"])["outputs"]
-        selected = select(self.retriever, question, self.chunks, sims, scope_q)
-        live = live_chunk_ids if live_chunk_ids is not None else [s.chunk_id for s in self.retriever.retrieve(question)]
+        selected = select(self.retriever, query, self.chunks, sims, scope_q)
+        if live_chunk_ids is None:
+            rw = Rewrite.from_text(rewrite) if rewrite else None
+            live_chunk_ids = [s.chunk_id for s in self.retriever.retrieve(question, rewrite=rw)]
+        live = live_chunk_ids
         return {"kind": "retrieval", "version": BUNDLE_VERSION, "question": question,
+                "rewrite": rewrite,  # unproven LLM input, disclosed; the proof covers question + rewrite
                 "sources": [s.chunk_id for s in selected], "live_comparison": compare(selected, live),
                 "scope_embedding": [round(v, 6) for v in scope_q],  # unproven; verifiers recompute it
                 "corpus_root": self.tree.root, "vk_sha256": self.retrieval.describe()["vk_sha256"],
@@ -167,16 +179,18 @@ class ZkService:
             from app.zk.retrieval_circuit import scope_vector
 
             scope_q = scope_vector(self.retriever, bundle["question"])
-        selected = select(self.retriever, bundle["question"], self.chunks, sims, scope_q)
+        query = f"{bundle['question']}\n{bundle['rewrite']}" if bundle.get("rewrite") else bundle["question"]
+        selected = select(self.retriever, query, self.chunks, sims, scope_q)
         ids = [s.chunk_id for s in selected]
         checks.append({"name": "the retrieval rules applied to the proven scores give exactly these sources",
                        "ok": ids == bundle.get("sources")})
         if getattr(self.retriever, "embedder", None) is not None:  # recompute the (unproven) query embedding
             from app.zk.retrieval_circuit import query_vector
 
-            q = query_vector(self.retriever, bundle["question"])
+            q = query_vector(self.retriever, query)
             diff = max(abs(a - b) for a, b in zip(q, pub["inputs"]))
-            checks.append({"name": "the proven query embedding is this question's", "ok": diff < 2e-3,
+            checks.append({"name": "the proven query embedding is this question's"
+                           + (" (with the disclosed rewrite)" if bundle.get("rewrite") else ""), "ok": diff < 2e-3,
                            "detail": f"max difference {diff:.5f}"})
         published_root = self.manifest.get("corpus", {}).get("merkle_root")
         checks.append({"name": "corpus root matches the published manifest", "ok": bundle.get("corpus_root") == published_root})

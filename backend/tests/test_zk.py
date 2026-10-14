@@ -171,6 +171,16 @@ def test_selection_from_exact_scores_reproduces_the_retriever() -> None:
         live = retr.retrieve(q)
         sims = E @ emb.embed([retr.expander.expand(q)])[0]
         assert [s.chunk_id for s in select(retr, q, chunks, sims)] == [s.chunk_id for s in live], q
+    # an LLM rewrite: the proof covers question + disclosed rewrite, and must select what the chat did
+    from app.core.query_rewriter import Rewrite
+
+    rw = Rewrite(True, [("cheating", "5"), ("hurt", "9")])
+    q = "someone tricked me out of my savings"
+    live = retr.retrieve(q, rewrite=Rewrite.from_text(rw.text))
+    query = f"{q}\n{rw.text}"
+    sims = E @ emb.embed([retr.expander.search_query(query)])[0]
+    assert [s.chunk_id for s in select(retr, query, chunks, sims)] == [s.chunk_id for s in live]
+    assert {s.section for s in live} >= {"5", "9"}
 
 
 # ------------------------------------------------------------------ attestation

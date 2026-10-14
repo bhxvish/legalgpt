@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     # floor for questions below RETRIEVAL_MIN_SIMILARITY that the scope check says are about an
     # IPC offence (everyday fact patterns; app/core/scope.py)
     retrieval_scope_floor: float = Field(default=0.40, alias="RETRIEVAL_SCOPE_FLOOR")
+    # Everyday fact patterns: the chat's LLM names the likely IPC offences, and their sections are
+    # retrieved (app/core/query_rewriter.py). One extra short LLM call per new question.
+    query_rewrite: bool = Field(default=True, alias="QUERY_REWRITE")
+    # scope-check probability a question needs before a rewrite may steer retrieval
+    rewrite_gate: float = Field(default=0.5, alias="REWRITE_GATE")
 
     # Module 2 — BERT-assisted annotation
     rrl_model_dir: Path = Field(default=REPO_ROOT / "data" / "models" / "rrl", alias="RRL_MODEL_DIR")

@@ -165,6 +165,15 @@ function HowChosen({ r }) {
   if (r.lexicon_terms.length)
     lines.push(`Everyday words in your question were matched to legal wording for the search: ${r.lexicon_terms.map((t) => `"${t.split(':')[0]}"`).join(', ')}.`)
   if (r.used_context) lines.push('Your question looked like a follow-up, so the previous question was searched too.')
+  const rw = r.rewrite
+  if (rw?.used)
+    lines.push(
+      `The model read your question as: ${rw.offences.map((o) => `${o.name} (s.${o.section})`).join(', ')}. ` +
+        'The text of those sections was fetched. This only chose what to read: the answer must still come from, and cite, the statute text.',
+    )
+  else if (rw && !rw.criminal) lines.push('The model judged this not to be a criminal matter, so its reading was not used for the search.')
+  else if (rw?.offences?.length)
+    lines.push(`The model suggested ${rw.offences.map((o) => `s.${o.section}`).join(', ')}, but the scope check did not agree that this is about a crime, so the suggestion was not used.`)
   if (r.scope_probability != null)
     lines.push(
       lowered

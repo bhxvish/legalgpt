@@ -119,6 +119,7 @@ const post = (path, body) =>
 export const zkApi = {
   manifest: () => fetch(`${API_BASE_URL}/api/zk/manifest`).then(json),
   proveVerdict: (facts, section) => post('/api/zk/prove/verdict', { facts, section }),
-  proveRetrieval: (question) => post('/api/zk/prove/retrieval', { question }),
+  // rewrite: the LLM rewrite the answer's retrieval used (signed in the attestation), if any
+  proveRetrieval: (question, rewrite) => post('/api/zk/prove/retrieval', { question, rewrite: rewrite || null }),
   verify: (bundle, extra = {}) => post('/api/zk/verify', { bundle, ...extra }),
 }

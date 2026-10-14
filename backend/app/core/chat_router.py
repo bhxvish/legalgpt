@@ -28,6 +28,7 @@ from app.core.prompt_builder import PromptBuilder
 from app.core.retriever import RetrievalResult, Retriever
 
 if TYPE_CHECKING:
+    from app.core.query_rewriter import QueryRewriter
     from app.explainability.explanation_builder import ExplanationBuilder
     from app.verification.verification_service import VerificationService
 
@@ -83,6 +84,7 @@ class ChatRouter:
         default_model: str | None = None,
         model_notes: dict[str, str] | None = None,
         verifier: "VerificationService | None" = None,
+        rewriter: "QueryRewriter | None" = None,
     ) -> None:
         """`llm` is the default model. `models` adds named alternatives a request can choose with
         `model` (the base-vs-tuned toggle); `model_notes` explains slow or unavailable ones."""
@@ -97,6 +99,7 @@ class ChatRouter:
         self.prompt_builder = prompt_builder or PromptBuilder()
         self.explainer = explainer
         self.verifier = verifier
+        self.rewriter = rewriter  # LLM query rewrite for everyday fact patterns (query_rewriter.py)
         self.router = APIRouter(prefix="/api", tags=["chat"])
         self.router.add_api_route("/chat", self.chat, methods=["POST"], response_class=StreamingResponse)
         self.router.add_api_route("/models", self.list_models, methods=["GET"], response_model=list[ModelInfo])
@@ -144,22 +147,35 @@ class ChatRouter:
             yield sse("token", {"text": text})
         yield sse("token", {"text": GENERAL_CAUTION})
 
-    def _retrieve(self, question: str, context: str | None) -> RetrievalResult:
+    def _rewrite_llm(self, llm: LLMClient) -> LLMClient:
+        """The model that rewrites the query: the chat's model, except that the local LoRA model
+        (small and slow) hands the rewrite to a hosted model when one is configured."""
+        if type(llm).__name__ != "AdapterClient":
+            return llm
+        return next((m for m in self.models.values() if type(m).__name__ != "AdapterClient"), llm)
+
+    def _retrieve(self, question: str, context: str | None, llm: LLMClient | None = None) -> RetrievalResult:
         if hasattr(self.retriever, "retrieve_with_diagnostics"):
-            return self.retriever.retrieve_with_diagnostics(question, context=context)
+            rewrite = None
+            # a question that names its section, or continues the previous one, needs no rewrite
+            follow_up = bool(context) and self.retriever.expander.is_follow_up(question)
+            if self.rewriter is not None and llm is not None and not follow_up                     and not self.retriever.expander.section_refs(question):
+                rewrite = self.rewriter.rewrite(question, self._rewrite_llm(llm))
+            return self.retriever.retrieve_with_diagnostics(question, context=context, rewrite=rewrite)
         sources = self.retriever.retrieve(question, context=context)  # minimal retrievers (tests)
         return RetrievalResult(sources, max((s.similarity for s in sources), default=0.0), 0.0, len(sources))
 
     def _legal(self, question: str, history: list[Message], llm: LLMClient) -> Iterator[str]:
         previous = next((m.content for m in reversed(history) if m.role == "user"), None)
-        result = self._retrieve(question, previous)
+        result = self._retrieve(question, previous, llm)
         sources = result.sources
         if not sources:
             yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": True})
             yield sse("retrieval", self._retrieval_info(question, result))
             yield sse("token", {"text": SCOPE_REFUSAL})
             yield from self._explanation(question, result, SCOPE_REFUSAL, True, llm.model_id)
-            yield from self._attestation(question, [], SCOPE_REFUSAL, [], llm.model_id, True, result.used_context)
+            yield from self._attestation(question, [], SCOPE_REFUSAL, [], llm.model_id, True, result.used_context,
+                                         self._used_rewrite(result))
             return
         yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": False})
         yield sse("sources", [s.model_dump() for s in sources])
@@ -170,7 +186,8 @@ class ChatRouter:
             answer.append(text)
             yield sse("token", {"text": text})
         yield from self._explanation(question, result, "".join(answer), False, llm.model_id)
-        yield from self._attestation(question, messages, "".join(answer), sources, llm.model_id, False, result.used_context)
+        yield from self._attestation(question, messages, "".join(answer), sources, llm.model_id, False,
+                                     result.used_context, self._used_rewrite(result))
 
     def _retrieval_info(self, question: str, result: RetrievalResult) -> dict[str, Any]:
         """Why these sources: the floor in force (lowered by the scope check for everyday fact
@@ -187,21 +204,27 @@ class ChatRouter:
             "used_context": result.used_context,
             "scope_probability": None if result.scope_probability is None else round(result.scope_probability, 3),
             "lexicon_terms": statutory_terms(question),
+            "rewrite": result.rewrite,  # the LLM's reading of the question, and whether it steered retrieval
             "named_sections": named,
             "sources": [{"marker": s.marker, "section": s.section, "similarity": s.similarity,
                          "weight": round(s.score / s.similarity, 2) if s.similarity else None,
                          "named": s.section in named} for s in result.sources],
         }
 
+    @staticmethod
+    def _used_rewrite(result: RetrievalResult) -> str | None:
+        return result.rewrite["text"] if result.rewrite and result.rewrite.get("used") else None
+
     def _attestation(self, question: str, prompt: Any, answer: str, sources: list, model_id: str, refused: bool,
-                     follow_up: bool) -> Iterator[str]:
+                     follow_up: bool, rewrite: str | None = None) -> Iterator[str]:
         """Signed record of this answer (after everything else; a failure is logged and skipped)."""
         if self.attest is None:
             return
         try:
             payload = [{"role": m.role, "content": m.content} for m in prompt] if prompt else []
+            extra = {"rewrite": rewrite} if rewrite else {}
             yield sse("attestation", self.attest(question=question, prompt=payload, answer=answer, sources=sources,
-                                                 model_id=model_id, refused=refused, follow_up=follow_up))
+                                                 model_id=model_id, refused=refused, follow_up=follow_up, **extra))
         except Exception:
             logger.exception("could not sign the answer")
 

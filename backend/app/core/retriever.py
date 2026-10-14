@@ -125,6 +125,8 @@ class RetrievalResult:
     candidates: int
     used_context: bool = False  # the previous question was also searched (a follow-up)
     scope_probability: float | None = None  # set when the scope check decided the floor (see scope.py)
+    rewrite: dict | None = None  # the LLM rewrite offered (query_rewriter.py), and whether it was used
+    query: str = ""  # the text actually searched: the question, plus a rewrite's offences if used
 
 
 def build_retriever(settings, embedder: Embedder | None = None, scope: bool = True) -> "Retriever":
@@ -146,6 +148,7 @@ def build_retriever(settings, embedder: Embedder | None = None, scope: bool = Tr
         min_similarity=settings.retrieval_min_similarity,
         scope=check,
         scope_floor=settings.retrieval_scope_floor,
+        rewrite_gate=getattr(settings, "rewrite_gate", 0.5),
     )
 
 
@@ -163,6 +166,7 @@ class Retriever:
         scope=None,
         scope_floor: float = 0.40,
         boilerplate_pref: dict[str, float] | None = None,
+        rewrite_gate: float = 0.5,
     ) -> None:
         """`scope` (app.core.scope.ScopeCheck): when nothing clears `min_similarity` but the
         question is about an IPC offence, sources down to `scope_floor` are used instead - for
@@ -178,32 +182,48 @@ class Retriever:
         self.scope = scope
         self.scope_floor = scope_floor
         self.boilerplate_pref = boilerplate_pref if boilerplate_pref is not None else dict(DEFAULT_BOILERPLATE_PREF)
+        # scope probability a question needs before an LLM rewrite may steer its retrieval
+        self.rewrite_gate = rewrite_gate
 
-    def retrieve(self, question: str, context: str | None = None) -> list[SourceEvidence]:
+    def retrieve(self, question: str, context: str | None = None, rewrite=None) -> list[SourceEvidence]:
         """`context` is the previous user turn, if any. Follow-ups ("within how many years?")
         rarely retrieve well alone, so the question is also searched with the context prepended;
         both result sets are merged, so a change of topic still matches on its own words."""
-        return self.retrieve_with_diagnostics(question, context).sources
+        return self.retrieve_with_diagnostics(question, context, rewrite).sources
 
-    def retrieve_with_diagnostics(self, question: str, context: str | None = None) -> "RetrievalResult":
+    def retrieval_query(self, question: str, rewrite, scope_embedding) -> tuple[str, dict | None]:
+        """The text to search: the question, plus the rewrite's offences ("cheating (section 420)")
+        when the rewrite says the matter is criminal *and* the scope check agrees at `rewrite_gate`.
+        The named sections are then fetched like sections the user named."""
+        if rewrite is None:
+            return question, None
+        info = rewrite.to_dict() | {"text": rewrite.text}
+        p = self.scope.probability(scope_embedding) if self.scope is not None else None
+        info["scope_probability"] = None if p is None else round(p, 4)
+        info["used"] = bool(rewrite.criminal and rewrite.offences and (p is None or p >= self.rewrite_gate))
+        return (f"{question}\n{rewrite.text}" if info["used"] else question), info
+
+    def retrieve_with_diagnostics(self, question: str, context: str | None = None, rewrite=None) -> "RetrievalResult":
         """retrieve(), plus the best similarity among *all* candidates — also when none cleared
-        the floor and the answer will be a refusal (the explainability layer reports it)."""
+        the floor and the answer will be a refusal (the explainability layer reports it).
+        `rewrite` (query_rewriter.Rewrite) is an LLM's reading of the question; see retrieval_query."""
+        # the scope check reads the plain question: the lexicon's (or a rewrite's) added wording
+        # would make civil questions ("my order arrived damaged") look like crimes
+        scope_embedding = list(self.embedder.embed([self.expander.expand(question)]))[0]
+        query, rewrite_info = self.retrieval_query(question, rewrite, scope_embedding)
         use_context = bool(context) and self.expander.is_follow_up(question)
-        queries = [question] + ([f"{context}\n{question}"] if use_context else [])
-        # the scope check reads the plain question: the lexicon's added wording would make
-        # civil questions ("my order arrived damaged") look like crimes
-        texts = [self.expander.search_query(q) for q in queries] + [self.expander.expand(question)]
-        *embeddings, scope_embedding = list(self.embedder.embed(texts))
+        queries = [query] + ([f"{context}\n{question}"] if use_context else [])
+        embeddings = list(self.embedder.embed([self.expander.search_query(q) for q in queries]))
         cands: list[Candidate] = []
         for embedding in embeddings:
             cands += [Candidate(r.chunk, r.similarity) for r in self.store.query(embedding, self.top_k)]
-        for section in self.expander.section_refs(question):
+        for section in self.expander.section_refs(query):
             for r in self.store.query(embeddings[0], k=3, where={"section": section}):
                 cands.append(Candidate(r.chunk, r.similarity, explicit=True))
         ranked = self.rerank(cands)
         best = max((c.similarity for c in ranked), default=0.0)
         floor, scope_p = self.floor_for(self.best_substantive(ranked), scope_embedding,
-                                        lexicon=bool(statutory_terms(question)))
+                                        lexicon=bool(statutory_terms(query)))
         return RetrievalResult(
             sources=self.assemble_context(ranked, self.max_chunks, self.max_context_chars, floor=floor),
             best_similarity=best,
@@ -211,6 +231,8 @@ class Retriever:
             candidates=len(ranked),
             used_context=use_context,
             scope_probability=scope_p,
+            rewrite=rewrite_info,
+            query=query,
         )
 
     def floor_for(self, best_similarity: float, scope_embedding, lexicon: bool = False) -> tuple[float, float | None]:

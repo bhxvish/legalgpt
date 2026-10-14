@@ -107,7 +107,7 @@ class OpenAICompatClient(LLMClient):
         if status == 404:  # the provider's message often names the replacement model
             return LLMClientError(f"{name}: model not found (HTTP 404); check the model name. {_message(text)}")
         if status == 429:
-            daily = bool(re.search(r"per ?day|PerDay|daily|quota", text, re.IGNORECASE))
+            daily = bool(re.search(r"per ?day|PerDay|daily", text, re.IGNORECASE))
             what = f"The {self.provider} daily usage limit has been reached" if daily else \
                 f"{self.provider} is receiving too many requests right now (rate limit)"
             m = re.search(r'"retry[_-]?after[^0-9]*(\d+)|retry in ([\d.]+)s', text, re.IGNORECASE)
@@ -139,7 +139,7 @@ class OpenAICompatClient(LLMClient):
         used = reply.get("usage") or {}
         self.usage["in"] += used.get("prompt_tokens") or 0
         self.usage["out"] += used.get("completion_tokens") or 0
-        return choice["message"].get("content") or ""
+        return (choice.get("message") or {}).get("content") or ""  # a blocked reply has no message
 
     def stream(self, messages: list[Message]) -> Iterator[str]:
         for wait in (*self.retry_waits, None):  # retry only before the first token

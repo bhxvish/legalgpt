@@ -42,8 +42,9 @@ class Attestor:
                 "alg": "Ed25519"}
 
     def answer_record(self, *, question: str, prompt: Any, answer: str, sources: list, model_id: str,
-                      refused: bool, follow_up: bool, leaf_of) -> dict[str, Any]:
-        return self.sign({
+                      refused: bool, follow_up: bool, leaf_of, rewrite: str | None = None) -> dict[str, Any]:
+        extra = {"retrieval_rewrite": rewrite} if rewrite else {}  # the LLM rewrite that steered retrieval
+        return self.sign({**extra,
             "question_sha256": sha256_hex(question.encode()),
             "prompt_sha256": sha256_hex(canonical(prompt)),
             "answer_sha256": sha256_hex(answer.encode()),

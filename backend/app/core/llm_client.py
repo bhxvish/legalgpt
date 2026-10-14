@@ -116,6 +116,13 @@ class GroqClient(LLMClient):
     def generate(self, messages: list[Message]) -> str:
         return self._create(messages).choices[0].message.content or ""
 
+    def generate_brief(self, messages: list[Message]) -> str:
+        """generate() with as little hidden reasoning as the model allows: for short classification
+        calls (the query rewrite), where reasoning tokens would only use up the free daily quota."""
+        effort = {"openai/gpt-oss": "low", "qwen/": "none"}
+        extra = next(({"reasoning_effort": v} for k, v in effort.items() if self.model_id.startswith(k)), {})
+        return self._create(messages, **extra).choices[0].message.content or ""
+
     def stream(self, messages: list[Message]) -> Iterator[str]:
         for event in self._create(messages, stream=True):
             if event.choices and (delta := event.choices[0].delta.content):

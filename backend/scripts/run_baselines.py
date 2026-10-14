@@ -101,7 +101,7 @@ def _dotenv(name: str) -> str:
     return ""
 
 
-def make_system(spec: str, route: str | None = None):
+def make_system(spec: str, route: str | None = None, rewrite: bool = False):
     """-> callable(question) -> (answer, extra_cited_sections)."""
     from app.core.llm_client import AdapterClient, GroqClient, latest_adapter
     from app.core.models import Message
@@ -128,8 +128,13 @@ def make_system(spec: str, route: str | None = None):
         retriever = build_retriever(s)
         llm = hosted(model) if kind == "legalgpt" else AdapterClient(s.adapter_path or latest_adapter(s.lora_dir))
 
+        from app.core.query_rewriter import QueryRewriter
+
+        rewriter = QueryRewriter() if rewrite and kind == "legalgpt" else None  # the answering model rewrites, as in the app
+
         def run(q: str):
-            sources = retriever.retrieve(q)
+            rw = rewriter.rewrite(q, llm) if rewriter and not retriever.expander.section_refs(q) else None
+            sources = retriever.retrieve(q, rewrite=rw)
             if not sources:
                 return NOT_COVERED_REPLY, []
             answer = llm.generate(PromptBuilder().build(q, sources, "legal", []))
@@ -210,13 +215,13 @@ def run(args) -> None:
     if len(cache_as) != len(args.systems):
         raise SystemExit("--cache-as needs one spec per system")
     for spec, cache_spec in zip(args.systems, cache_as):
-        path = out / f"{slug(cache_spec or spec)}.jsonl"
+        path = out / f"{slug(cache_spec or spec)}{args.suffix}.jsonl"
         done = {json.loads(line)["id"] for line in path.read_text(encoding="utf-8").splitlines()} if path.exists() else set()
         todo = [it for it in items if it["id"] not in done]
         print(f"{spec}: {len(done)} cached, {len(todo)} to answer")
         if not todo:
             continue
-        system = make_system(spec, args.route)
+        system = make_system(spec, args.route, rewrite=args.rewrite)
         usage = getattr(getattr(system, "llm", None), "usage", None)
         with path.open("a", encoding="utf-8") as f:
             for it in todo:
@@ -300,6 +305,8 @@ def main() -> int:
     ap.add_argument("--smoke", action="store_true",
                     help="answer just 4 questions per system (in a separate folder) to check keys and model names")
     ap.add_argument("--max-wait-hours", type=float, default=12.0)
+    ap.add_argument("--rewrite", action="store_true", help="LegalGPT: LLM query rewrite before retrieval (as in the app)")
+    ap.add_argument("--suffix", default="", help="appended to the answers file name, e.g. _v2, to keep earlier runs")
     ap.add_argument("--route", help="OpenRouter host to pin, no fallbacks (e.g. Groq)")
     ap.add_argument("--cache-as", nargs="*", metavar="SPEC",
                     help="save each system's answers in this spec's cache (one per system), to finish a run on another route")
