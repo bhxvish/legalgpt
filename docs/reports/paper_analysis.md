@@ -31,6 +31,7 @@ Within LegalGPT, before vs after the scenario fix:
 |---|---|---|---|---|---|---|---|
 | LegalGPT + gpt-5.4-mini | acceptable section (scenario) | 60 | 45% | 88% | 0 | 26 | <0.001 |
 | LegalGPT-LoRA v0.4 (new prompt and lexicon only) | acceptable section (scenario) | 60 | 8% | 13% | 0 | 3 | 0.25 |
+| LoRA v0.4 → v0.5 (retrained with scenario examples) | acceptable section (scenario) | 60 | 13% | 43% | 0 | 18 | <0.001 |
 
 **What the tests support.**
 - **Safety gains are significant for all three models:**
@@ -71,7 +72,28 @@ answering from the sources"):
 | gpt-5.4-mini, + expanded lexicon + rewrite + prompt rule | **88%** |
 | LoRA v0.4, original pipeline | 8% |
 | LoRA v0.4, + expanded lexicon + prompt rule (offline, no rewrite) | 13% |
-| LoRA v0.5 (retrained with 355 scenario examples), offline | *running* |
+| LoRA v0.5 (retrained with 355 scenario examples, no refusals), offline | 43%, but 22% cite only wrong sections |
+| LoRA v0.6 (as v0.5, plus 51 scenario refusals = 13%; only 51 misses were available), offline | 43%, still 22% only wrong sections |
+
+**LoRA v0.5.**
+- Offline retrieval gives an acceptable section for only 30 of the 60 held-out scenarios. v0.4 refused 19 of those 30.
+- Retraining with scenario examples answers most of them: 13% → 43% acceptable (p < 0.001).
+- Statute accuracy (78%) and out-of-scope refusals (100%) are unchanged.
+- The one "wrong punishment" is the malformed s.311 question (section 3).
+- **The cost:** "only wrong sections" rose from 5% to 22%. In 10 of those 13 answers, retrieval had not supplied an acceptable section, and v0.5 applied the nearest retrieved offence anyway, since its scenario examples never showed a refusal. Some fits are defensible (an axe attack → s.324), others are not (chain snatching → s.279, rash driving).
+- v0.6 added refusal examples to test whether this trade-off can be avoided.
+
+**LoRA v0.6.**
+- Only 51 refusal examples were available (13% of the scenario examples, not the 25% intended).
+- They did not change the trade-off: 43% acceptable and 22% only wrong sections, the same as v0.5
+  (paired test v0.5 vs v0.6: 1 question better, 1 worse).
+- Statute accuracy was 80% (v0.5: 78%), and answers were faster (2.5 s vs 3.7 s).
+- Reducing force-fitting probably needs many more refusal examples, or human-written answers that
+  explain why a retrieved offence does not fit.
+- **The app stays on v0.4** (`ADAPTER_PATH` in `.env`):
+  - the published ZK manifest fingerprints v0.4;
+  - v0.4 rarely cites a wrong section (5%), though it refuses most scenarios.
+- Switching to v0.6 means re-running `zk_setup.py` to publish its fingerprint.
 
 **Reading.**
 - The original pipeline was limited by **retrieval**: embedding search alone almost never reaches

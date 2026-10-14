@@ -33,6 +33,8 @@ PAIRS = [  # (system A, system B, metrics)
     ("legalgpt_openai_gpt-5.4-mini", "legalgpt_openai_gpt-5.4-mini_rw", ["acceptable section (scenario)"]),
     ("legalgpt-lora", "legalgpt-lora_v2", ["acceptable section (scenario)"]),
     ("legalgpt-lora_v2", "legalgpt-lora_v3", list(METRICS)),
+    ("legalgpt-lora_v3", "legalgpt-lora_v4", list(METRICS)),
+    ("legalgpt-lora_v2", "legalgpt-lora_v4", list(METRICS)),
 ]
 
 

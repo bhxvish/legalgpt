@@ -145,11 +145,11 @@ def test_comparator_runs_same_evidence_through_each_model_and_saves(tmp_path: Pa
 def test_llm_backend_switch(tmp_path: Path) -> None:
     assert isinstance(build_llm_client(Settings(LLM_BACKEND="groq")), GroqClient)
     with pytest.raises(LLMClientError, match="no adapter"):
-        build_llm_client(Settings(LLM_BACKEND="adapter", LORA_DIR=str(tmp_path)))
+        build_llm_client(Settings(_env_file=None, LLM_BACKEND="adapter", LORA_DIR=str(tmp_path)))  # not the local .env
     adapter = tmp_path / "v0.2-test"
     adapter.mkdir()
     (adapter / "adapter_meta.json").write_text(json.dumps({"base_model": "Qwen/Qwen2.5-1.5B-Instruct"}), encoding="utf-8")
-    client = build_llm_client(Settings(LLM_BACKEND="adapter", LORA_DIR=str(tmp_path)))
+    client = build_llm_client(Settings(_env_file=None, LLM_BACKEND="adapter", LORA_DIR=str(tmp_path)))  # not the local .env
     assert isinstance(client, AdapterClient) and isinstance(client, LLMClient)
     assert client.model_id == "Qwen/Qwen2.5-1.5B-Instruct+lora:v0.2-test"  # nothing loaded until first use
     with pytest.raises(ValueError):
