@@ -8,7 +8,7 @@ import { AnswerProof } from './ZkProof.jsx'
 
 const HISTORY_MESSAGES = 6
 
-const PROVIDER_NAMES = { gemini: 'Gemini', github: 'GitHub', openai: 'OpenAI', openrouter: 'OpenRouter' }
+const PROVIDER_NAMES = { gemini: 'Gemini', openai: 'OpenAI', openrouter: 'OpenRouter' }
 
 /** Short name for the model switch: "gemini:gemini-2.5-flash" -> "Gemini 2.5 flash". */
 function modelLabel(id) {

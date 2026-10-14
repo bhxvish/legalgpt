@@ -9,8 +9,8 @@ Systems (any number, each answers the same seeded sample; answers are cached and
   legalgpt+<provider>:<model>  LegalGPT's pipeline with another provider's model as the LLM
   closed+<provider>:<model>    that model alone, closed-book
                              providers (app/core/openai_compat.py): gemini (GEMINI_API_KEY, free tier),
-                             github (GITHUB_TOKEN, GitHub Models, free), openai (OPENAI_API_KEY),
-                             openrouter (OPENROUTER_API_KEY); e.g. legalgpt+gemini:gemini-2.5-flash
+                             openai (OPENAI_API_KEY), openrouter (OPENROUTER_API_KEY);
+                             e.g. legalgpt+gemini:gemini-3.5-flash-lite
   anthropic:<model>          Claude closed-book (ANTHROPIC_API_KEY)
   --smoke                    4 questions per system first, to check keys and model names
 

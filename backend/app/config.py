@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     lora_dir: Path = Field(default=REPO_ROOT / "data" / "models" / "lora", alias="LORA_DIR")
     adapter_path: Path | None = Field(default=None, alias="ADAPTER_PATH")  # default: newest under LORA_DIR
     # More chat models for the model switch, comma-separated <provider>:<model> (app/core/openai_compat.py),
-    # e.g. "gemini:gemini-2.5-flash,github:openai/gpt-4o-mini". Each needs its key (GEMINI_API_KEY, GITHUB_TOKEN ...).
+    # e.g. "gemini:gemini-3.5-flash-lite,openai:gpt-4o-mini". Each needs its key (GEMINI_API_KEY, OPENAI_API_KEY ...).
     extra_models: str = Field(default="", alias="EXTRA_MODELS")
     # How the local (LoRA) model is loaded: auto | float32 | bfloat16 | 4bit. auto = bfloat16 on a GPU
     # (4-bit if it does not fit), float32 on a CPU with >= 12 GB RAM, else bfloat16.
