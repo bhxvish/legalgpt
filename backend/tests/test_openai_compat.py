@@ -108,3 +108,9 @@ def test_token_usage_is_counted() -> None:
     client.generate(MSGS)
     client.generate(MSGS)
     assert client.usage == {"in": 240, "out": 60}
+
+
+def test_extra_body_is_sent() -> None:
+    pin = {"provider": {"order": ["Groq"], "allow_fallbacks": False}}
+    body = OpenAICompatClient("openrouter", "openai/gpt-oss-120b", api_key="k", extra_body=pin)._body(MSGS, False)
+    assert body["provider"] == pin["provider"] and body["model"] == "openai/gpt-oss-120b"

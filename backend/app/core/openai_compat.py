@@ -67,7 +67,8 @@ def parse_spec(spec: str) -> tuple[str, str]:
 
 class OpenAICompatClient(LLMClient):
     def __init__(self, provider: str, model: str, api_key: str | None = None, max_tokens: int = 2048,
-                 temperature: float = 0.1, timeout: float = 120.0, transport: Any = None) -> None:
+                 temperature: float = 0.1, timeout: float = 120.0, transport: Any = None,
+                 extra_body: dict[str, Any] | None = None) -> None:
         if provider not in PROVIDERS:
             raise ValueError(f"unknown provider {provider!r}")
         self.provider, self.model = provider, model
@@ -76,6 +77,7 @@ class OpenAICompatClient(LLMClient):
         self.api_key = api_key if api_key is not None else provider_key(provider)
         self.max_tokens, self.temperature, self.timeout = max_tokens, temperature, timeout
         self._transport = transport  # tests pass an httpx.MockTransport
+        self.extra_body = extra_body or {}  # provider-specific fields, e.g. OpenRouter's "provider" routing
         self.retry_waits = (5.0, 15.0, 45.0)  # after "overloaded" (500/502/503/504) replies
         self.usage = {"in": 0, "out": 0}  # billed tokens so far (generate only; out includes reasoning)
 
@@ -96,7 +98,7 @@ class OpenAICompatClient(LLMClient):
             # and only the default temperature
             body["max_completion_tokens"] = body.pop("max_tokens")
             del body["temperature"]
-        return body
+        return body | self.extra_body
 
     def _error(self, status: int, text: str) -> LLMClientError:
         name = f"{self.provider} ({self.model})"

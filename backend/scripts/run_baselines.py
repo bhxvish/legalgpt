@@ -101,7 +101,7 @@ def _dotenv(name: str) -> str:
     return ""
 
 
-def make_system(spec: str):
+def make_system(spec: str, route: str | None = None):
     """-> callable(question) -> (answer, extra_cited_sections)."""
     from app.core.llm_client import AdapterClient, GroqClient, latest_adapter
     from app.core.models import Message
@@ -119,7 +119,9 @@ def make_system(spec: str):
         raise SystemExit(f"unknown provider {provider!r} in {spec!r}; use one of {', '.join(PROVIDERS)}")
 
     def hosted(name: str):
-        return (OpenAICompatClient(provider, name, max_tokens=MAX_TOKENS) if provider
+        # --route pins OpenRouter to one host (no fallbacks), e.g. Groq, to match earlier answers
+        pin = {"provider": {"order": [route], "allow_fallbacks": False}} if route and provider == "openrouter" else None
+        return (OpenAICompatClient(provider, name, max_tokens=MAX_TOKENS, extra_body=pin) if provider
                 else GroqClient(s.groq_api_key, name, max_tokens=MAX_TOKENS))
 
     if kind in ("legalgpt", "legalgpt-lora"):
@@ -170,14 +172,17 @@ def run(args) -> None:
     spent = 0.0  # USD in this invocation, from the providers' token counts and --price
     cost = lambda u: (u["in"] * args.price[0] + u["out"] * args.price[1]) / 1e6
     worst = cost({"in": 6000, "out": MAX_TOKENS})  # the most one answer can cost
-    for spec in args.systems:
-        path = out / f"{slug(spec)}.jsonl"
+    cache_as = args.cache_as or [None] * len(args.systems)
+    if len(cache_as) != len(args.systems):
+        raise SystemExit("--cache-as needs one spec per system")
+    for spec, cache_spec in zip(args.systems, cache_as):
+        path = out / f"{slug(cache_spec or spec)}.jsonl"
         done = {json.loads(line)["id"] for line in path.read_text(encoding="utf-8").splitlines()} if path.exists() else set()
         todo = [it for it in items if it["id"] not in done]
         print(f"{spec}: {len(done)} cached, {len(todo)} to answer")
         if not todo:
             continue
-        system = make_system(spec)
+        system = make_system(spec, args.route)
         usage = getattr(getattr(system, "llm", None), "usage", None)
         with path.open("a", encoding="utf-8") as f:
             for it in todo:
@@ -207,6 +212,8 @@ def run(args) -> None:
                     break
                 row = {"id": it["id"], "set": it["set"], "answer": answer, "extra_cited": extra,
                        "seconds": round(time.perf_counter() - t, 2)}
+                if cache_spec:  # answered by another route than the file's name says
+                    row["via"] = spec + (f" (host {args.route})" if args.route else "")
                 if usage:
                     row["tokens"] = {k: usage[k] - before[k] for k in usage}
                     spent += cost(row["tokens"])
@@ -259,11 +266,15 @@ def main() -> int:
     ap.add_argument("--smoke", action="store_true",
                     help="answer just 4 questions per system (in a separate folder) to check keys and model names")
     ap.add_argument("--max-wait-hours", type=float, default=12.0)
+    ap.add_argument("--route", help="OpenRouter host to pin, no fallbacks (e.g. Groq)")
+    ap.add_argument("--cache-as", nargs="*", metavar="SPEC",
+                    help="save each system's answers in this spec's cache (one per system), to finish a run on another route")
     ap.add_argument("--budget-usd", type=float, help="stop before spending more than this (needs --price)")
     ap.add_argument("--price", type=float, nargs=2, default=[0.0, 0.0], metavar=("IN", "OUT"),
                     help="USD per million input / output tokens, for --budget-usd and the cost printout")
     ap.add_argument("--sample", type=int, nargs=4, default=[40, 20, 60, 30], metavar=("PUN", "DEF", "SCEN", "OOS"))
     args = ap.parse_args()
+    sys.stdout.reconfigure(errors="replace")  # Windows consoles cannot print every Unicode answer
     {"run": run, "score": score}[args.step](args)
     return 0
 
