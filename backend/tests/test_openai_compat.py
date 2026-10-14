@@ -83,10 +83,11 @@ def test_parse_spec() -> None:
             parse_spec(bad)
 
 
-def test_extra_models_appear_in_the_model_list(monkeypatch) -> None:
+def test_extra_models_appear_in_the_model_list(monkeypatch, tmp_path) -> None:
     from app.config import Settings
     from app.main import build_models
 
+    monkeypatch.setattr("app.config.REPO_ROOT", tmp_path)  # keys come only from the environment set here
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     s = Settings(EXTRA_MODELS="gemini:gemini-2.5-flash, openrouter:some/model, bad")
