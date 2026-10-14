@@ -134,3 +134,13 @@ def test_a_question_naming_its_section_is_not_rewritten(retriever: Retriever) ->
 def test_visible_reasoning_is_skipped() -> None:
     rw = parse('<think>maybe {"criminal": false} ... no</think>\n' + REPLY)
     assert rw.criminal and rw.offences == [("Cheating by personation", "419")]
+
+
+def test_a_rate_limited_rewrite_does_not_fail_the_question() -> None:
+    from app.core.llm_client import LLMRateLimitError
+
+    class _Limited(StubLLM):
+        def generate(self, messages):
+            raise LLMRateLimitError("The hosted model's daily usage limit has been reached.")
+
+    assert QueryRewriter().rewrite(QUESTION, _Limited()) is None

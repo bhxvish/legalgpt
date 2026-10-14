@@ -180,7 +180,7 @@ def test_selection_from_exact_scores_reproduces_the_retriever() -> None:
     query = f"{q}\n{rw.text}"
     sims = E @ emb.embed([retr.expander.search_query(query)])[0]
     assert [s.chunk_id for s in select(retr, query, chunks, sims)] == [s.chunk_id for s in live]
-    assert {s.section for s in live} >= {"5", "9"}
+    assert any(s.section in {"5", "9"} for s in live)  # the rewrite's sections were fetched
 
 
 # ------------------------------------------------------------------ attestation

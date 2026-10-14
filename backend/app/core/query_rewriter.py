@@ -89,10 +89,9 @@ class QueryRewriter:
         self.cache_size = cache_size
 
     def rewrite(self, question: str, llm) -> Rewrite | None:
-        """None when the model's reply cannot be used; retrieval then runs without a rewrite.
-        Rate-limit errors propagate (the answer would hit the same limit)."""
-        from app.core.llm_client import LLMRateLimitError
-
+        """None when there is no usable rewrite (a failed call, a rate limit, an unreadable reply);
+        retrieval then runs without one. A refusal needs no model, so a used-up quota must not
+        turn it into an error; failures are not cached, so the next question tries again."""
         key = (llm.model_id, question.strip())
         if key in self._cache:
             self._cache.move_to_end(key)
@@ -100,8 +99,6 @@ class QueryRewriter:
         try:
             ask = getattr(llm, "generate_brief", llm.generate)  # little hidden reasoning where supported
             reply = ask([Message("system", REWRITE_PROMPT), Message("user", question)])
-        except LLMRateLimitError:
-            raise
         except Exception as exc:  # retrieval works without it
             logger.warning("query rewrite failed (%s): %s", llm.model_id, exc)
             return None
