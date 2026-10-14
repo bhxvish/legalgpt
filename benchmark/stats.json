@@ -1,0 +1,32 @@
+{
+ "statute_qa": {
+  "definition": 52,
+  "punishment": 313
+ },
+ "scenarios": {
+  "dev": 20,
+  "test": 288
+ },
+ "out_of_scope": 54,
+ "fact_patterns": {
+  "base": 42,
+  "paraphrase": 42,
+  "flip": 126,
+  "omit": 96,
+  "natural": 23
+ },
+ "fact_pattern_verdicts": {
+  "CONSISTENT": 95,
+  "INCONSISTENT": 133,
+  "INSUFFICIENT": 101
+ },
+ "fact_pattern_sections": {
+  "304A": 57,
+  "337": 31,
+  "338": 31,
+  "323": 33,
+  "279": 52,
+  "379": 64,
+  "304B": 61
+ }
+}
