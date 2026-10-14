@@ -21,7 +21,7 @@ function Bar({ value, threshold }) {
  * "Why this answer?" — built from the explanation SSE event. Every number here describes how the
  * answer relates to the retrieved IPC text; none of them says the answer is legally correct.
  */
-export default function WhyPanel({ explanation: ex, sources, onOpenSource }) {
+export default function WhyPanel({ explanation: ex, sources, retrieval, onOpenSource }) {
   const [hoverSentence, setHoverSentence] = useState(null)
   const [hoverSource, setHoverSource] = useState(null)
   const byMarker = new Map((sources || []).map((s) => [s.marker, s]))
@@ -151,7 +151,41 @@ export default function WhyPanel({ explanation: ex, sources, onOpenSource }) {
             </ul>
           </section>
         )}
+        {retrieval && <HowChosen r={retrieval} />}
       </div>
     </details>
+  )
+}
+
+/** How the sources were chosen: floor, scope check, lay-term expansion, follow-up context. */
+function HowChosen({ r }) {
+  const lowered = r.floor < r.base_floor
+  const lines = []
+  if (r.named_sections.length) lines.push(`You named ${r.named_sections.map((s) => `s.${s}`).join(', ')}, so those sections were fetched directly.`)
+  if (r.lexicon_terms.length)
+    lines.push(`Everyday words in your question were matched to legal wording for the search: ${r.lexicon_terms.map((t) => `"${t.split(':')[0]}"`).join(', ')}.`)
+  if (r.used_context) lines.push('Your question looked like a follow-up, so the previous question was searched too.')
+  if (r.scope_probability != null)
+    lines.push(
+      lowered
+        ? `No section reached the usual match level (${pct(r.base_floor)}), but the question was judged to be about a crime (${pct(r.scope_probability)} sure), so sources down to ${pct(r.floor)} were used.`
+        : r.floor > 1
+          ? `The question was judged not to be about an IPC offence (${pct(r.scope_probability)} likely to be), so no sources were used.`
+          : `The question was judged ${r.scope_probability >= 0.5 ? '' : 'not '}to be about a crime (${pct(r.scope_probability)}).`,
+    )
+  if (!r.sources.length && r.floor <= 1) lines.push(`The best match was ${pct(r.best_similarity)}, below the ${pct(r.floor)} needed, so no sources were used.`)
+  return (
+    <section data-testid="why-retrieval">
+      <h4 className="mb-1 font-semibold text-slate-700">How the sources were chosen</h4>
+      <ul className="list-disc space-y-0.5 pl-5 text-slate-600">
+        {lines.length ? lines.map((l) => <li key={l}>{l}</li>) : <li>Sources with a match of at least {pct(r.floor)} were used, best first.</li>}
+      </ul>
+      {(new Set(r.sources.map((s) => s.weight)).size > 1 || r.sources.some((s) => s.named)) && (
+        <p className="mt-1 text-slate-500">
+          Ranking weights: {r.sources.map((s) => `[${s.marker}] ×${s.weight}${s.named ? ' (named)' : ''}`).join(' · ')} (bare-act text ×1.2;
+          state amendments and Chapter I general provisions down-weighted).
+        </p>
+      )}
+    </section>
   )
 }

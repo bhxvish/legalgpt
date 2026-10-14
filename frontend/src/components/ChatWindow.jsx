@@ -138,7 +138,7 @@ function AssistantMessage({ msg, onCite }) {
           </ul>
         </div>
       )}
-      {msg.explanation && <WhyPanel explanation={msg.explanation} sources={msg.sources} onOpenSource={onCite} />}
+      {msg.explanation && <WhyPanel explanation={msg.explanation} sources={msg.sources} retrieval={msg.retrieval} onOpenSource={onCite} />}
       <AnswerProof msg={msg} />
       {msg.verifySection && !msg.verification && !msg.error && (
         <p className="mt-3 animate-pulse text-xs text-slate-500">Checking the facts against s.{msg.verifySection}…</p>
@@ -311,6 +311,7 @@ export default function ChatWindow() {
             else if (event === 'explanation') upd((m) => ({ ...m, explanation: data }))
             else if (event === 'verification') upd((m) => ({ ...m, verification: data }))
             else if (event === 'attestation') upd((m) => ({ ...m, attestation: data }))
+            else if (event === 'retrieval') upd((m) => ({ ...m, retrieval: data }))
             else if (event === 'error') upd((m) => ({ ...m, error: data.message }))
           },
           controller.signal,

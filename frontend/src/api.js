@@ -74,6 +74,8 @@ export const annotationApi = {
 export const reviewApi = {
   cases: () => fetch(`${API_BASE_URL}/api/review/cases`).then(json),
   getCase: (caseId) => fetch(`${API_BASE_URL}/api/review/cases/${enc(caseId)}`).then(json),
+  explain: (caseId, sentenceId, label) =>
+    fetch(`${API_BASE_URL}/api/review/cases/${enc(caseId)}/items/${enc(sentenceId)}/explain${label ? `?label=${enc(label)}` : ''}`).then(json),
   setLabel: (caseId, sentenceId, reviewer, label) =>
     fetch(`${API_BASE_URL}/api/review/cases/${enc(caseId)}/items/${enc(sentenceId)}`, {
       method: 'PUT',

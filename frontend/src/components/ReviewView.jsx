@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { annotationApi, reviewApi } from '../api.js'
+import RoleExplanation from './RoleExplanation.jsx'
 
 const PALETTE = [
   'bg-sky-100 text-sky-800 ring-sky-300',
@@ -176,6 +177,7 @@ function CaseReview({ caseId, reviewer, scheme, onBack }) {
   const [cursor, setCursor] = useState(null) // sentence_id
   const [status, setStatus] = useState({ state: 'idle', text: '' })
   const [result, setResult] = useState(null)
+  const [explainFor, setExplainFor] = useState(null) // sentence_id whose explanation is open
   const rowRefs = useRef({})
   const colour = useMemo(() => Object.fromEntries(scheme.map((l, i) => [l.name, PALETTE[i % PALETTE.length]])), [scheme])
   const byShortcut = useMemo(() => Object.fromEntries(scheme.map((l) => [l.shortcut, l.name])), [scheme])
@@ -270,6 +272,9 @@ function CaseReview({ caseId, reviewer, scheme, onBack }) {
         const delta = e.key === 'ArrowDown' || e.key === 'j' ? 1 : -1
         const next = visible[Math.min(Math.max(i + delta, 0), visible.length - 1)]
         if (next) setCursorNow(next.sentence_id)
+      } else if (e.key === 'w' && id) {
+        e.preventDefault()
+        setExplainFor((cur) => (cur === id ? null : id))
       } else if (e.key === 'n') {
         e.preventDefault()
         const next = pendingAfter(d.items, id)
@@ -372,6 +377,22 @@ function CaseReview({ caseId, reviewer, scheme, onBack }) {
                     )}
                   </div>
                   <p className="mt-1 break-words leading-relaxed text-slate-800">{it.text}</p>
+                  {active && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setExplainFor((cur) => (cur === it.sentence_id ? null : it.sentence_id))
+                      }}
+                      className="mt-1 text-xs text-indigo-600 hover:underline"
+                      data-testid="explain-toggle"
+                    >
+                      {explainFor === it.sentence_id ? 'Hide explanation' : 'Why this suggestion? (w)'}
+                    </button>
+                  )}
+                  {explainFor === it.sentence_id && (
+                    <RoleExplanation caseId={caseId} item={it} labels={scheme.map((l) => l.name)} colour={colour} />
+                  )}
                 </li>
               )
             })}
@@ -426,7 +447,7 @@ function CaseReview({ caseId, reviewer, scheme, onBack }) {
               </button>
             )}
           </div>
-          <p className="text-xs text-slate-400">Enter accept · 1–{scheme.length} choose a role · ↑/↓ move · n next unchecked · hover a role for its meaning</p>
+          <p className="text-xs text-slate-400">Enter accept · 1–{scheme.length} choose a role · ↑/↓ move · n next unchecked · w why this suggestion · hover a role for its meaning</p>
         </div>
       </div>
     </div>

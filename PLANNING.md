@@ -563,6 +563,26 @@ The weaknesses found by the evaluation, fixed and re-measured:
   (11/41 plain, 12/12 punishments correct, 4.52 vs 4.30), so the gain comes from the answer style,
   not the extra epoch. [Report](docs/reports/lora_v0.4_eval.md)
 
+## Explainability additions (2026-10-14)
+
+- **Review tab, "Why this suggestion?" (w):**
+  - word highlights for the classifier's role, by word removal (default) or Integrated Gradients
+    (128 steps; completeness gap 0.03 logits);
+  - "Why not X?" for any other role;
+  - the share of evidence from the context segment, flagged above 50%;
+  - the 3 most similar human-checked sentences by the classifier's pooled representation
+    (`build_explain_index.py`; 4,823 sentences of corpus v0.3).
+- **Faithfulness** (`eval_explanations.py`, 100 held-out sentences): ERASER comprehensiveness and
+  sufficiency, both methods well above random, word removal above IG. The two methods agree on
+  the top word only 20% of the time, and context carries 65% of the attribution.
+  [Report](docs/reports/classifier_explanations.md)
+- **Verify tab, "What would change the verdict":** computed exactly from the rules
+  (`what_if.py`): missing facts as plain questions, contradicted elements, and the verdict if each
+  were satisfied.
+- **Chat, "How the sources were chosen":** a new `retrieval` SSE event after meta/sources: the
+  floor in force (and whether the scope check lowered it), lexicon terms, follow-up context,
+  named sections and ranking weights.
+
 ## Known limitations
 
 **Scope**

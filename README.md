@@ -18,9 +18,9 @@ check the facts you describe against the legal elements of an offence.
 | | Feature | In plain words |
 |---|---|---|
 | 💬 | **Grounded answers** | Finds the relevant IPC sections, answers only from them, and cites each one as `[1]`, `[2]`… Click a citation to read the section. If nothing in the IPC matches, it says so instead of guessing. |
-| 🔍 | **"Why this answer?"** | Shows how closely the retrieved law matched your question, which source supports each sentence of the answer, and warns about anything unsupported. |
+| 🔍 | **"Why this answer?"** | Shows how closely the retrieved law matched your question, which source supports each sentence of the answer, how the sources were chosen (including how everyday words were translated into legal terms), and warns about anything unsupported. |
 | ✅ | **Fact check with rules** | Describe a case and pick a section (e.g. 304A). An AI pulls out the facts, each with a quote from your text, and a Prolog rule engine checks them against the section's elements: *consistent*, *inconsistent* or *insufficient facts*. |
-| 🏷️ | **Faster dataset building** | An InLegalBERT model suggests the role of every sentence in a judgment (Facts, Argument, Ruling…). People check only the uncertain ones plus random spot checks. |
+| 🏷️ | **Faster dataset building** | An InLegalBERT model suggests the role of every sentence in a judgment (Facts, Argument, Ruling…). People check only the uncertain ones plus random spot checks. **"Why this suggestion?"** highlights the words that drove it (Integrated Gradients), shows how much it relied on the neighbouring sentences, and lists similar sentences people have labelled. |
 | 🔐 | **Verifiable results** | Zero-knowledge proofs (EZKL / Halo2) that a fact-check verdict follows from the published rules (the facts stay hidden) and that an answer's sources are exactly what the retrieval rules pick from all 685 sections. Every answer is also signed. [How it works](docs/zk/README.md) |
 | 🧪 | **Fine-tuned model comparison** | Switch between a hosted model and a small model fine-tuned on our data (LoRA) to compare their answers side by side. |
 

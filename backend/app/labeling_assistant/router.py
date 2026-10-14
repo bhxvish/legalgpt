@@ -29,6 +29,7 @@ class ReviewRouter:
         self.router.add_api_route("/cases/{case_id}", self.get_case, methods=["GET"])
         self.router.add_api_route("/cases/{case_id}/items/{sentence_id}", self.correct, methods=["PUT"])
         self.router.add_api_route("/cases/{case_id}/sign-off", self.sign_off, methods=["POST"])
+        self.router.add_api_route("/cases/{case_id}/items/{sentence_id}/explain", self.explain, methods=["GET"])
         self.router.add_api_route("/uploads", self.upload, methods=["POST"], status_code=202)
         self.router.add_api_route("/uploads", self.list_uploads, methods=["GET"])
         self.router.add_api_route("/uploads/{job_id}", self.get_upload, methods=["GET"])
@@ -108,6 +109,34 @@ class ReviewRouter:
             raise HTTPException(409, str(e)) from None
         return {"promoted": result.promoted, "status": result.status,
                 "audit_error_rate": result.audit_error_rate, "reason": result.reason}
+
+    # ------------------------------------------------------------ explanations
+
+    def explain(self, case_id: str, sentence_id: str, label: str | None = None) -> dict[str, Any]:
+        """Why the classifier suggests a role for this sentence: word attributions (Integrated
+        Gradients), reliance on the context, and similar human-labelled sentences. Uses the newest
+        checkpoint, which may differ from the one that made the queued suggestion."""
+        from app.labeling_assistant.dataset import RRLExample
+        from app.labeling_assistant.explain import ClassifierExplainer
+
+        case = self._load(case_id)
+        examples = [RRLExample(it.prediction.sentence_id, case_id, it.prediction.idx, it.prediction.text)
+                    for it in case.items]
+        target = next((e for e in examples if e.sentence_id == sentence_id), None)
+        if target is None:
+            raise HTTPException(404, f"sentence {sentence_id!r} is not in this case")
+        clf, model = self._intake()._classifier()
+        if getattr(self, "_explainer_model", None) != model:
+            from app.labeling_assistant.intake import latest_checkpoint
+
+            ckpt = latest_checkpoint(self._intake().model_dir)
+            self._explainer = ClassifierExplainer(clf, ckpt / "neighbours.npz" if ckpt else None)
+            self._explainer_model = model
+        if label is not None and label not in clf.labels:
+            raise HTTPException(422, f"unknown label {label!r}")
+        item = next(it for it in case.items if it.prediction.sentence_id == sentence_id)
+        out = self._explainer.explain(target, examples, label)
+        return {**out, "model": model, "queued_suggestion": item.prediction.label, "queued_model": case.model}
 
     # ------------------------------------------------------------ uploads (JudgmentIntake)
 

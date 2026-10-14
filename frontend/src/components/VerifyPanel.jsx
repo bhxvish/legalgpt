@@ -82,6 +82,22 @@ export function VerificationResultView({ result: r, className = "space-y-4 round
         </table>
         </div>
   
+        {r.what_if && (
+          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm ring-1 ring-slate-200" data-testid="verify-what-if">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">What would change the verdict</p>
+            <p className="mt-1 text-slate-700">{r.what_if.summary}</p>
+            {r.what_if.missing.length > 0 && (
+              <ul className="mt-1 list-disc pl-5 text-xs text-slate-600">
+                {r.what_if.missing.map((m) => (
+                  <li key={m.predicate}>
+                    {m.description}: if the facts established it, the verdict would be <b>{m.verdict_if_satisfied}</b>.
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         {r.alternatives.some((a) => a.status === 'CONSISTENT') && (
           <p className="text-sm text-slate-700">
             These facts also satisfy:{' '}

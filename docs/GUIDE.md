@@ -240,6 +240,24 @@ cd backend
 ..\.venv-gpu\Scripts\python -m uvicorn app.main:app --port 8000
 ```
 
+### Explanations in the Review tab
+
+Press **w** (or click *Why this suggestion?*) on a sentence to see:
+- **Word highlights:** Integrated Gradients over the input embeddings, 128 steps, [PAD]
+  baseline. Green words push toward the role and red words push against it. *Why not…* explains
+  any other role.
+- **Context reliance:** the share of the evidence that came from the sentence's position and
+  neighbours rather than the sentence itself. Above 50% is flagged, because neighbouring quoted
+  precedent is a common cause of Ruling/Precedent mistakes.
+- **Similar labelled sentences:** the nearest human-checked sentences by the classifier's own
+  representation. Build the index once per checkpoint:
+  `.venv-gpu\Scripts\python backend/scripts/build_explain_index.py`.
+
+The API is `GET /api/review/cases/{case_id}/items/{sentence_id}/explain[?label=Ruling]`. A
+faithfulness test (ERASER comprehensiveness and sufficiency; IG vs occlusion vs random) is in
+`backend/scripts/eval_explanations.py` and reported in
+[docs/reports/classifier_explanations.md](reports/classifier_explanations.md).
+
 ## Neuro-symbolic verification (Module 5)
 
 Needs [SWI-Prolog](https://www.swi-prolog.org/download/stable) on `PATH` (the backend still starts
@@ -252,6 +270,9 @@ each element as true / false / unknown with a quote from the text (twice — onl
 agree on are kept), and Prolog returns **CONSISTENT** (every element established), **INCONSISTENT**
 (an element contradicted) or **INSUFFICIENT** (an element not established), plus the other encoded
 sections the facts fit. It checks extracted facts against encoded elements; it does not decide guilt.
+Each result also says **what would change the verdict**: the facts still missing (as plain questions) for
+INSUFFICIENT, and the contradicted elements for INCONSISTENT. This is computed exactly from the rules
+(`app/verification/what_if.py`).
 
 `POST /api/verify` with `{"case_text": "...", "cited_section": "304A"}`; `GET /api/verify/sections`.
 To produce a sanity-check report on real annotated cases (written to `data/reports/`, git-ignored):

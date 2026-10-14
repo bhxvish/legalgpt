@@ -7,6 +7,7 @@ Event stream (each `data:` line is JSON):
   explanation   ExplanationRecord               legal mode, after the answer (incl. refusals)
   verification  VerificationResult | {"error"}  legal mode, only when the request names verify_section
   error         {"message"}                     generation/retrieval failure (stream then ends)
+  retrieval     how the sources were chosen    legal mode, after meta / sources (floor, scope check, lexicon)
   attestation   signed answer record (app/zk)  legal mode, when the server signs answers
   done          {}                              always last
 """
@@ -155,12 +156,14 @@ class ChatRouter:
         sources = result.sources
         if not sources:
             yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": True})
+            yield sse("retrieval", self._retrieval_info(question, result))
             yield sse("token", {"text": SCOPE_REFUSAL})
             yield from self._explanation(question, result, SCOPE_REFUSAL, True, llm.model_id)
             yield from self._attestation(question, [], SCOPE_REFUSAL, [], llm.model_id, True, result.used_context)
             return
         yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": False})
         yield sse("sources", [s.model_dump() for s in sources])
+        yield sse("retrieval", self._retrieval_info(question, result))
         messages = self.prompt_builder.build(question, sources, "legal", history)
         answer: list[str] = []
         for text in normalize_stream(llm.stream(messages)):
@@ -168,6 +171,27 @@ class ChatRouter:
             yield sse("token", {"text": text})
         yield from self._explanation(question, result, "".join(answer), False, llm.model_id)
         yield from self._attestation(question, messages, "".join(answer), sources, llm.model_id, False, result.used_context)
+
+    def _retrieval_info(self, question: str, result: RetrievalResult) -> dict[str, Any]:
+        """Why these sources: the floor in force (lowered by the scope check for everyday fact
+        patterns), the statutory wording the lexicon added, follow-up context, and per source its
+        similarity and the weight applied by the reranker."""
+        from app.core.lay_terms import statutory_terms
+        from app.core.retriever import QueryExpander
+
+        named = QueryExpander.section_refs(question)
+        return {
+            "floor": round(result.min_similarity, 3),
+            "base_floor": getattr(self.retriever, "min_similarity", result.min_similarity),
+            "best_similarity": round(result.best_similarity, 3),
+            "used_context": result.used_context,
+            "scope_probability": None if result.scope_probability is None else round(result.scope_probability, 3),
+            "lexicon_terms": statutory_terms(question),
+            "named_sections": named,
+            "sources": [{"marker": s.marker, "section": s.section, "similarity": s.similarity,
+                         "weight": round(s.score / s.similarity, 2) if s.similarity else None,
+                         "named": s.section in named} for s in result.sources],
+        }
 
     def _attestation(self, question: str, prompt: Any, answer: str, sources: list, model_id: str, refused: bool,
                      follow_up: bool) -> Iterator[str]:

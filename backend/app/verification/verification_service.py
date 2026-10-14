@@ -53,7 +53,11 @@ class VerificationResult:
     disclaimer: str = DISCLAIMER
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        from app.verification.what_if import what_if
+
+        d = asdict(self)
+        d["what_if"] = what_if(d["elements"])  # what would change the verdict (computed from the rules)
+        return d
 
 
 _ORDER = {"CONSISTENT": 0, "INSUFFICIENT": 1, "INCONSISTENT": 2}
