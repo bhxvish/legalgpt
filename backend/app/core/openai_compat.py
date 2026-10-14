@@ -141,6 +141,18 @@ class OpenAICompatClient(LLMClient):
         self.usage["out"] += used.get("completion_tokens") or 0
         return (choice.get("message") or {}).get("content") or ""  # a blocked reply has no message
 
+    def generate_brief(self, messages: list[Message]) -> str:
+        """generate() with low reasoning effort on OpenAI's reasoning models (short classification
+        calls such as the query rewrite); other models answer as usual."""
+        if self.provider == "openai" and re.match(r"(gpt-5|o\d)", self.model):
+            saved = self.extra_body
+            self.extra_body = saved | {"reasoning_effort": "low"}
+            try:
+                return self.generate(messages)
+            finally:
+                self.extra_body = saved
+        return self.generate(messages)
+
     def stream(self, messages: list[Message]) -> Iterator[str]:
         for wait in (*self.retry_waits, None):  # retry only before the first token
             with self._client() as http, http.stream("POST", "/chat/completions", json=self._body(messages, True)) as r:

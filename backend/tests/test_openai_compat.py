@@ -115,3 +115,16 @@ def test_extra_body_is_sent() -> None:
     pin = {"provider": {"order": ["Groq"], "allow_fallbacks": False}}
     body = OpenAICompatClient("openrouter", "openai/gpt-oss-120b", api_key="k", extra_body=pin)._body(MSGS, False)
     assert body["provider"] == pin["provider"] and body["model"] == "openai/gpt-oss-120b"
+
+
+def test_brief_generation_lowers_reasoning_on_openai_reasoning_models() -> None:
+    seen = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(req.content))
+        return httpx.Response(200, json={"choices": [{"message": {"content": "x"}}]})
+
+    c = OpenAICompatClient("openai", "gpt-5.4-mini", api_key="k", transport=httpx.MockTransport(handler))
+    c.generate_brief(MSGS)
+    c.generate(MSGS)
+    assert seen[0]["reasoning_effort"] == "low" and "reasoning_effort" not in seen[1]
