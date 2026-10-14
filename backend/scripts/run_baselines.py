@@ -6,9 +6,13 @@ Systems (any number, each answers the same seeded sample; answers are cached and
   closed:<groq model>[@effort]  the model alone, with a neutral "answer about Indian law, cite sections" prompt;
                              @low/@medium/@high sets gpt-oss reasoning effort (gpt-oss-20b at the default
                              effort often spends the whole output budget on hidden reasoning)
-  openai:<model> / anthropic:<model> / gemini:<model>
-                             closed-book via those APIs (needs OPENAI_API_KEY / ANTHROPIC_API_KEY /
-                             GEMINI_API_KEY in .env or the environment)
+  legalgpt+<provider>:<model>  LegalGPT's pipeline with another provider's model as the LLM
+  closed+<provider>:<model>    that model alone, closed-book
+                             providers (app/core/openai_compat.py): gemini (GEMINI_API_KEY, free tier),
+                             github (GITHUB_TOKEN, GitHub Models, free), openai (OPENAI_API_KEY),
+                             openrouter (OPENROUTER_API_KEY); e.g. legalgpt+gemini:gemini-2.5-flash
+  anthropic:<model>          Claude closed-book (ANTHROPIC_API_KEY)
+  --smoke                    4 questions per system first, to check keys and model names
 
 Scored automatically (app/benchmark/metrics.py): correct section, correct punishment terms, wrong
 punishment, invented sections, IPC/BNS confusion, scenario hits, and civil questions treated as
@@ -102,12 +106,23 @@ def make_system(spec: str):
     from app.core.prompt_builder import NOT_COVERED_REPLY, PromptBuilder
     from app.core.retriever import build_retriever
 
+    from app.core.openai_compat import PROVIDERS, OpenAICompatClient
+
     s = get_settings()
     kind, _, model = spec.partition(":")
+    if kind in ("openai", "gemini"):  # older spelling: openai:<model> = closed+openai:<model>
+        kind = f"closed+{kind}"
+    kind, _, provider = kind.partition("+")  # legalgpt+gemini:gemini-2.5-flash
+    if provider and provider not in PROVIDERS:
+        raise SystemExit(f"unknown provider {provider!r} in {spec!r}; use one of {', '.join(PROVIDERS)}")
+
+    def hosted(name: str):
+        return (OpenAICompatClient(provider, name, max_tokens=MAX_TOKENS) if provider
+                else GroqClient(s.groq_api_key, name, max_tokens=MAX_TOKENS))
+
     if kind in ("legalgpt", "legalgpt-lora"):
         retriever = build_retriever(s)
-        llm = (GroqClient(s.groq_api_key, model, max_tokens=MAX_TOKENS) if kind == "legalgpt"
-               else AdapterClient(s.adapter_path or latest_adapter(s.lora_dir)))
+        llm = hosted(model) if kind == "legalgpt" else AdapterClient(s.adapter_path or latest_adapter(s.lora_dir))
 
         def run(q: str):
             sources = retriever.retrieve(q)
@@ -118,15 +133,15 @@ def make_system(spec: str):
             return answer, [by_marker[int(m)] for m in MARKER.findall(answer) if int(m) in by_marker and by_marker[int(m)]]
         return run
     if kind == "closed":
-        model, _, effort = model.partition("@")  # closed:openai/gpt-oss-20b@low -> reasoning_effort="low"
-        llm = GroqClient(s.groq_api_key, model, max_tokens=MAX_TOKENS)
-        extra = {"reasoning_effort": effort} if effort else {}
+        model, _, effort = model.partition("@")  # closed:openai/gpt-oss-20b@low -> reasoning_effort="low" (Groq)
+        llm = hosted(model)
+        extra = {"reasoning_effort": effort} if effort and not provider else {}
 
         def ask(q: str):
             msgs = [Message("system", CLOSED_SYSTEM), Message("user", q)]
             return (llm._create(msgs, **extra).choices[0].message.content or "") if extra else llm.generate(msgs), []
         return ask
-    if kind in ("openai", "anthropic", "gemini"):
+    if kind == "anthropic":
         client = HttpChat(kind, model)
         return lambda q: (client.ask(q), [])
     raise SystemExit(f"unknown system {spec!r}")
@@ -142,10 +157,14 @@ def run(args) -> None:
     from app.benchmark.quota import QuotaWaiter
 
     waiter = QuotaWaiter(args.patient, args.max_wait_hours)
-    items = sample(args.seed, *args.sample)
-    OUT.mkdir(parents=True, exist_ok=True)
+    items = sample(args.seed, *((1, 1, 1, 1) if args.smoke else args.sample))
+    out = OUT / "smoke" if args.smoke else OUT
+    if args.smoke:  # a fresh 4-question check of keys and model names; never touches the real caches
+        for f in out.glob("*.jsonl"):
+            f.unlink()
+    out.mkdir(parents=True, exist_ok=True)
     for spec in args.systems:
-        path = OUT / f"{slug(spec)}.jsonl"
+        path = out / f"{slug(spec)}.jsonl"
         done = {json.loads(line)["id"] for line in path.read_text(encoding="utf-8").splitlines()} if path.exists() else set()
         todo = [it for it in items if it["id"] not in done]
         print(f"{spec}: {len(done)} cached, {len(todo)} to answer")
@@ -177,6 +196,9 @@ def run(args) -> None:
                 f.write(json.dumps({"id": it["id"], "set": it["set"], "answer": answer, "extra_cited": extra,
                                     "seconds": round(time.perf_counter() - t, 2)}, ensure_ascii=False) + "\n")
                 f.flush()
+                if args.smoke:
+                    ok = "FAILED" if answer.startswith("ERROR") or not answer.strip() else "ok"
+                    print(f"  [{ok}] {it['set']}: {it['question'][:60]}\n        -> {answer[:160]!r}")
 
 
 def score(args) -> None:
@@ -216,6 +238,8 @@ def main() -> int:
     ap.add_argument("--systems", nargs="*", default=[])
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--patient", action="store_true", help="wait out daily limits instead of stopping")
+    ap.add_argument("--smoke", action="store_true",
+                    help="answer just 4 questions per system (in a separate folder) to check keys and model names")
     ap.add_argument("--max-wait-hours", type=float, default=12.0)
     ap.add_argument("--sample", type=int, nargs=4, default=[40, 20, 60, 30], metavar=("PUN", "DEF", "SCEN", "OOS"))
     args = ap.parse_args()

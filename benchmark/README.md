@@ -45,6 +45,8 @@ item (law students or advocates), disagreements resolved by discussion, and Cohe
 
 ```bash
 python backend/scripts/run_baselines.py run --systems legalgpt:openai/gpt-oss-120b closed:openai/gpt-oss-120b
+# other providers (keys in .env; docs/GUIDE.md "Other models"); --smoke checks keys on 4 questions first
+python backend/scripts/run_baselines.py run --smoke --systems legalgpt+gemini:gemini-2.5-flash closed+gemini:gemini-2.5-flash
 python backend/scripts/run_baselines.py score
 python backend/scripts/run_counterfactual.py run --model qwen/qwen3.8-27b --frames 0 && python backend/scripts/run_counterfactual.py score
 ```

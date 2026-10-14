@@ -240,6 +240,32 @@ cd backend
 ..\.venv-gpu\Scripts\python -m uvicorn app.main:app --port 8000
 ```
 
+### Other models (Gemini, GitHub Models, OpenAI, OpenRouter)
+
+LegalGPT's pipeline (retrieval, citations, verification) can run on any model behind an
+OpenAI-compatible chat API (`backend/app/core/openai_compat.py`). List them in `.env`, with keys:
+
+```bash
+EXTRA_MODELS=gemini:gemini-2.5-flash,github:openai/gpt-4o-mini
+GEMINI_API_KEY=...
+GITHUB_TOKEN=...
+```
+
+They then appear in the chat's model switch. A model whose key is missing is listed in the
+backend's startup notes and left out.
+
+| Provider | Key | Cost | How to get the key |
+|---|---|---|---|
+| `gemini` | `GEMINI_API_KEY` | free tier (rate-limited; Google may use free-tier prompts to improve its products) | [aistudio.google.com/apikey](https://aistudio.google.com/apikey): sign in, **Create API key** |
+| `github` | `GITHUB_TOKEN` | free (rate-limited per day) | GitHub, Settings, Developer settings, Personal access tokens, Fine-grained tokens, **Generate**; under permissions give **Models: read**. Model names: [github.com/marketplace/models](https://github.com/marketplace/models), e.g. `openai/gpt-4o-mini` |
+| `openai` | `OPENAI_API_KEY` | paid | platform.openai.com |
+| `openrouter` | `OPENROUTER_API_KEY` | pay as you go; some `:free` models | openrouter.ai |
+
+The same specs work in the benchmark runner (`benchmark/README.md`): `legalgpt+gemini:gemini-2.5-flash`
+is LegalGPT with Gemini as the LLM, `closed+gemini:gemini-2.5-flash` is Gemini on its own. Run with
+`--smoke` first: it answers 4 questions per system, so a wrong key or model name shows up before a
+full run.
+
 ### Explanations in the Review tab
 
 Press **w** (or click *Why this suggestion?*) on a sentence to see:

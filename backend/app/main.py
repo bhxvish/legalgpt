@@ -71,6 +71,19 @@ def build_models(settings: Settings) -> tuple[dict[str, LLMClient], dict[str, st
         notes["adapter"] = "LoRA-tuned Qwen2.5-1.5B, runs on this machine (GPU if available, otherwise slow on CPU)"
     else:
         notes["adapter"] = f"no LoRA adapter found in {settings.lora_dir} (train one with backend/scripts/train_lora.py)"
+    from app.core.openai_compat import PROVIDERS, OpenAICompatClient, parse_spec, provider_key
+
+    for spec in (x.strip() for x in settings.extra_models.split(",") if x.strip()):
+        try:
+            provider, model = parse_spec(spec)
+        except ValueError as e:
+            logger.warning("EXTRA_MODELS: %s", e)
+            continue
+        if provider_key(provider):
+            models[spec] = OpenAICompatClient(provider, model)
+            notes[spec] = f"{model} via {provider}"
+        else:
+            notes[spec] = f"set {PROVIDERS[provider][1]} in .env to use {model} via {provider}"
     default = settings.llm_backend if settings.llm_backend in models else "groq"
     if settings.llm_backend == "adapter" and "adapter" not in models:
         raise LLMClientError(notes["adapter"])

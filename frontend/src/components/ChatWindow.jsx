@@ -8,6 +8,17 @@ import { AnswerProof } from './ZkProof.jsx'
 
 const HISTORY_MESSAGES = 6
 
+const PROVIDER_NAMES = { gemini: 'Gemini', github: 'GitHub', openai: 'OpenAI', openrouter: 'OpenRouter' }
+
+/** Short name for the model switch: "gemini:gemini-2.5-flash" -> "Gemini 2.5 flash". */
+function modelLabel(id) {
+  if (id === 'adapter') return 'Tuned (LoRA)'
+  if (id === 'groq') return 'Base (Groq)'
+  const [provider, model = ''] = id.split(/:(.*)/s)
+  const name = model.split('/').pop().replace(/^gemini-/, '').replace(/-/g, ' ')
+  return `${PROVIDER_NAMES[provider] || provider} ${name}`.trim()
+}
+
 const EXAMPLES = [
   'What is the punishment for causing death by negligence?',
   'What is the difference between culpable homicide and murder?',
@@ -448,7 +459,7 @@ export default function ChatWindow() {
                         model === m.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      {m.id === 'adapter' ? 'Tuned (LoRA)' : m.id === 'groq' ? 'Base (Groq)' : m.id}
+                      {modelLabel(m.id)}
                     </button>
                   ))}
                 </div>
