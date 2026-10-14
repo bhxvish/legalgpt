@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.annotation.store import AnnotationStore  # noqa: E402
-from app.config import get_settings  # noqa: E402
+from app.config import REPO_ROOT, get_settings  # noqa: E402
 from app.finetuning.instruction_builder import InstructionBuilder  # noqa: E402
 from app.finetuning.lora_trainer import LoRATrainer, TrainConfig  # noqa: E402
 
@@ -39,6 +39,8 @@ def main() -> int:
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--ipc-qa", action="store_true",
                     help="add grounded Q&A examples built from the IPC with the real retriever (app/finetuning/ipc_qa.py)")
+    ap.add_argument("--scenarios", action="store_true",
+                    help="add everyday fact-pattern examples (app/finetuning/scenario_qa.py); never the benchmark's held-out 60")
     ap.add_argument("--no-case-refusals", action="store_true",
                     help="drop the judgment-based refusal examples (they taught v0.2 to refuse IPC sources)")
     args = ap.parse_args()
@@ -62,6 +64,30 @@ def main() -> int:
         ipc = IpcQaBuilder(retriever, chunks, seed=args.seed).build(sorted({c.section for c in chunks if c.section}))
         print(f"IPC Q&A: {len(ipc)} examples; {len(EVAL_SECTIONS)} sections held out for evaluation")
         examples += ipc
+    if args.scenarios:
+        import json as json_mod
+
+        from app.core.corpus import load_chunks
+        from app.core.query_rewriter import parse
+        from app.core.retriever import build_retriever
+        from app.finetuning.scenario_qa import ScenarioQaBuilder
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from eval_scenario_bench import splits as bench_splits
+
+        pool = bench_splits()
+        held_out = {q["id"] for q in pool["final"]}
+        train_scen = [q for q in pool["tune"] + pool["check"] if q["id"] not in held_out]
+        caches = [json_mod.loads(f.read_text(encoding="utf-8"))  # rewrites cached by eval_scenario_bench.py
+                  for f in sorted((REPO_ROOT / "data" / "reports" / "bench" / "rewrites").glob("*.json"), reverse=True)]
+
+        def rewrite_for(q: str):
+            return next((parse(c[q]) for c in caches if q in c), None)
+
+        scen = ScenarioQaBuilder(build_retriever(s), load_chunks(s.corpus_chunks_path), seed=args.seed).build(train_scen, rewrite_for)
+        print(f"scenarios: {len(scen)} examples from {len({e.source_case_id for e in scen})} of {len(train_scen)} questions "
+              f"(held-out benchmark scenarios excluded: {len(held_out)})")
+        examples += scen
     splits = builder.split_by_case(examples, seed=args.seed)
     case_sets = {k: {e.source_case_id for e in v} for k, v in splits.items()}
     assert not (case_sets["train"] & case_sets["val"] or case_sets["train"] & case_sets["test"] or case_sets["val"] & case_sets["test"])
