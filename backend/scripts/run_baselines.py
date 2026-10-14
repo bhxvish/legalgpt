@@ -135,6 +135,7 @@ def make_system(spec: str, route: str | None = None, rewrite: bool = False):
         def run(q: str):
             rw = rewriter.rewrite(q, llm) if rewriter and not retriever.expander.section_refs(q) else None
             sources = retriever.retrieve(q, rewrite=rw)
+            run.last_sources = [x.section for x in sources]  # saved with the answer (see run())
             if not sources:
                 return NOT_COVERED_REPLY, []
             answer = llm.generate(PromptBuilder().build(q, sources, "legal", []))
@@ -168,8 +169,10 @@ def cited_sections(answer: str, sources) -> list[str]:
 
 
 def recite(args) -> None:
-    """Re-derive extra_cited for cached LegalGPT answers whose markers are not plain [n]. Retrieval is
-    local and deterministic, so the sources are the ones the model saw. Keeps a .bak of each file changed."""
+    """Re-derive extra_cited for cached LegalGPT answers whose markers are not plain [n], once per row.
+    Retrieval is local and deterministic, so the sources are the ones the model saw - only while the
+    retriever is unchanged, so run it straight after the run. Rows are then marked "recited" and
+    skipped (a later run once re-cited 5 rows with a changed lexicon). Keeps a .bak of each file changed."""
     from app.core.retriever import build_retriever
 
     items = {it["id"]: it for it in sample(args.seed, *args.sample)}
@@ -182,8 +185,11 @@ def recite(args) -> None:
                 continue
             if not re.search("[\u3010\uff3b]|\[\d+[\u2020\u2021]", r["answer"]):
                 continue  # plain [n] only: already scored correctly
+            if r.get("recited") or "sources" in r:
+                continue  # done once already, or the run saved its sources: never re-derive with a newer retriever
             retriever = retriever or build_retriever(get_settings())
             new = cited_sections(r["answer"], retriever.retrieve(items[r["id"]]["question"]))
+            r["recited"] = True
             if new != r["extra_cited"]:
                 r["extra_cited"], changed = new, changed + 1
         print(f"{path.name}: {changed} answers re-cited")
@@ -251,6 +257,8 @@ def run(args) -> None:
                     break
                 row = {"id": it["id"], "set": it["set"], "answer": answer, "extra_cited": extra,
                        "seconds": round(time.perf_counter() - t, 2)}
+                if getattr(system, "last_sources", None) is not None:  # the sections retrieval gave the model
+                    row["sources"] = system.last_sources
                 if cache_spec:  # answered by another route than the file's name says
                     row["via"] = spec + (f" (host {args.route})" if args.route else "")
                 if usage:
