@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react'
+
 // Line drawing of the Ashoka Chakra (24 spokes), used as quiet decoration on the empty chat.
 // Not the State Emblem of India, whose use is restricted by the State Emblem of India
 // (Prohibition of Improper Use) Act, 2005.
@@ -38,5 +40,81 @@ export default function Chakra({ className = '' }) {
         )
       })}
     </svg>
+  )
+}
+
+/**
+ * The Chakra behind the chat (wide screens). Empty chat: large, mid-right, turning very slowly.
+ * While chatting: it glides into the lower-right corner, smaller and fainter; while an answer is
+ * being written it speeds up, with a soft glow, and eases back to its slow turn when it is done.
+ * The speed is changed through the Web Animations playbackRate (blended over ~1.2 s), so the
+ * wheel never jumps.
+ */
+export function ChakraBackdrop({ chatting = false, busy = false }) {
+  const wheelRef = useRef(null)
+  const animRef = useRef(null)
+  // fast answers (Groq) finish in about a second: keep the whirl going for at least 2.5 s so it
+  // reads as a gesture rather than a twitch
+  const [spin, setSpin] = useState(false)
+  const busySince = useRef(0)
+  useEffect(() => {
+    if (busy) {
+      busySince.current = performance.now()
+      setSpin(true)
+      return
+    }
+    const t = setTimeout(() => setSpin(false), Math.max(0, 2500 - (performance.now() - busySince.current)))
+    return () => clearTimeout(t)
+  }, [busy])
+
+  useEffect(() => {
+    const el = wheelRef.current
+    if (!el?.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const anim = el.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], { duration: 180000, iterations: Infinity })
+    animRef.current = anim
+    return () => anim.cancel()
+  }, [])
+
+  useEffect(() => {
+    const anim = animRef.current
+    if (!anim) return
+    const from = anim.playbackRate
+    const to = spin ? 30 : 1 // one turn in 6 s while answering, 3 min otherwise
+    const start = performance.now()
+    let raf
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / 1200)
+      const eased = 1 - Math.pow(1 - t, 3)
+      anim.playbackRate = from + (to - from) * eased
+      if (t < 1) raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    // frames do not run in a background tab: make sure the wheel still ends at the right speed
+    const done = setTimeout(() => (anim.playbackRate = to), 1300)
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(done)
+    }
+  }, [spin])
+
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 hidden overflow-hidden xl:block">
+      <div
+        className="absolute -right-28 top-1/2 transition-[transform,opacity] duration-[1200ms] ease-[cubic-bezier(0.3,0,0,1)]"
+        style={{
+          transform: chatting ? 'translate(3.5rem, -2%) scale(0.58)' : 'translate(0, -50%) scale(1)',
+          opacity: chatting ? 0.7 : 1,
+        }}
+      >
+        <div
+          className={`absolute inset-[18%] rounded-full bg-[radial-gradient(closest-side,var(--color-indigo-300),transparent)] blur-2xl transition-opacity duration-1000 ${
+            spin ? 'animate-pulse opacity-30' : 'opacity-0'
+          }`}
+        />
+        <div ref={wheelRef} className="relative">
+          <Chakra className="size-[30rem] text-indigo-900/[0.08] [mask-image:radial-gradient(circle,#000_55%,transparent_75%)]" />
+        </div>
+      </div>
+    </div>
   )
 }
