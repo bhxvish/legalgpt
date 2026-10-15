@@ -9,6 +9,7 @@ answer instead of minutes. Everything stays on this machine.
 Needs `llama-cpp-python` (a CUDA build for GPU offload; the CPU build works, slower).
 """
 
+import re
 import threading
 from collections.abc import Iterator
 from pathlib import Path
@@ -56,7 +57,8 @@ class LlamaCppClient(LLMClient):
         self.n_gpu_layers, self.n_ctx = n_gpu_layers, n_ctx
         self.max_tokens, self.temperature = max_tokens, temperature
         lora = f"+gguf-adapter:{self.lora_path.stem}" if self.lora_path else ""
-        self.model_id = f"{self.model_path.stem}{lora}"
+        base = re.sub(r"-\d{5}-of-\d{5}$", "", self.model_path.stem)  # a split GGUF's first part names the model
+        self.model_id = f"{base}{lora}"
         self._llama = llama  # tests pass a stub
         self._lock = threading.Lock()  # one generation at a time (llama.cpp contexts are not thread-safe)
 

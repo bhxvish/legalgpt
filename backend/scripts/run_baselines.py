@@ -11,6 +11,7 @@ Systems (any number, each answers the same seeded sample; answers are cached and
                              providers (app/core/openai_compat.py): gemini (GEMINI_API_KEY, free tier),
                              openai (OPENAI_API_KEY), openrouter (OPENROUTER_API_KEY);
                              e.g. legalgpt+gemini:gemini-3.5-flash-lite
+  legalgpt-heavy             LegalGPT with the local 7B through llama.cpp (HEAVY_MODEL_GGUF / HEAVY_LORA_GGUF)
   anthropic:<model>          Claude closed-book (ANTHROPIC_API_KEY)
   --smoke                    4 questions per system first, to check keys and model names
   --budget-usd 1 --price 0.75 4.5
@@ -124,9 +125,16 @@ def make_system(spec: str, route: str | None = None, rewrite: bool = False):
         return (OpenAICompatClient(provider, name, max_tokens=MAX_TOKENS, extra_body=pin) if provider
                 else GroqClient(s.groq_api_key, name, max_tokens=MAX_TOKENS))
 
-    if kind in ("legalgpt", "legalgpt-lora"):
+    if kind in ("legalgpt", "legalgpt-lora", "legalgpt-heavy"):
         retriever = build_retriever(s)
-        llm = hosted(model) if kind == "legalgpt" else AdapterClient(s.adapter_path or latest_adapter(s.lora_dir))
+        if kind == "legalgpt-heavy":  # the 7B through llama.cpp, as the app's "Local heavy" model (HEAVY_* in .env)
+            from app.core.llamacpp_client import LlamaCppClient
+
+            if not s.heavy_model_gguf:
+                raise SystemExit("legalgpt-heavy needs HEAVY_MODEL_GGUF (and HEAVY_LORA_GGUF) in .env")
+            llm = LlamaCppClient(s.heavy_model_gguf, s.heavy_lora_gguf, n_gpu_layers=s.heavy_gpu_layers)
+        else:
+            llm = hosted(model) if kind == "legalgpt" else AdapterClient(s.adapter_path or latest_adapter(s.lora_dir))
 
         from app.core.query_rewriter import QueryRewriter
 

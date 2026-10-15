@@ -37,6 +37,11 @@ def test_llamacpp_client_generates_and_streams(tmp_path) -> None:
     assert c.is_local
 
 
+def test_split_gguf_model_id_names_the_model(tmp_path) -> None:
+    c = LlamaCppClient(tmp_path / "qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf", tmp_path / "v0.7-7b-l4.gguf", llama=_Llama())
+    assert c.model_id == "qwen2.5-7b-instruct-q4_k_m+gguf-adapter:v0.7-7b-l4"
+
+
 def test_missing_model_file_is_a_clear_error(tmp_path) -> None:
     import pytest
 
