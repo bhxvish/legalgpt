@@ -15,18 +15,32 @@ const STYLES = {
 function HealthBadge() {
   const [health, setHealth] = useState({ state: 'loading', text: 'checking…' })
 
+  // checked again every few seconds while unreachable (e.g. the page opened before the backend
+  // finished starting), and every 30 s once up, so the badge also notices the backend stopping
   useEffect(() => {
     const controller = new AbortController()
-    fetch(`${API_BASE_URL}/health`, { signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return res.json()
-      })
-      .then((data) => setHealth({ state: data.status === 'ok' ? 'ok' : 'error', text: `backend ${data.status}` }))
-      .catch((err) => {
-        if (err.name !== 'AbortError') setHealth({ state: 'error', text: 'backend unreachable' })
-      })
-    return () => controller.abort()
+    let timer
+    const check = () =>
+      fetch(`${API_BASE_URL}/health`, { signal: controller.signal })
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          return res.json()
+        })
+        .then((data) => {
+          const ok = data.status === 'ok'
+          setHealth({ state: ok ? 'ok' : 'error', text: `backend ${data.status}` })
+          timer = setTimeout(check, ok ? 30000 : 4000)
+        })
+        .catch((err) => {
+          if (err.name === 'AbortError') return
+          setHealth({ state: 'error', text: 'backend unreachable' })
+          timer = setTimeout(check, 4000)
+        })
+    check()
+    return () => {
+      controller.abort()
+      clearTimeout(timer)
+    }
   }, [])
 
   return (
