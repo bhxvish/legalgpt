@@ -11,6 +11,7 @@ Results are **preliminary**: scenario and out-of-scope labels are still silver (
   rule). Rows without a suffix are the earlier pipeline.
 - `legalgpt-lora`: v0.4. `_v2`: v0.4 with the new prompt. `_v3` / `_v4`: v0.5 / v0.6, retrained with
   scenario examples.
+- Statute questions: 59 per system. ss.143 and 311 are flagged invalid (`benchmark/README.md`).
 - Significance tests, ablation and error analysis are in `paper_analysis.md`.
 
 ## 1. LegalGPT vs closed-book chatbots
@@ -19,20 +20,20 @@ See `benchmark/README.md` for the sets. Statute questions have gold answers from
 
 | system | statute: right section | punishment right | punishment wrong | scenario: acceptable section | out-of-scope: answered as IPC offence | no answer (empty) |
 |---|---|---|---|---|---|---|
-| closed_gemini_gemini-3.5-flash-lite | 80% [68–88] (n=60) | 78% [62–88] (n=40) | 18% [9–32] (n=40) | 78% [66–87] (n=60) | 47% [30–64] (n=30) | 0 of 150 |
-| closed_openai_gpt-5.4-mini | 73% [61–83] (n=60) | 80% [65–90] (n=40) | 18% [9–32] (n=40) | 83% [72–91] (n=60) | 47% [30–64] (n=30) | 0 of 150 |
-| closed_openai_gpt-oss-120b | 40% [29–53] (n=60) | 40% [26–55] (n=40) | 55% [40–69] (n=40) | 85% [74–92] (n=60) | 90% [74–97] (n=30) | 0 of 150 |
-| closed_openai_gpt-oss-20b_low | 15% [8–26] (n=60) | 25% [14–40] (n=40) | 62% [47–76] (n=40) | 48% [36–61] (n=60) | 80% [63–90] (n=30) | 0 of 150 |
-| legalgpt-lora | 78% [66–87] (n=60) | 92% [80–97] (n=40) | 0% [0–9] (n=40) | 8% [4–18] (n=60) | 0% [0–11] (n=30) | 0 of 150 |
-| legalgpt-lora_v2 | 78% [66–87] (n=60) | 92% [80–97] (n=40) | 0% [0–9] (n=40) | 13% [7–24] (n=60) | 0% [0–11] (n=30) | 0 of 150 |
-| legalgpt-lora_v3 | 78% [66–87] (n=60) | 92% [80–97] (n=40) | 2% [0–13] (n=40) | 43% [32–56] (n=60) | 0% [0–11] (n=30) | 0 of 150 |
-| legalgpt-lora_v4 | 80% [68–88] (n=60) | 90% [77–96] (n=40) | 2% [0–13] (n=40) | 43% [32–56] (n=60) | 0% [0–11] (n=30) | 0 of 150 |
-| legalgpt_gemini_gemini-3.5-flash-lite | 82% [70–89] (n=60) | 100% [91–100] (n=40) | 0% [0–9] (n=40) | 43% [32–56] (n=60) | 0% [0–11] (n=30) | 0 of 150 |
-| legalgpt_gemini_gemini-3.5-flash-lite_rw | 83% [72–91] (n=60) | 100% [91–100] (n=40) | 0% [0–9] (n=40) | 90% [80–95] (n=60) | 0% [0–11] (n=30) | 0 of 150 |
-| legalgpt_openai_gpt-5.4-mini | 82% [70–89] (n=60) | 100% [91–100] (n=40) | 0% [0–9] (n=40) | 45% [33–58] (n=60) | 0% [0–11] (n=30) | 0 of 150 |
-| legalgpt_openai_gpt-5.4-mini_rw | 82% [70–89] (n=60) | 100% [91–100] (n=40) | 0% [0–9] (n=40) | 88% [78–94] (n=60) | 0% [0–11] (n=30) | 0 of 150 |
-| legalgpt_openai_gpt-oss-120b | 82% [70–89] (n=60) | 100% [91–100] (n=40) | 0% [0–9] (n=40) | 45% [33–58] (n=60) | 0% [0–11] (n=30) | 0 of 150 |
-| legalgpt_openai_gpt-oss-120b_rw | 82% [70–89] (n=60) | 100% [91–100] (n=40) | 0% [0–9] (n=40) | 82% [70–89] (n=60) | 0% [0–11] (n=30) | 0 of 150 |
+| closed_gemini_gemini-3.5-flash-lite | 81% [70–89] (n=59) | 77% [62–87] (n=39) | 18% [9–33] (n=39) | 78% [66–87] (n=60) | 47% [30–64] (n=30) | 0 of 149 |
+| closed_openai_gpt-5.4-mini | 75% [62–84] (n=59) | 79% [64–89] (n=39) | 18% [9–33] (n=39) | 83% [72–91] (n=60) | 47% [30–64] (n=30) | 0 of 149 |
+| closed_openai_gpt-oss-120b | 41% [29–53] (n=59) | 38% [25–54] (n=39) | 56% [41–71] (n=39) | 85% [74–92] (n=60) | 90% [74–97] (n=30) | 0 of 149 |
+| closed_openai_gpt-oss-20b_low | 15% [8–27] (n=59) | 26% [15–41] (n=39) | 64% [48–77] (n=39) | 48% [36–61] (n=60) | 80% [63–90] (n=30) | 0 of 149 |
+| legalgpt-lora | 80% [68–88] (n=59) | 95% [83–99] (n=39) | 0% [0–9] (n=39) | 8% [4–18] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
+| legalgpt-lora_v2 | 80% [68–88] (n=59) | 95% [83–99] (n=39) | 0% [0–9] (n=39) | 13% [7–24] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
+| legalgpt-lora_v3 | 80% [68–88] (n=59) | 95% [83–99] (n=39) | 0% [0–9] (n=39) | 43% [32–56] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
+| legalgpt-lora_v4 | 81% [70–89] (n=59) | 92% [80–97] (n=39) | 3% [0–13] (n=39) | 43% [32–56] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
+| legalgpt_gemini_gemini-3.5-flash-lite | 83% [72–91] (n=59) | 100% [91–100] (n=39) | 0% [0–9] (n=39) | 43% [32–56] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
+| legalgpt_gemini_gemini-3.5-flash-lite_rw | 85% [73–92] (n=59) | 100% [91–100] (n=39) | 0% [0–9] (n=39) | 90% [80–95] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
+| legalgpt_openai_gpt-5.4-mini | 83% [72–91] (n=59) | 100% [91–100] (n=39) | 0% [0–9] (n=39) | 45% [33–58] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
+| legalgpt_openai_gpt-5.4-mini_rw | 83% [72–91] (n=59) | 100% [91–100] (n=39) | 0% [0–9] (n=39) | 88% [78–94] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
+| legalgpt_openai_gpt-oss-120b | 83% [72–91] (n=59) | 100% [91–100] (n=39) | 0% [0–9] (n=39) | 45% [33–58] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
+| legalgpt_openai_gpt-oss-120b_rw | 83% [72–91] (n=59) | 100% [91–100] (n=39) | 0% [0–9] (n=39) | 82% [70–89] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
 
 ## 2. Counterfactual test: LLM + rules vs LLM alone
 
@@ -41,7 +42,7 @@ See `benchmark/README.md` for the sets. Statute questions have gold answers from
 | model | arm | n | accuracy | flip correct | omit correct | paraphrase stable | unsafe errors | cautious errors |
 |---|---|---|---|---|---|---|---|---|
 | qwen_qwen3.8-27b | direct | 147 | 92% [86–95] (n=147) | 95% | 77% | 100% | 6% | 2% |
-| qwen_qwen3.8-27b | pipeline__runs1 | 48 | 98% [89–100] (n=48) | 100% | 92% | 100% | 2% | 0% |
+| qwen_qwen3.8-27b | pipeline__runs1 | 89 | 96% [89–98] (n=89) | 95% | 86% | 93% | 4% | 0% |
 
 ### Reading section 1
 
