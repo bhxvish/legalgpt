@@ -66,13 +66,14 @@ illustrative facts, not real cases.
 
 | Module | Implemented | Future work |
 |---|---|---|
-| 0 Retrieval & chat | IPC bare act, hierarchical chunks, ChromaDB + MiniLM, calibrated refusal floor, SSE chat with `[n]` citations, Legal/General modes | BNS/BNSS and IPC↔BNS mapping; judgments as a retrieval source; re-ranker |
+| 0 Retrieval & chat | IPC bare act, hierarchical chunks, ChromaDB + MiniLM, calibrated refusal floor, scope check, 41-rule lay-term lexicon, LLM query rewrite for everyday scenarios (gated by the scope check), definition-question lookup, SSE chat with `[n]` citations, Legal/General modes, several back-ends (Groq, Gemini, OpenAI, OpenRouter, local LoRA, local 7B via llama.cpp), `OFFLINE_MODE` | BNS/BNSS and IPC↔BNS mapping; judgments as a retrieval source; re-ranker |
 | 1 Dataset | Collector with screening, 5-role scheme + guideline, append-only store, kappa tooling, frozen versions with hashes | Double annotation to actually measure agreement |
-| 2 Assisted labelling | InLegalBERT classifier (CV macro-F1 0.664 ± 0.031), confidence + audit review queue, review UI | Larger corpus, active learning |
-| 3 Fine-tuning | 4-bit LoRA on Qwen2.5-1.5B, instruction builder, base-vs-tuned comparison, in-app toggle | Human-written answer targets (the adapter copies sources and over-refuses) |
-| 4 Explainability | Evidence-match band, citation checks, sentence attribution, warnings on every legal answer | Detecting subtle legal errors, not just unsupported sentences |
-| 5 Verification | Prolog element checklists for 7 sections (279, 304A, 304B, 323, 337, 338, 379), quote-checked two-run fact extraction | More sections, exceptions and Chapter IV defences |
-| ZKML | Zero-knowledge proofs (EZKL) of fact-check verdicts (facts hidden) and of retrieval over all chunks; commitments manifest; Ed25519-signed answers; offline verifier ([docs/zk](zk/README.md)) | Proving the LLMs themselves: a 1.5B+ transformer is still orders of magnitude too slow to prove on this hardware, and it would prove which model ran, not that the answer is legally right |
+| 2 Assisted labelling | InLegalBERT classifier (CV macro-F1 0.745 ± 0.021), confidence + audit review queue, review UI, explanations (integrated gradients, occlusion, nearest examples) with faithfulness metrics | Larger corpus, active learning |
+| 3 Fine-tuning | 4-bit LoRA (Qwen2.5-1.5B on the laptop; 3B and 7B on Colab), instruction builder with IPC Q&A, scenario answers, refusals and a distilled query rewrite; base-vs-tuned comparison; in-app switch | Human-written answer targets; fewer wrong-section answers on scenarios when retrieval misses |
+| 4 Explainability | Evidence-match band, citation checks, sentence attribution (legal claims vs other sentences), "how the sources were chosen" (floor, scope check, lexicon, rewrite, definition lookup), warnings on every legal answer | Detecting subtle legal errors, not just unsupported sentences |
+| 5 Verification | Prolog element checklists for 7 sections (279, 304A, 304B, 323, 337, 338, 379), quote-checked two-run fact extraction, rule-computed what-ifs | More sections, exceptions and Chapter IV defences |
+| ZKML | Zero-knowledge proofs (EZKL) of fact-check verdicts (facts hidden) and of retrieval over all chunks, including the disclosed query rewrite; commitments manifest; Ed25519-signed answers; offline verifier ([docs/zk](zk/README.md)) | Proving the LLMs themselves (including the rewrite): a 1.5B+ transformer is still orders of magnitude too slow to prove on this hardware, and it would prove which model ran, not that the answer is legally right |
+| Evaluation | IPC benchmark (1,056 items) with held-out sampling, baselines against three model families, paired significance tests, retrieval ablation, error analysis, counterfactual test of the rules ([benchmark](../benchmark/README.md), [reports](reports/)) | Legal review of the AI-written (silver) scenario and out-of-scope labels |
 
 Known limitations are consolidated in [PLANNING.md](../PLANNING.md#known-limitations).
 
