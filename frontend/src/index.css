@@ -256,6 +256,11 @@
       scrollbar-color: color-mix(in oklab, var(--color-slate-400) 55%, transparent) transparent;
     }
   }
+  /* the browser draws native dropdown lists itself: give the options the theme's colours */
+  option {
+    background-color: var(--color-white);
+    color: var(--color-slate-900);
+  }
   ::selection {
     background-color: var(--color-indigo-200);
   }

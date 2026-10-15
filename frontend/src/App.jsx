@@ -5,7 +5,7 @@ import ChatWindow from './components/ChatWindow.jsx'
 import ReviewView from './components/ReviewView.jsx'
 import VerifyPanel from './components/VerifyPanel.jsx'
 import { SlidingPill } from './components/motion.jsx'
-import { useTheme } from './theme.js'
+import ThemeMenu from './components/ThemeMenu.jsx'
 
 const STYLES = {
   loading: { badge: 'text-slate-500', dot: 'bg-slate-400 animate-pulse' },
@@ -78,36 +78,6 @@ function AnnotateNote() {
   )
 }
 
-const THEMES = [
-  { id: 'system', label: 'System theme' },
-  { id: 'light', label: 'Light' },
-  { id: 'dark', label: 'Dark' },
-]
-
-function ThemeSelect() {
-  const [theme, setTheme] = useTheme()
-  return (
-    <label className="relative inline-flex items-center">
-      <span className="sr-only">Colour theme</span>
-      <select
-        value={theme}
-        onChange={(e) => setTheme(e.target.value)}
-        className="appearance-none rounded-md border border-slate-200 py-1 pl-2 pr-6 text-xs font-medium text-slate-700 hover:border-slate-300"
-        data-testid="theme-select"
-      >
-        {THEMES.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.label}
-          </option>
-        ))}
-      </select>
-      <svg aria-hidden="true" viewBox="0 0 12 12" className="pointer-events-none absolute right-1.5 size-3 text-slate-500">
-        <path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </label>
-  )
-}
-
 function Nav({ view, className }) {
   const ref = useRef(null)
   return (
@@ -166,7 +136,7 @@ export default function App() {
           </div>
           <div className="flex shrink-0 items-center gap-3">
             <HealthBadge />
-            <ThemeSelect />
+            <ThemeMenu />
           </div>
         </div>
         <Nav view={view} className="-mx-1 mt-2 flex overflow-x-auto sm:hidden" />
