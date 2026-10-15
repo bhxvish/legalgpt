@@ -19,11 +19,11 @@
  },
  "adapter": {
   "files": {
-   "adapter_config.json": "a2b27f3f7b12c25c23098f691915ffbba0b5979bf8f826e71c2da43d35b6ea0f",
-   "adapter_model.safetensors": "60470155c90e2b674918b23fef539f0194767d156f281a4e15528160d29240ee"
+   "adapter_config.json": "fc340116a525fc363c6a3d2b7f47542dd8a06bd0eb7ab3eb136c788696a4353e",
+   "adapter_model.safetensors": "60368a2567876dcd5e498262a342635e91654749899842ca45c54e88930b801a"
   },
-  "sha256": "3e0939248c5085c40d12ad357b5ca65ad8b958a89de69883463a76fa81e7ec52",
-  "name": "v0.4-plain-2ep"
+  "sha256": "e5cd46a7027db9a106edf91976a9b36a52d4720560e9e3be9133fc8fc1947ac0",
+  "name": "v0.7-3b-l4"
  },
  "verdict": {
   "elements": 26,
@@ -487,5 +487,6 @@
   "retrieval_proof_kb": 196,
   "retrieval_matches_live": true,
   "machine": "measured by zk_setup.py on the machine that built the circuits"
- }
+ },
+ "adapter_updated_at": "2026-10-15T15:53:17+00:00"
 }

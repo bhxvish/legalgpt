@@ -73,7 +73,7 @@ partial runs are left untouched.
 themselves, and nothing is sent to Groq or any other service. Fact-checking (Module 5) still needs
 the hosted model.
 
-**Signed answers (ZK):** the published manifest fingerprints one adapter (v0.4 today). After
+**Signed answers (ZK):** the published manifest fingerprints one adapter (the 3B, v0.7-3b-l4, since 2026-10-15). After
 switching `ADAPTER_PATH`, run `backend/scripts/zk_setup.py --adapter-only` so that signed answers carry the
 new adapter's fingerprint (circuits and keys are not rebuilt). Until then they carry none.
 

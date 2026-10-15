@@ -37,6 +37,9 @@ class StatuteQuestion:
     gold_terms: list[str] = field(default_factory=list)  # punishment terms in the statute (lower case)
     lora_held_out: bool = False  # the LoRA adapter never saw this section in training
     invalid: str = ""  # why the question is not scored (kept in the file so the seed-7 sample is unchanged)
+    # every punishment term anywhere in the section. Graded sections (s.213: seven years if the screened
+    # offence is capital, three if it carries life) make another tier a fair answer, not a wrong one
+    allowed_terms: list[str] = field(default_factory=list)
 
 
 def terms_in(text: str) -> set[str]:
@@ -78,7 +81,8 @@ def build(corpus_path: Path, seed: int = 13) -> list[StatuteQuestion]:
                 q = rng.choice(templates).format(t=_topic(c.title))
                 # a bare generic title (s.311 is titled "Punishment") gives "... prescribe for punishment?"
                 bad = "topic is a generic word, not an offence" if _topic(c.title).lower() in GENERIC_TITLES else ""
-                out.append(StatuteQuestion(f"pun-{s}", "punishment", q, s, c.title.strip(), gold, s in held, bad))
+                allowed = sorted(set(gold) | terms_in(c.text))
+                out.append(StatuteQuestion(f"pun-{s}", "punishment", q, s, c.title.strip(), gold, s in held, bad, allowed))
         body = c.text.lower()
         if not parts and ("said to" in body or s in EXTRA_DEFINITIONS):
             term = re.sub(r"[“”\"]", "", c.title.strip().rstrip(".")).split(". ")[0]

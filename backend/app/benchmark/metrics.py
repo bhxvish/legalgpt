@@ -77,7 +77,8 @@ def score_statute(item: dict, answer: str, extra_cited: list[str] | None = None,
     if item["kind"] == "punishment":
         got, want = terms_in(answer), set(item["gold_terms"])
         out["punishment_correct"] = want <= got
-        out["punishment_wrong"] = bool(got) and not (got & want)
+        # wrong = states terms the section never mentions (another tier of a graded section is not wrong)
+        out["punishment_wrong"] = bool(got) and not (got & set(item.get("allowed_terms") or want))
     return out
 
 

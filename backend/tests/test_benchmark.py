@@ -115,3 +115,15 @@ def test_hyphenated_amendment_sections_are_known() -> None:
               "driving ... In Section 304-AA of the Indian Penal Code", "IPC > Chapter XVI > Section 304A > State Amendments",
               section="304A")
     assert "304AA" in known_sections([c])
+
+
+def test_another_tier_of_a_graded_section_is_not_a_wrong_punishment() -> None:
+    """s.213: seven years if the screened offence is capital, three if it carries life."""
+    from app.benchmark.metrics import score_statute
+
+    item = {"section": "213", "kind": "punishment", "gold_terms": ["three year"],
+            "allowed_terms": ["death", "life", "seven year", "ten year", "three year"]}
+    seven = score_statute(item, "Section 213 [1]: imprisonment of up to seven years, and a fine.")
+    assert not seven["punishment_wrong"] and not seven["punishment_correct"]  # fair, but not the key's term
+    assert score_statute(item, "Section 213: up to two years.")["punishment_wrong"]  # not in the section at all
+    assert score_statute({**item, "allowed_terms": []}, "up to seven years")["punishment_wrong"]  # old items: key only

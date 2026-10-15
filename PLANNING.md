@@ -632,9 +632,18 @@ The weaknesses found by the evaluation, fixed and re-measured:
 - v0.5 / v0.6 (2026-10-15, + scenario examples / + 51 refusals): held-out scenarios offline 13% ->
   43%, but 22% cite only wrong sections (force-fitting when retrieval missed). The app stays on
   v0.4, whose adapter the ZK manifest fingerprints.
-- v0.7 adds a distilled query rewrite and refusals made by removing the labelled section. Qwen2.5-3B
-  (everyday) and 7B (heavy, via llama.cpp) are trained on Colab (`backend/scripts/colab/`). Results
-  are pending.
+- v0.7 (2026-10-15) adds a distilled query rewrite and refusals made by removing the labelled
+  section. It was trained on identical data at three sizes, fully offline:
+  | size | statute | scenarios | wrong punishment |
+  |---|---|---|---|
+  | 1.5B | 90% | 50% | 8% |
+  | 3B | 100% | 60% | 0% |
+  | 7B | 98% | 65% | 0% |
+  The local models' own rewrite names a correct offence for only about 57% of scenarios, so their
+  legal knowledge is the bottleneck (`docs/reports/paper_analysis.md`, section 5).
+  The app now uses the 3B (`ADAPTER_PATH=data/models/lora/v0.7-3b-l4`, 4-bit, fingerprinted in the
+  ZK manifest), with the 7B as "Local heavy" through llama.cpp. On the 4 GB laptop GPU the 3B takes
+  about a minute per answer, rewrite included.
 - Speed: float32 on CPU needs ~6 GB RAM; machines under 12 GB (including Docker's default VM) fall
   back to bfloat16, where reading the prompt takes ~30 s on CPUs without native bfloat16. Its 3 GB
   base model downloads at ~0.2 MB/s inside Docker here, so `HF_CACHE_DIR` mounts the host cache.

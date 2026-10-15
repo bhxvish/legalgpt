@@ -9,9 +9,12 @@ Results are **preliminary**: scenario and out-of-scope labels are still silver (
 **Row names.**
 - `_rw`: the current pipeline, with the scenario fix (LLM query rewrite, expanded lexicon, prompt
   rule). Rows without a suffix are the earlier pipeline.
+- `legalgpt-lora_v0.7-1.5b` / `_v0.7-3b`, `legalgpt-heavy_v0.7-7b`: the local models by size, trained on identical data.
 - `legalgpt-lora`: v0.4. `_v2`: v0.4 with the new prompt. `_v3` / `_v4`: v0.5 / v0.6, retrained with
   scenario examples.
-- Statute questions: 59 per system. ss.143 and 311 are flagged invalid (`benchmark/README.md`).
+- Statute questions: 59 per system (39 punishment). "Wrong punishment" means a term the section never
+  mentions (graded sections such as s.213).
+- Statute questions: ss.143 and 311 are flagged invalid (`benchmark/README.md`).
 - Significance tests, ablation and error analysis are in `paper_analysis.md`.
 
 ## 1. LegalGPT vs closed-book chatbots
@@ -20,16 +23,17 @@ See `benchmark/README.md` for the sets. Statute questions have gold answers from
 
 | system | statute: right section | punishment right | punishment wrong | scenario: acceptable section | out-of-scope: answered as IPC offence | no answer (empty) |
 |---|---|---|---|---|---|---|
-| closed_gemini_gemini-3.5-flash-lite | 81% [70–89] (n=59) | 77% [62–87] (n=39) | 18% [9–33] (n=39) | 78% [66–87] (n=60) | 47% [30–64] (n=30) | 0 of 149 |
-| closed_openai_gpt-5.4-mini | 75% [62–84] (n=59) | 79% [64–89] (n=39) | 18% [9–33] (n=39) | 83% [72–91] (n=60) | 47% [30–64] (n=30) | 0 of 149 |
-| closed_openai_gpt-oss-120b | 41% [29–53] (n=59) | 38% [25–54] (n=39) | 56% [41–71] (n=39) | 85% [74–92] (n=60) | 90% [74–97] (n=30) | 0 of 149 |
-| closed_openai_gpt-oss-20b_low | 15% [8–27] (n=59) | 26% [15–41] (n=39) | 64% [48–77] (n=39) | 48% [36–61] (n=60) | 80% [63–90] (n=30) | 0 of 149 |
+| closed_gemini_gemini-3.5-flash-lite | 81% [70–89] (n=59) | 77% [62–87] (n=39) | 15% [7–30] (n=39) | 78% [66–87] (n=60) | 47% [30–64] (n=30) | 0 of 149 |
+| closed_openai_gpt-5.4-mini | 75% [62–84] (n=59) | 79% [64–89] (n=39) | 15% [7–30] (n=39) | 83% [72–91] (n=60) | 47% [30–64] (n=30) | 0 of 149 |
+| closed_openai_gpt-oss-120b | 41% [29–53] (n=59) | 38% [25–54] (n=39) | 54% [39–68] (n=39) | 85% [74–92] (n=60) | 90% [74–97] (n=30) | 0 of 149 |
+| closed_openai_gpt-oss-20b_low | 15% [8–27] (n=59) | 26% [15–41] (n=39) | 59% [43–73] (n=39) | 48% [36–61] (n=60) | 80% [63–90] (n=30) | 0 of 149 |
 | legalgpt-heavy_v0.7-7b | 98% [91–100] (n=59) | 97% [87–100] (n=39) | 0% [0–9] (n=39) | 65% [52–76] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
 | legalgpt-lora | 80% [68–88] (n=59) | 95% [83–99] (n=39) | 0% [0–9] (n=39) | 8% [4–18] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
-| legalgpt-lora_v0.7-3b | 100% [94–100] (n=59) | 92% [80–97] (n=39) | 3% [0–13] (n=39) | 60% [47–71] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
+| legalgpt-lora_v0.7-1.5b | 90% [80–95] (n=59) | 87% [73–94] (n=39) | 8% [3–20] (n=39) | 50% [38–62] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
+| legalgpt-lora_v0.7-3b | 100% [94–100] (n=59) | 92% [80–97] (n=39) | 0% [0–9] (n=39) | 60% [47–71] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
 | legalgpt-lora_v2 | 80% [68–88] (n=59) | 95% [83–99] (n=39) | 0% [0–9] (n=39) | 13% [7–24] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
 | legalgpt-lora_v3 | 80% [68–88] (n=59) | 95% [83–99] (n=39) | 0% [0–9] (n=39) | 43% [32–56] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
-| legalgpt-lora_v4 | 81% [70–89] (n=59) | 92% [80–97] (n=39) | 3% [0–13] (n=39) | 43% [32–56] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
+| legalgpt-lora_v4 | 81% [70–89] (n=59) | 92% [80–97] (n=39) | 0% [0–9] (n=39) | 43% [32–56] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
 | legalgpt_gemini_gemini-3.5-flash-lite | 83% [72–91] (n=59) | 100% [91–100] (n=39) | 0% [0–9] (n=39) | 43% [32–56] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
 | legalgpt_gemini_gemini-3.5-flash-lite_rw | 85% [73–92] (n=59) | 100% [91–100] (n=39) | 0% [0–9] (n=39) | 90% [80–95] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
 | legalgpt_openai_gpt-5.4-mini | 83% [72–91] (n=59) | 100% [91–100] (n=39) | 0% [0–9] (n=39) | 45% [33–58] (n=60) | 0% [0–11] (n=30) | 0 of 149 |

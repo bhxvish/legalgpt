@@ -1,4 +1,15 @@
-# Analysis for the paper: significance, ablation, errors, IPC vs BNS
+# Analysis for the paper: significance, ablation, errors, model size, IPC vs BNS
+
+**Scoring corrections (2026-10-15)**, applied to every table here and in `benchmark_results.md`:
+1. **Malformed questions.** ss.143 and 311 are titled just "Punishment"; their questions are flagged
+   invalid and not scored. Statute n is now 59 and punishment n is 39.
+2. **"Wrong punishment".** It now means stating a term the section never mentions. In graded sections
+   another tier is a fair answer: s.213 gives up to seven years if the screened offence is capital,
+   three if it carries life. The answer key's own term is still required for "punishment correct".
+   This moved closed-book wrong-punishment rates down by 1-3 points, and the 3B's from 3% to 0%; every
+   significance conclusion is unchanged.
+3. **State amendments.** Sections inserted by state amendments count as real sections, not invented
+   ones.
 
 All numbers come from the benchmark runs in `data/reports/bench/baselines/` (seed 7: 40 punishment and
 20 definition questions, 60 held-out scenarios, 30 out-of-scope questions). Scenario and out-of-scope
@@ -12,15 +23,15 @@ exact McNemar test (two-sided binomial test on the disagreements).
 
 | A (closed-book) | B (inside LegalGPT) | measure | n | A | B | only A | only B | p |
 |---|---|---|---|---|---|---|---|---|
-| gpt-5.4-mini | gpt-5.4-mini (with query rewrite) | wrong punishment ↓ | 40 | 18% | 0% | 7 | 0 | 0.016 |
+| gpt-5.4-mini | gpt-5.4-mini (with query rewrite) | wrong punishment ↓ | 39 | 15% | 0% | 6 | 0 | 0.031 |
 | | | right section (statute) | 60 | 73% | 82% | 10 | 15 | 0.42 |
 | | | acceptable section (scenario) | 60 | 83% | 88% | 6 | 9 | 0.61 |
 | | | civil question answered as an offence ↓ | 30 | 47% | 0% | 14 | 0 | <0.001 |
-| gemini-3.5-flash-lite | gemini-3.5-flash-lite (before the rewrite) | wrong punishment ↓ | 40 | 18% | 0% | 7 | 0 | 0.016 |
+| gemini-3.5-flash-lite | gemini-3.5-flash-lite (with the rewrite) | wrong punishment ↓ | 39 | 15% | 0% | 6 | 0 | 0.031 |
 | | | right section (statute) | 60 | 80% | 82% | 9 | 10 | 1.00 |
 | | | acceptable section (scenario) | 60 | 78% | 43% | 25 | 4 | <0.001 |
 | | | civil question answered as an offence ↓ | 30 | 47% | 0% | 14 | 0 | <0.001 |
-| gpt-oss-120b | gpt-oss-120b (before the rewrite) | wrong punishment ↓ | 40 | 55% | 0% | 22 | 0 | <0.001 |
+| gpt-oss-120b | gpt-oss-120b (with the rewrite) | wrong punishment ↓ | 39 | 54% | 0% | 21 | 0 | <0.001 |
 | | | right section (statute) | 60 | 40% | 82% | 5 | 30 | <0.001 |
 | | | acceptable section (scenario) | 60 | 85% | 45% | 26 | 2 | <0.001 |
 | | | civil question answered as an offence ↓ | 30 | 90% | 0% | 27 | 0 | <0.001 |
@@ -37,7 +48,7 @@ Within LegalGPT, before vs after the scenario fix:
 
 **What the tests support.**
 - **Safety gains are significant for all three models:**
-  - no wrong punishments (p ≤ 0.016);
+  - no wrong punishments (p ≤ 0.031);
   - no civil questions treated as offences (p < 0.001).
 - **Accuracy gains:**
   - LegalGPT's statute-section accuracy is significantly higher for gpt-oss-120b (40% → 82%).
@@ -51,13 +62,13 @@ Within LegalGPT, before vs after the scenario fix:
 - **gpt-oss-120b with the fix:**
   - LegalGPT 82% vs the model alone 85% on scenarios (p = 0.77, parity).
   - Right section on statute questions: 82% vs 40% (p < 0.001).
-  - Wrong punishment: 0% vs 55% (p < 0.001).
+  - Wrong punishment: 0% vs 54% (p < 0.001).
   - Civil questions answered as offences: 0% vs 90% (p < 0.001).
   - Its last 84 answers came through OpenRouter, pinned to Groq as host, with the same settings.
 - **gemini-3.5-flash-lite with the fix:**
   - LegalGPT 90% vs the model alone 78% on scenarios (p = 0.12, not significant).
   - Only-wrong-section scenario answers: 0% vs 15%.
-  - Wrong punishment: 0% vs 18% (p = 0.016).
+  - Wrong punishment: 0% vs 15% (p = 0.031).
   - Civil questions answered as offences: 0% vs 47% (p < 0.001).
 - **Across all three models**, the fix raised LegalGPT's scenario accuracy from 43–45% to 82–90%
   (each p < 0.001; 76 questions improved, none got worse). Each model is now at parity with itself
@@ -215,3 +226,52 @@ given.
   amendments (Gujarat's s.379A/379B on snatching, Chhattisgarh's s.509B, Himachal Pradesh's s.304-AA) as invented. LegalGPT cited
   them from the State Amendments text it was given. With those sections recognised
   (`metrics.known_sections`), every LegalGPT configuration has 0% invented sections.
+
+## 5. Local models by size (same training data, fully offline)
+
+1.5B, 3B and 7B (Qwen2.5-Instruct) were LoRA-trained on **identical examples and splits**. The 1.5B
+was trained with `--examples-from` the 3B's `examples.jsonl`, and the training data has no judgment
+texts. All three were evaluated with the same retrieval code; each model writes its own query rewrite,
+with no hosted model. Figure: `docs/figures/fig4_size.png`.
+
+| | 1.5B | 3B | 7B |
+|---|---|---|---|
+| statute: right section (59) | 90% | **100%** | 98% |
+| punishment correct (39) | 87% | 92% | **97%** |
+| wrong punishment (39) | 8% | **0%** | **0%** |
+| scenario: acceptable section (60) | 50% | 60% | **65%** |
+| scenario: only wrong sections | 37% | 32% | **23%** |
+| civil question answered as an offence (30) | 0% | 0% | 0% |
+| own rewrite named an acceptable section | 28/60 | 34/60 | 35/60 |
+| where it was run | Colab L4, 4-bit | laptop RTX 3050 Ti, 4-bit | Colab L4, llama.cpp Q4_K_M (the app's GGUF files) |
+
+**Paired tests:**
+- 1.5B -> 3B, statute: p = 0.031.
+- 1.5B -> 7B, scenarios: p = 0.049.
+- 3B -> 7B, scenarios: p = 0.65 (not significant).
+
+**Reading.** Accuracy rises with size, and safety on civil questions holds at every size. Between 3B
+and 7B the gain is small, because both local models name an acceptable section in their own rewrite
+for only 57-58% of scenarios. The same pipeline reaches 82-90% when a large hosted model writes the
+rewrite. At this scale the bottleneck is the local model's legal knowledge, not the retrieval
+pipeline.
+
+**Practical choice.** The 3B is the everyday offline model: as accurate as the 7B on statute
+questions, no wrong punishments, and it fits a 4 GB laptop GPU. The 7B, through llama.cpp, is
+available as "Local heavy". The earlier 1.5B v0.4 (old recipe: 80% statute, 13% scenarios) refused
+most scenarios. The v0.7 recipe trades some of that caution for coverage.
+
+## 6. Counterfactual test (complete)
+
+147 paired fact patterns, qwen3.8-27b, `benchmark_results.md` section 2.
+
+| | LLM alone | LLM + Prolog rules |
+|---|---|---|
+| accuracy | 92% | 95% |
+| one-fact flip changes the verdict correctly | 95% | 100% |
+| omitted element gives INSUFFICIENT | 77% | 85% |
+| same verdict for a paraphrase | 100% | 95% |
+
+- 8 cases are right only with the rules and 3 only without them: exact McNemar p = 0.23, a trend.
+- The rules help most on what they encode: flips and omissions.
+- 3 answers came from another host (Cerebras via OpenRouter); without them the result is identical.

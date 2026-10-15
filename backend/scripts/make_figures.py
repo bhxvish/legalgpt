@@ -181,7 +181,8 @@ def fig_ablation() -> None:
 
 
 def fig_size(items, ipc) -> None:
-    systems = [("1.5B (v0.4)", "legalgpt-lora_v2"), ("3B (v0.7)", "legalgpt-lora_v0.7-3b"), ("7B (v0.7)", "legalgpt-heavy_v0.7-7b")]
+    # the same v0.7 training examples (and split) and retrieval code for all three sizes
+    systems = [("1.5B", "legalgpt-lora_v0.7-1.5b"), ("3B", "legalgpt-lora_v0.7-3b"), ("7B", "legalgpt-heavy_v0.7-7b")]
     from app.benchmark.metrics import load_jsonl
     from run_baselines import OUT as RUNS
 
@@ -193,12 +194,16 @@ def fig_size(items, ipc) -> None:
     if len(present) < 2:
         print("fig4_size: skipped (needs at least two local-model benchmark runs)")
         return
-    fig, ax = plt.subplots(figsize=(8, 4))
-    style(ax, "Local models by size, fully offline (higher is better)")
-    grouped(ax, ["Right section\n(statute)", "Acceptable section\n(scenario)"], [
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4), gridspec_kw={"width_ratios": [2, 1]})
+    style(axes[0], "Accuracy (higher is better)")
+    grouped(axes[0], ["Right section\n(statute, 59)", "Acceptable section\n(scenario, 60)"], [
         (label, [rate(o, "right section (statute)"), rate(o, "acceptable section (scenario)")]) for label, o in present
-    ], ymax=110)
-    ax.legend(frameon=False, fontsize=9, loc="upper right")
+    ], ymax=115)
+    style(axes[1], "Wrong punishment (lower is better)")
+    grouped(axes[1], ["Punishment\nquestions (39)"], [(label, [rate(o, "wrong punishment")]) for label, o in present], ymax=115)
+    axes[0].legend(frameon=False, fontsize=9, loc="upper right", title="model size", title_fontsize=9)
+    fig.suptitle("Local LoRA models by size: same training data, fully offline", x=0.01, ha="left", fontsize=12,
+                 color=INK, y=1.04)
     save(fig, "fig4_size")
 
 
