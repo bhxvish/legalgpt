@@ -30,3 +30,4 @@ data/reports/
 
 # ZKML: proving keys (~1 GB), compiled circuits and the server signing key
 data/zk/
+data/colab/

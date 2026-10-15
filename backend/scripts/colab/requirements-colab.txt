@@ -1,0 +1,15 @@
+# Google Colab (T4 GPU) environment for LoRA training and the benchmark. Colab's own CUDA build of
+# PyTorch is used as installed (do not reinstall torch there). Versions match .venv-gpu on the laptop.
+transformers==5.18.0
+peft==0.21.2
+trl==1.14.1
+bitsandbytes==0.50.2
+accelerate==1.15.0
+datasets==5.0.1
+chromadb==1.5.9
+sentence-transformers==6.1.0
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-dotenv==1.2.4
+groq==1.7.0
+httpx==0.28.1
