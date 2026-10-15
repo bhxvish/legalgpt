@@ -71,7 +71,7 @@ def build_models(settings: Settings) -> tuple[dict[str, LLMClient], dict[str, st
 
         models["adapter"] = LlamaCppClient(settings.local_model_gguf, settings.local_lora_gguf,
                                            n_gpu_layers=settings.local_gpu_layers)
-        notes["adapter"] = f"{settings.local_model_gguf.stem} with the LoRA adapter, via llama.cpp on this machine"
+        notes["adapter"] = f"{models['adapter'].model_id.split('+')[0]} with the LoRA adapter, via llama.cpp on this machine"
     elif adapter is not None:
         models["adapter"] = AdapterClient(adapter, dtype=settings.local_llm_dtype)
         base = models["adapter"].base_model.split("/")[-1]
@@ -83,7 +83,7 @@ def build_models(settings: Settings) -> tuple[dict[str, LLMClient], dict[str, st
 
         models["local-heavy"] = LlamaCppClient(settings.heavy_model_gguf, settings.heavy_lora_gguf,
                                                n_gpu_layers=settings.heavy_gpu_layers)
-        notes["local-heavy"] = (f"{settings.heavy_model_gguf.stem} with the LoRA adapter, via llama.cpp on this machine "
+        notes["local-heavy"] = (f"{models['local-heavy'].model_id.split('+')[0]} with the LoRA adapter, via llama.cpp on this machine "
                                 "(slower; for harder questions)")
     from app.core.openai_compat import PROVIDERS, OpenAICompatClient, parse_spec, provider_key
 
