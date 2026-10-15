@@ -101,9 +101,10 @@ def known_sections(chunks) -> set[str]:
     secs = {c.section for c in chunks if c.section}
     for c in chunks:
         if "State Amendments" in c.citation_path:
-            # "section 509B" in the text, or an inserted section's heading ("379A. Snatching.")
-            secs |= {m.upper() for m in re.findall(r"\bsections?\s+(\d{1,3}[A-Z]{1,2})\b", c.text, re.IGNORECASE)}
-            secs |= {m.upper() for m in re.findall(r"(?:^|\s)(\d{1,3}[A-Z]{1,2})\.\s*[A-Z]", c.text)}
+            # "section 509B" in the text, or an inserted section's heading ("379A. Snatching.",
+            # Himachal Pradesh's "304-AA. Causing death ...")
+            secs |= {a + b.upper() for a, b in re.findall(r"\bsections?\s+(\d{1,3})-?([A-Z]{1,2})\b", c.text, re.IGNORECASE)}
+            secs |= {a + b for a, b in re.findall(r"(?:^|[\s\"'“‘])(\d{1,3})-?([A-Z]{1,2})\.\s*[A-Z]", c.text)}
     return secs
 
 

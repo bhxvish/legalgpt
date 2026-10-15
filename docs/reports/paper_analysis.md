@@ -31,6 +31,7 @@ Within LegalGPT, before vs after the scenario fix:
 |---|---|---|---|---|---|---|---|
 | LegalGPT + gpt-5.4-mini | acceptable section (scenario) | 60 | 45% | 88% | 0 | 26 | <0.001 |
 | LegalGPT + gpt-oss-120b | acceptable section (scenario) | 60 | 45% | 82% | 0 | 22 | <0.001 |
+| LegalGPT + gemini-3.5-flash-lite | acceptable section (scenario) | 60 | 43% | 90% | 0 | 28 | <0.001 |
 | LegalGPT-LoRA v0.4 (new prompt and lexicon only) | acceptable section (scenario) | 60 | 8% | 13% | 0 | 3 | 0.25 |
 | LoRA v0.4 → v0.5 (retrained with scenario examples) | acceptable section (scenario) | 60 | 13% | 43% | 0 | 18 | <0.001 |
 
@@ -53,7 +54,14 @@ Within LegalGPT, before vs after the scenario fix:
   - Wrong punishment: 0% vs 55% (p < 0.001).
   - Civil questions answered as offences: 0% vs 90% (p < 0.001).
   - Its last 84 answers came through OpenRouter, pinned to Groq as host, with the same settings.
-- **Gemini** has not yet been re-run with the fix (free tier, pending).
+- **gemini-3.5-flash-lite with the fix:**
+  - LegalGPT 90% vs the model alone 78% on scenarios (p = 0.12, not significant).
+  - Only-wrong-section scenario answers: 0% vs 15%.
+  - Wrong punishment: 0% vs 18% (p = 0.016).
+  - Civil questions answered as offences: 0% vs 47% (p < 0.001).
+- **Across all three models**, the fix raised LegalGPT's scenario accuracy from 43–45% to 82–90%
+  (each p < 0.001; 76 questions improved, none got worse). Each model is now at parity with itself
+  answering alone, while keeping 0% wrong punishments and 0% civil questions treated as offences.
 
 ## 2. Retrieval ablation (`backend/scripts/ablation_retrieval.py`)
 
@@ -78,6 +86,8 @@ answering from the sources"):
 | gpt-5.4-mini, + expanded lexicon + rewrite + prompt rule | **88%** |
 | gpt-oss-120b, original pipeline | 45% |
 | gpt-oss-120b, + expanded lexicon + rewrite + prompt rule | **82%** |
+| gemini-3.5-flash-lite, original pipeline | 43% |
+| gemini-3.5-flash-lite, + expanded lexicon + rewrite + prompt rule | **90%** |
 | LoRA v0.4, original pipeline | 8% |
 | LoRA v0.4, + expanded lexicon + prompt rule (offline, no rewrite) | 13% |
 | LoRA v0.5 (retrained with 355 scenario examples, no refusals), offline | 43%, but 22% cite only wrong sections |
@@ -167,6 +177,6 @@ given.
   which were mapped back to sources with the app's own canonicalization (see
   `benchmark_results.md`).
 - "Invented sections" (a cited number not in the IPC) originally counted sections inserted by state
-  amendments (Gujarat's s.379A/379B on snatching, Chhattisgarh's s.509B) as invented. LegalGPT cited
+  amendments (Gujarat's s.379A/379B on snatching, Chhattisgarh's s.509B, Himachal Pradesh's s.304-AA) as invented. LegalGPT cited
   them from the State Amendments text it was given. With those sections recognised
   (`metrics.known_sections`), every LegalGPT configuration has 0% invented sections.

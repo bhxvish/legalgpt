@@ -105,3 +105,13 @@ def test_state_amendment_sections_are_known() -> None:
                     "Whoever ... 379B.Snatching after preparation ... punishable under section 509B", 
                     "IPC > Chapter XVII > Section 379 > State Amendments", section="379")]
     assert known_sections(chunks) == {"379", "379A", "379B", "509B"}
+
+
+def test_hyphenated_amendment_sections_are_known() -> None:
+    from app.benchmark.metrics import known_sections
+    from app.core.models import Chunk
+
+    c = Chunk("IPC:304A:sa", "IPC", "the following section shall be added, namely: “304-AA. Causing death or injury by "
+              "driving ... In Section 304-AA of the Indian Penal Code", "IPC > Chapter XVI > Section 304A > State Amendments",
+              section="304A")
+    assert "304AA" in known_sections([c])
