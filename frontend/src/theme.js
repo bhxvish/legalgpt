@@ -16,7 +16,13 @@ function readChoice() {
 
 function apply(choice) {
   const dark = choice === 'dark' || (choice === 'system' && media().matches)
-  document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+  const root = document.documentElement
+  const next = dark ? 'dark' : 'light'
+  if (root.dataset.theme === next) return
+  // switch instantly: without this, every button fades through grey as its colours transition
+  root.classList.add('theme-switching')
+  root.dataset.theme = next
+  requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('theme-switching')))
 }
 
 export function useTheme() {

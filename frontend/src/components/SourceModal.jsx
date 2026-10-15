@@ -16,14 +16,14 @@ export default function SourceModal({ source, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 p-4 backdrop-blur-[2px] animate-fade"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="source-modal-title"
-        className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl bg-white shadow-xl ring-1 ring-slate-200"
+        className="flex max-h-[85vh] w-full max-w-2xl animate-pop flex-col rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200"
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
           <div className="min-w-0">

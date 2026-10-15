@@ -23,6 +23,18 @@
   --color-scrim: oklch(14% 0.03 262);
   --color-accent: var(--color-indigo-600);
   --color-accent-hover: var(--color-indigo-700);
+  --animate-rise: rise 220ms cubic-bezier(0.2, 0, 0, 1);
+  --animate-pop: pop 180ms cubic-bezier(0.2, 0, 0, 1);
+  --animate-fade: fade 180ms ease-out;
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(6px); }
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  }
+  @keyframes fade {
+    from { opacity: 0; }
+  }
 }
 
 /* Dark: every scale is mirrored (50 <-> 950), so bg-*-50 tints become deep tints and text-*-800
@@ -162,6 +174,9 @@
   }
   ::selection {
     background-color: var(--color-indigo-200);
+  }
+  .theme-switching *, .theme-switching *::before, .theme-switching *::after {
+    transition: none !important;
   }
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
