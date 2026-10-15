@@ -142,11 +142,16 @@ class OpenAICompatClient(LLMClient):
         return (choice.get("message") or {}).get("content") or ""  # a blocked reply has no message
 
     def generate_brief(self, messages: list[Message]) -> str:
-        """generate() with low reasoning effort on OpenAI's reasoning models (short classification
-        calls such as the query rewrite); other models answer as usual."""
+        """generate() with low reasoning effort on reasoning models (short classification calls such
+        as the query rewrite), as GroqClient.generate_brief does; other models answer as usual."""
+        low = None
         if self.provider == "openai" and re.match(r"(gpt-5|o\d)", self.model):
+            low = {"reasoning_effort": "low"}
+        elif self.provider == "openrouter" and "gpt-oss" in self.model:
+            low = {"reasoning": {"effort": "low"}}  # OpenRouter's form of the same setting
+        if low:
             saved = self.extra_body
-            self.extra_body = saved | {"reasoning_effort": "low"}
+            self.extra_body = saved | low
             try:
                 return self.generate(messages)
             finally:
