@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     # More chat models for the model switch, comma-separated <provider>:<model> (app/core/openai_compat.py),
     # e.g. "gemini:gemini-3.5-flash-lite,openai:gpt-4o-mini". Each needs its key (GEMINI_API_KEY, OPENAI_API_KEY ...).
     extra_models: str = Field(default="", alias="EXTRA_MODELS")
+    # The everyday local model through llama.cpp instead of PyTorch (much faster on a small GPU):
+    # the base model as GGUF and the LoRA adapter converted to GGUF. When set, "Local (LoRA)" uses it.
+    local_model_gguf: Path | None = Field(default=None, alias="LOCAL_MODEL_GGUF")
+    local_lora_gguf: Path | None = Field(default=None, alias="LOCAL_LORA_GGUF")
+    local_gpu_layers: int = Field(default=99, alias="LOCAL_GPU_LAYERS")  # 99 = every layer on the GPU
     # A larger local model for harder questions ("Local heavy" in the model switch), run through
     # llama.cpp: the base model as GGUF (e.g. Qwen2.5-7B-Instruct Q4_K_M) and the LoRA adapter
     # converted to GGUF (backend/scripts/colab/README.md). Layers that fit go on the GPU.

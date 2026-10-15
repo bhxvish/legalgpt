@@ -66,7 +66,13 @@ def build_models(settings: Settings) -> tuple[dict[str, LLMClient], dict[str, st
     models: dict[str, LLMClient] = {"groq": GroqClient(api_key=settings.groq_api_key, model=settings.groq_model)}
     notes = {"groq": "hosted base model"}
     adapter = settings.adapter_path or latest_adapter(settings.lora_dir)
-    if adapter is not None:
+    if settings.local_model_gguf:  # the local model through llama.cpp (fast on a small GPU)
+        from app.core.llamacpp_client import LlamaCppClient
+
+        models["adapter"] = LlamaCppClient(settings.local_model_gguf, settings.local_lora_gguf,
+                                           n_gpu_layers=settings.local_gpu_layers)
+        notes["adapter"] = f"{settings.local_model_gguf.stem} with the LoRA adapter, via llama.cpp on this machine"
+    elif adapter is not None:
         models["adapter"] = AdapterClient(adapter, dtype=settings.local_llm_dtype)
         base = models["adapter"].base_model.split("/")[-1]
         notes["adapter"] = f"LoRA-tuned {base}, runs on this machine (GPU if available, otherwise slow on CPU)"

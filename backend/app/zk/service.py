@@ -89,6 +89,10 @@ class ZkService:
         adapter = m.get("adapter") or {}
         if "+lora" in model_id and adapter and model_id.endswith(f":{adapter.get('name')}"):
             record_context["adapter_sha256"] = adapter["sha256"]  # only for the adapter the manifest publishes
+        elif "+gguf-adapter:" in model_id:  # a llama.cpp model: its GGUF adapter, if published
+            gguf = (m.get("adapter_gguf") or {}).get(model_id.rsplit(":", 1)[-1])
+            if gguf:
+                record_context["adapter_sha256"] = gguf
         self.attestor.context = record_context
         return self.attestor.answer_record(question=question, prompt=prompt, answer=answer, sources=sources,
                                            model_id=model_id, refused=refused, follow_up=follow_up, leaf_of=self.leaf_of,

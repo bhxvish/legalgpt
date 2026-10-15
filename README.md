@@ -30,7 +30,7 @@ check the facts you describe against the legal elements of an offence.
 flowchart LR
     Q[Your question] --> R[Retriever<br/>ChromaDB + MiniLM<br/>over 574 IPC sections]
     R -->|nothing relevant| X[Polite refusal]
-    R -->|top sections| G[LLM answers only from them<br/>gpt-oss-120b via Groq<br/>or LoRA-tuned Qwen 1.5B]
+    R -->|top sections| G[LLM answers only from them<br/>gpt-oss-120b via Groq,<br/>Gemini, or a local<br/>LoRA-tuned Qwen 3B / 7B]
     G --> E[Explanation<br/>evidence match, per-sentence support,<br/>citation checks]
     G -.->|if you ask| V[Fact check<br/>AI extracts facts → Prolog rules]
     E --> A[Answer with citations]
@@ -60,7 +60,7 @@ also builds its search index from the IPC text in this repo (about a minute; the
 **What works out of the box:** Chat (Legal and General modes), citations, the Why panel, fact
 checking and the Verify tab. The annotation data and trained models are not in this repository,
 so the **Review** and **Annotate** tabs start empty, uploading judgments in the Review tab needs a
-trained sentence-role classifier, and the **Tuned (LoRA)** model is disabled until you train one (see
+trained sentence-role classifier, and the **Local (LoRA)** model is disabled until you train one (see
 the [full guide](docs/GUIDE.md)).
 
 Try asking:

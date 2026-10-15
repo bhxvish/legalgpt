@@ -63,6 +63,11 @@ def main() -> int:
             raise SystemExit("no adapter: set ADAPTER_PATH in .env")
         old = (manifest.get("adapter") or {}).get("name")
         manifest["adapter"] = adapter_hash(adapter)
+        # the llama.cpp (GGUF) adapters the app may run, by name: "Local (LoRA)" and "Local heavy"
+        import hashlib
+
+        manifest["adapter_gguf"] = {Path(f).stem: hashlib.sha256(Path(f).read_bytes()).hexdigest()
+                                    for f in (s.local_lora_gguf, s.heavy_lora_gguf) if f and Path(f).exists()}
         manifest["adapter_updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         path.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
         print(f"published adapter fingerprint: {old} -> {manifest['adapter']['name']} ({manifest['adapter']['sha256'][:16]}...)")

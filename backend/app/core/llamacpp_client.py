@@ -34,7 +34,7 @@ def add_windows_dll_dirs() -> None:
     for pkg in ("nvidia.cuda_runtime", "nvidia.cublas", "llama_cpp"):
         try:
             spec = importlib.util.find_spec(pkg)
-        except ModuleNotFoundError:
+        except (ModuleNotFoundError, ValueError):  # not installed, or a stand-in module (tests)
             continue
         if spec and spec.submodule_search_locations:
             base = Path(next(iter(spec.submodule_search_locations)))
@@ -48,11 +48,14 @@ def add_windows_dll_dirs() -> None:
                 os.environ["PATH"] = f"{d}{os.pathsep}{os.environ.get('PATH', '')}"
 
 
+_LOADED: set = set()  # LlamaCppClients whose model is in memory
+
+
 class LlamaCppClient(LLMClient):
     is_local = True  # chat_router: hands the query rewrite to a hosted model unless OFFLINE_MODE
 
     def __init__(self, model_path: str | Path, lora_path: str | Path | None = None, n_gpu_layers: int = 16,
-                 n_ctx: int = 4096, max_tokens: int = 512, temperature: float = 0.1, llama: Any = None) -> None:
+                 n_ctx: int = 4096, max_tokens: int = 512, temperature: float = 0.0, llama: Any = None) -> None:
         self.model_path, self.lora_path = Path(model_path), Path(lora_path) if lora_path else None
         self.n_gpu_layers, self.n_ctx = n_gpu_layers, n_ctx
         self.max_tokens, self.temperature = max_tokens, temperature
@@ -64,6 +67,10 @@ class LlamaCppClient(LLMClient):
 
     def _model(self) -> Any:
         if self._llama is None:
+            # a small GPU holds one local model: free the other one ("Local" vs "Local heavy") first
+            for other in list(_LOADED):
+                if other is not self:
+                    other.close()
             add_windows_dll_dirs()
             try:
                 from llama_cpp import Llama
@@ -73,20 +80,41 @@ class LlamaCppClient(LLMClient):
                 raise LLMClientError(f"HEAVY_MODEL_GGUF not found: {self.model_path}")
             self._llama = Llama(model_path=str(self.model_path), lora_path=str(self.lora_path) if self.lora_path else None,
                                 n_gpu_layers=self.n_gpu_layers, n_ctx=self.n_ctx, verbose=False)
+            _LOADED.add(self)
         return self._llama
+
+    def close(self) -> None:
+        """Free the model (and its GPU memory); it is loaded again on the next question."""
+        with self._lock:
+            if self._llama is not None:
+                close = getattr(self._llama, "close", None)
+                if close:
+                    close()
+                self._llama = None
+                import gc
+
+                gc.collect()
+            _LOADED.discard(self)
 
     def _messages(self, messages: list[Message]) -> list[dict[str, str]]:
         return [{"role": m.role, "content": m.content} for m in messages]
 
+    def _fresh(self):
+        """The model with its context cleared: llama.cpp otherwise reuses the previous prompt's cache,
+        which made the same question give different answers (even at temperature 0)."""
+        model = self._model()
+        model.reset()
+        return model
+
     def generate(self, messages: list[Message]) -> str:
         with self._lock:
-            out = self._model().create_chat_completion(messages=self._messages(messages), max_tokens=self.max_tokens,
+            out = self._fresh().create_chat_completion(messages=self._messages(messages), max_tokens=self.max_tokens,
                                                        temperature=self.temperature)
         return out["choices"][0]["message"].get("content") or ""
 
     def stream(self, messages: list[Message]) -> Iterator[str]:
         with self._lock:
-            for chunk in self._model().create_chat_completion(messages=self._messages(messages), max_tokens=self.max_tokens,
+            for chunk in self._fresh().create_chat_completion(messages=self._messages(messages), max_tokens=self.max_tokens,
                                                               temperature=self.temperature, stream=True):
                 text = chunk["choices"][0].get("delta", {}).get("content")
                 if text:

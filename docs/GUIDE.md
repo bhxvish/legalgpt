@@ -18,20 +18,24 @@ cp .env.example .env            # then set GROQ_API_KEY in .env
 docker compose up --build
 ```
 
-- Frontend: <http://localhost:5173> — Chat (Legal / General mode, **Base (Groq)** vs **Tuned (LoRA)**
-  toggle, "also verify facts against" a section), Verify, Annotate, Review.
+- Frontend: <http://localhost:5173>:
+  - **Chat:** Legal / General mode, a model switch (see "Model options in the chat" below), and
+    "also verify facts against" a section;
+  - **Verify**, **Annotate** and **Review** tabs.
 - Backend: <http://localhost:8000/docs>.
 
 On the first start the backend downloads the embedding model and embeds the committed IPC chunks
 (`data/corpus/ipc_chunks.jsonl`) into the `chroma_db` volume — legal-mode questions work about a
 minute after `/health` turns green. SWI-Prolog is inside the backend image, so verification works
 without a separate service. ChromaDB, the annotation store, collected judgments and the Hugging Face
-cache live in named Docker volumes (`docker compose down -v` deletes them). The **Tuned (LoRA)**
-toggle is only enabled once an adapter exists under `data/models/lora/` (see Module 3). It needs the
-3 GB Qwen2.5-1.5B base model: if you already have it (e.g. from training), set
-`HF_CACHE_DIR=C:/Users/<you>/.cache/huggingface` in `.env` so Docker reuses your host cache —
-downloading it inside Docker ran at ~0.2 MB/s here (hours). On CPU the first Tuned answer takes about
-2 minutes (model load), later ones about 20–30 seconds.
+cache live in named Docker volumes (`docker compose down -v` deletes them).
+
+**Local (LoRA) in Docker:**
+- It is only enabled once an adapter exists under `data/models/lora/` (see Module 3).
+- The PyTorch path needs the adapter's base model. If you already have it (e.g. from training), set
+  `HF_CACHE_DIR=C:/Users/<you>/.cache/huggingface` in `.env` so Docker reuses your host cache;
+  downloading it inside Docker ran at ~0.2 MB/s here (hours).
+- On a CPU, answers take tens of seconds. The llama.cpp path below is the fast option on a GPU.
 
 ### With the team's data
 
@@ -232,9 +236,32 @@ unblinds the scores once the sheet is filled in:
 .venv-gpu\Scripts\python backend/scripts/blind_eval_answers.py score --rater "your name"
 ```
 
-The chat app offers the newest adapter next to the hosted model (the **Base / Tuned** toggle;
-`LLM_BACKEND=adapter` makes it the default). For GPU inference start the backend from the GPU
-environment:
+### Model options in the chat
+
+| In the model switch | What runs | Speed (RTX 3050 Ti laptop, 4 GB) | Set up with |
+|---|---|---|---|
+| **Base (Groq)** (default) | gpt-oss-120b on Groq's free tier | a few seconds | `GROQ_API_KEY` |
+| **Local (LoRA)** | the 3B LoRA model (v0.7) on this machine | **~3 s** through llama.cpp; ~20 s through PyTorch 4-bit | llama.cpp: `LOCAL_MODEL_GGUF` + `LOCAL_LORA_GGUF`; PyTorch: `ADAPTER_PATH` (+ `LOCAL_LLM_DTYPE=4bit`) |
+| **Local heavy (7B)** | the 7B LoRA model through llama.cpp, part on the GPU, part on the CPU | tens of seconds | `HEAVY_MODEL_GGUF` + `HEAVY_LORA_GGUF` |
+| **Gemini …** / **OpenAI …** | hosted models, listed in `EXTRA_MODELS` | a few seconds | see "Other models" below |
+
+**Local (LoRA) through llama.cpp vs PyTorch** (offline benchmark, the model writes its own rewrite;
+`docs/reports/paper_analysis.md`, section 5):
+- llama.cpp is 23x faster, with the same statute accuracy (100%) and safety (0% wrong punishments,
+  0% civil questions as offences).
+- It is more cautious on everyday scenarios: 45% answered with an acceptable section vs 60%, but
+  only 15% cite a wrong section vs 32%; it says "I don't know" instead.
+- The app uses llama.cpp when `LOCAL_MODEL_GGUF` is set. Remove it to use the PyTorch adapter.
+
+**Notes:**
+- A 4 GB GPU holds one local model at a time. Switching between Local and Local heavy unloads the
+  other, so the first answer after a switch includes a few seconds of loading.
+- `OFFLINE_MODE=true`: the local models also write the query rewrite themselves, so nothing is sent
+  to Groq or any other service (fact-checking still uses the hosted model).
+- Without it, the rewrite for a local model is written by the hosted model, which retrieves better.
+- How the models were trained and converted, and the `.env` lines: `backend/scripts/colab/README.md`.
+
+For GPU inference start the backend from the GPU environment:
 
 ```bash
 cd backend

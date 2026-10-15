@@ -301,6 +301,24 @@ for only 57-58% of scenarios. The same pipeline reaches 82-90% when a large host
 rewrite. At this scale the bottleneck is the local model's legal knowledge, not the retrieval
 pipeline.
 
+**Deployment format.** The same trained 3B adapter can also run through llama.cpp: the official Q4_K_M
+GGUF base model, with the adapter converted to GGUF. On the laptop's 4 GB GPU this takes 3.0 s per
+question against 70.9 s for PyTorch 4-bit (bitsandbytes NF4), measured offline with the model writing
+its own rewrite.
+
+| 3B, offline | PyTorch 4-bit (NF4) | llama.cpp Q4_K_M |
+|---|---|---|
+| right section (statute) | 100% | 100% |
+| wrong punishment | 0% | 0% |
+| scenario: acceptable section | 60% | 45% (p = 0.064) |
+| scenario: only wrong sections | 32% | 15% |
+| scenario: refused | 8% | 40% |
+
+The rewrites were about equally good (34 vs 32 of 60 named an acceptable section). The difference
+is in the answer step: the llama.cpp build refused 11 scenarios whose acceptable section had been
+retrieved (PyTorch: 1). The quantisation format alone shifts the trained model towards caution. The
+app uses the llama.cpp build for speed, and the paper's size comparison uses the PyTorch numbers.
+
 **Practical choice.** The 3B is the everyday offline model: as accurate as the 7B on statute
 questions, no wrong punishments, and it fits a 4 GB laptop GPU. The 7B, through llama.cpp, is
 available as "Local heavy". The earlier 1.5B v0.4 (old recipe: 80% statute, 13% scenarios) refused

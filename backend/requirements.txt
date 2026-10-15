@@ -26,6 +26,9 @@ trl==1.14.1
 # Neuro-symbolic verification (Module 5) — needs SWI-Prolog installed on the host
 pyswip==0.3.3
 
+# Paper figures (backend/scripts/make_figures.py)
+matplotlib==3.10.9
+
 # Testing
 pytest==9.1.1
 pytest-asyncio==1.4.0

@@ -488,5 +488,9 @@
   "retrieval_matches_live": true,
   "machine": "measured by zk_setup.py on the machine that built the circuits"
  },
- "adapter_updated_at": "2026-10-15T15:53:17+00:00"
+ "adapter_updated_at": "2026-10-15T18:39:43+00:00",
+ "adapter_gguf": {
+  "v0.7-3b-l4": "fe8a629f5226cb0a22475adf72b3407d82bf4e2d4948728b68de1b0b2f016a6b",
+  "v0.7-7b-l4": "995e9c12759c68506ec57d17d6a6c2934084d69da1814ca9dc9f4a605492dcce"
+ }
 }
