@@ -153,6 +153,14 @@
   --color-accent-hover: oklch(52% 0.135 256);
 }
 
+/* a faint dot grid behind the conversation, fading out towards the bottom */
+@utility bg-dots {
+  background-image: radial-gradient(color-mix(in oklab, var(--color-slate-400) 45%, transparent) 1px, transparent 1.2px);
+  background-size: 22px 22px;
+  background-position: -11px -11px;
+  mask-image: radial-gradient(ellipse 85% 75% at 50% 0%, #000 25%, transparent 85%);
+}
+
 /* text that shimmers while the app is working ("Searching the IPC…") */
 @utility text-shimmer {
   color: transparent;

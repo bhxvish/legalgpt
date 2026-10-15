@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { API_BASE_URL, streamChat, verifyApi } from '../api.js'
 import { chatTitle, loadChats, newId, relativeTime, saveChats } from '../chatStore.js'
-import { NewChatIcon, SearchIcon, SendIcon, SidebarIcon, StopIcon, TrashIcon } from './icons.jsx'
+import { CloseIcon, NewChatIcon, SearchIcon, SendIcon, SidebarIcon, StopIcon, TrashIcon } from './icons.jsx'
 import { SlidingPill, stagger } from './motion.jsx'
 import SourceModal from './SourceModal.jsx'
 import { VerificationResultView } from './VerifyPanel.jsx'
@@ -266,6 +266,7 @@ function dayGroup(ts, now = new Date()) {
 /** Saved conversations: new chat, search, switch, delete one, delete all. */
 function ChatHistory({ chats, activeId, streamingChatId, onSelect, onNew, onDelete, onClearAll, onClose, closeLabel, className = '' }) {
   const [query, setQuery] = useState('')
+  const [confirmClear, setConfirmClear] = useState(false)
   const q = query.trim().toLowerCase()
   const shown = q
     ? chats.filter((c) => c.title.toLowerCase().includes(q) || c.messages.some((m) => m.content?.toLowerCase().includes(q)))
@@ -360,11 +361,30 @@ function ChatHistory({ chats, activeId, streamingChatId, onSelect, onNew, onDele
       </nav>
       <div className="flex items-center justify-between gap-2 border-t border-slate-200 px-3 py-2.5 text-xs text-slate-400">
         <span>Saved in this browser only</span>
-        {chats.length > 0 && (
-          <button type="button" onClick={onClearAll} className="rounded px-1 hover:text-red-600" data-testid="clear-history">
-            Delete all
-          </button>
-        )}
+        {chats.length > 0 &&
+          (confirmClear ? (
+            <span className="flex items-center gap-1" onMouseLeave={() => setConfirmClear(false)}>
+              <span className="text-slate-500">Delete all?</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmClear(false)
+                  onClearAll()
+                }}
+                className="rounded-md bg-red-50 px-1.5 py-0.5 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100"
+                data-testid="confirm-clear-history"
+              >
+                Yes
+              </button>
+              <button type="button" onClick={() => setConfirmClear(false)} className="rounded-md px-1.5 py-0.5 hover:bg-slate-100 hover:text-slate-700">
+                No
+              </button>
+            </span>
+          ) : (
+            <button type="button" onClick={() => setConfirmClear(true)} className="rounded px-1 hover:text-red-600" data-testid="clear-history">
+              Delete all
+            </button>
+          ))}
       </div>
     </aside>
   )
@@ -383,6 +403,8 @@ export default function ChatWindow() {
   const [sections, setSections] = useState([])
   const [verifySection, setVerifySection] = useState('')
   const [openSource, setOpenSource] = useState(null)
+  const [undo, setUndo] = useState(null) // { label, removed: [chats], activeId } after a delete
+  const undoTimer = useRef(null)
   const abortRef = useRef(null)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
@@ -517,16 +539,35 @@ export default function ChatWindow() {
     setHistoryOpen(false)
   }
 
+  // Deleting happens at once, with an Undo notice for a few seconds (no browser confirm box).
+  const offerUndo = (label, removed) => {
+    clearTimeout(undoTimer.current)
+    setUndo({ label, removed, activeId })
+    undoTimer.current = setTimeout(() => setUndo(null), 6000)
+  }
+
+  const undoDelete = () => {
+    if (!undo) return
+    clearTimeout(undoTimer.current)
+    setChats((cs) =>
+      [...cs, ...undo.removed.filter((r) => !cs.some((c) => c.id === r.id))].sort((a, b) => b.updatedAt - a.updatedAt),
+    )
+    if (undo.removed.some((c) => c.id === undo.activeId)) setActiveId(undo.activeId)
+    setUndo(null)
+  }
+
+  useEffect(() => () => clearTimeout(undoTimer.current), [])
+
   const deleteChat = (chat) => {
-    if (!window.confirm(`Delete this chat?\n\n"${chat.title}"`)) return
     if (chat.id === streamingChatId) abortRef.current?.abort()
     setChats((cs) => cs.filter((c) => c.id !== chat.id))
     if (chat.id === activeId) setActiveId(null)
+    offerUndo('Chat deleted', [chat])
   }
 
   const clearAll = () => {
-    if (!window.confirm(`Delete all ${chats.length} saved chats? This cannot be undone.`)) return
     abortRef.current?.abort()
+    offerUndo(chats.length === 1 ? 'Chat deleted' : `${chats.length} chats deleted`, chats)
     setChats([])
     setActiveId(null)
   }
@@ -591,7 +632,8 @@ export default function ChatWindow() {
         </div>
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="relative isolate flex min-h-0 min-w-0 flex-1 flex-col">
+        <div aria-hidden="true" className="bg-dots pointer-events-none absolute inset-0 -z-10" />
         <div className="flex h-12 shrink-0 items-center gap-1 border-b border-slate-200/70 px-2 sm:px-3">
           <button
             type="button"
@@ -774,6 +816,32 @@ export default function ChatWindow() {
         </div>
 
         <SourceModal source={openSource} onClose={() => setOpenSource(null)} />
+        {undo && (
+          <div
+            key={undo.label + undo.removed.length}
+            role="status"
+            className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 animate-rise items-center md:left-4 md:translate-x-0 gap-1 rounded-xl bg-slate-900 py-1.5 pl-4 pr-1.5 text-sm text-slate-50 shadow-2xl ring-1 ring-slate-900/10"
+            data-testid="undo-toast"
+          >
+            <span className="pr-2">{undo.label}</span>
+            <button
+              type="button"
+              onClick={undoDelete}
+              className="rounded-lg px-2.5 py-1 font-semibold text-indigo-300 hover:bg-white/10"
+              data-testid="undo-delete"
+            >
+              Undo
+            </button>
+            <button
+              type="button"
+              onClick={() => setUndo(null)}
+              className="grid size-7 place-items-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-slate-50"
+              aria-label="Dismiss"
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
