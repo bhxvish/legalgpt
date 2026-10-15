@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { API_BASE_URL, streamChat, verifyApi } from '../api.js'
 import { chatTitle, loadChats, newId, relativeTime, saveChats } from '../chatStore.js'
 import { CloseIcon, NewChatIcon, SearchIcon, SendIcon, SidebarIcon, StopIcon, TrashIcon } from './icons.jsx'
+import Chakra from './Chakra.jsx'
 import { SlidingPill, stagger } from './motion.jsx'
 import SourceModal from './SourceModal.jsx'
 import { VerificationResultView } from './VerifyPanel.jsx'
@@ -632,8 +633,18 @@ export default function ChatWindow() {
         </div>
       </div>
 
-      <div className="relative isolate flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div aria-hidden="true" className="bg-dots pointer-events-none absolute inset-0 -z-10" />
+        {/* the Ashoka Chakra in faint outline on the empty chat's right side (wide screens only);
+            it fades away once the conversation starts */}
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none absolute -right-28 top-1/2 -z-10 hidden -translate-y-1/2 transition-opacity duration-700 xl:block ${
+            messages.length === 0 ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          <Chakra className="size-[30rem] animate-[spin_180s_linear_infinite] text-indigo-900/[0.08] [mask-image:radial-gradient(circle,#000_55%,transparent_75%)]" />
+        </div>
         <div className="flex h-12 shrink-0 items-center gap-1 px-2 sm:px-3">
           <button
             type="button"
