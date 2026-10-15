@@ -94,5 +94,18 @@ def score_oos(answer: str, extra_cited: list[str] | None = None) -> dict:
     return {"refused": refused(answer), "criminalised": bool(ipc), "cited": ipc}
 
 
+def known_sections(chunks) -> set[str]:
+    """Every IPC section a correct answer may cite: the corpus's sections, plus sections that state
+    amendments insert ("379A", "509B" in Gujarat or Chhattisgarh). Without the latter, an answer citing
+    an amendment it was given as a source counted as an invented section."""
+    secs = {c.section for c in chunks if c.section}
+    for c in chunks:
+        if "State Amendments" in c.citation_path:
+            # "section 509B" in the text, or an inserted section's heading ("379A. Snatching.")
+            secs |= {m.upper() for m in re.findall(r"\bsections?\s+(\d{1,3}[A-Z]{1,2})\b", c.text, re.IGNORECASE)}
+            secs |= {m.upper() for m in re.findall(r"(?:^|\s)(\d{1,3}[A-Z]{1,2})\.\s*[A-Z]", c.text)}
+    return secs
+
+
 def load_jsonl(path: Path) -> list[dict]:
     return [json.loads(line) for line in Path(path).read_text(encoding="utf-8").splitlines() if line.strip()]

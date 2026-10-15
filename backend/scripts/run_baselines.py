@@ -34,7 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.benchmark.metrics import load_jsonl, score_oos, score_scenario, score_statute  # noqa: E402
+from app.benchmark.metrics import known_sections, load_jsonl, score_oos, score_scenario, score_statute  # noqa: E402
 from app.config import REPO_ROOT, get_settings  # noqa: E402
 
 BENCH = REPO_ROOT / "benchmark"
@@ -282,7 +282,7 @@ def run(args) -> None:
 def score(args) -> None:
     from app.core.corpus import load_chunks
 
-    ipc = {c.section for c in load_chunks(get_settings().corpus_chunks_path) if c.section}
+    ipc = known_sections(load_chunks(get_settings().corpus_chunks_path))  # incl. state-amendment sections
     items = {it["id"]: it for it in sample(args.seed, *args.sample)}
     rows = []
     for path in sorted(OUT.glob("*.jsonl")):

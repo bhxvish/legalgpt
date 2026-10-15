@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from app.benchmark.metrics import load_jsonl, score_oos, score_scenario, score_statute  # noqa: E402
+from app.benchmark.metrics import known_sections, load_jsonl, score_oos, score_scenario, score_statute  # noqa: E402
 from app.core.corpus import load_chunks  # noqa: E402
 from run_baselines import OUT, get_settings, sample  # noqa: E402
 
@@ -30,6 +30,10 @@ PAIRS = [  # (system A, system B, metrics)
     ("closed_openai_gpt-5.4-mini", "legalgpt_openai_gpt-5.4-mini_rw", list(METRICS)),
     ("closed_gemini_gemini-3.5-flash-lite", "legalgpt_gemini_gemini-3.5-flash-lite", list(METRICS)),
     ("closed_openai_gpt-oss-120b", "legalgpt_openai_gpt-oss-120b", list(METRICS)),
+    ("closed_openai_gpt-oss-120b", "legalgpt_openai_gpt-oss-120b_rw", list(METRICS)),
+    ("closed_gemini_gemini-3.5-flash-lite", "legalgpt_gemini_gemini-3.5-flash-lite_rw", list(METRICS)),
+    ("legalgpt_openai_gpt-oss-120b", "legalgpt_openai_gpt-oss-120b_rw", ["acceptable section (scenario)"]),
+    ("legalgpt_gemini_gemini-3.5-flash-lite", "legalgpt_gemini_gemini-3.5-flash-lite_rw", ["acceptable section (scenario)"]),
     ("legalgpt_openai_gpt-5.4-mini", "legalgpt_openai_gpt-5.4-mini_rw", ["acceptable section (scenario)"]),
     ("legalgpt-lora", "legalgpt-lora_v2", ["acceptable section (scenario)"]),
     ("legalgpt-lora_v2", "legalgpt-lora_v3", list(METRICS)),
@@ -69,7 +73,7 @@ def outcomes(name: str, items: dict, ipc: set[str]) -> dict[str, dict[str, bool]
 
 
 def main() -> int:
-    ipc = {c.section for c in load_chunks(get_settings().corpus_chunks_path) if c.section}
+    ipc = known_sections(load_chunks(get_settings().corpus_chunks_path))  # incl. state-amendment sections
     items = {it["id"]: it for it in sample(7, 40, 20, 60, 30)}
     print("| A | B | measure | n | A | B | only A | only B | p (exact McNemar) |")
     print("|---|---|---|---|---|---|---|---|---|")

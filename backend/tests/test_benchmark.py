@@ -93,3 +93,15 @@ def test_scoring_rules() -> None:
     assert refused("I don't know — the retrieved sources do not cover this question.")
     assert terms_in("punishable with death or imprisonment for life, or 10 years") == {"death", "life", "ten year"}
     assert terms_in("causing death by negligence") == set()
+
+
+def test_state_amendment_sections_are_known() -> None:
+    """An answer citing an inserted section it was given (Gujarat's s.379A) is not an invented section."""
+    from app.benchmark.metrics import known_sections
+    from app.core.models import Chunk
+
+    chunks = [Chunk("IPC:379:a", "IPC", "Whoever commits theft shall be punished.", "IPC > Section 379", section="379"),
+              Chunk("IPC:379:sa", "IPC", "after section 379, the following sections shall be inserted:- 379A. Snatching.-(1) "
+                    "Whoever ... 379B.Snatching after preparation ... punishable under section 509B", 
+                    "IPC > Chapter XVII > Section 379 > State Amendments", section="379")]
+    assert known_sections(chunks) == {"379", "379A", "379B", "509B"}

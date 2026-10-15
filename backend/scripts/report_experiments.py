@@ -46,12 +46,12 @@ def main() -> int:
           "out-of-scope labels are silver (AI-written, awaiting legal review).", ""]
     md += ["| system | statute: right section | punishment right | punishment wrong | scenario: acceptable section | "
            "out-of-scope: answered as IPC offence | no answer (empty) |", "|---|---|---|---|---|---|---|"]
-    from app.benchmark.metrics import load_jsonl, score_oos, score_scenario, score_statute  # noqa: E402
+    from app.benchmark.metrics import known_sections, load_jsonl, score_oos, score_scenario, score_statute  # noqa: E402
     from app.core.corpus import load_chunks
     from app.config import get_settings
     import run_baselines as rb  # noqa: E402
 
-    ipc = {c.section for c in load_chunks(get_settings().corpus_chunks_path) if c.section}
+    ipc = known_sections(load_chunks(get_settings().corpus_chunks_path))  # incl. state-amendment sections
     items = {it["id"]: it for it in rb.sample(7, 40, 20, 60, 30)}
     for path in sorted((BENCH / "baselines").glob("*.jsonl")):
         allans = [a for a in load_jsonl(path) if a["id"] in items and not a["answer"].startswith("ERROR")]
