@@ -50,6 +50,7 @@ class VerificationResult:
     facts: dict[str, dict[str, str]]
     warnings: list[str] = field(default_factory=list)
     model_id: str = ""
+    model_note: str = ""  # set when a fallback model extracted the facts (e.g. Groq's daily limit was reached)
     disclaimer: str = DISCLAIMER
 
     def to_dict(self) -> dict[str, Any]:
@@ -107,6 +108,7 @@ class VerificationService:
             facts=extraction.facts,
             warnings=extraction.warnings,
             model_id=getattr(self.extractor.llm, "model_id", ""),
+            model_note=getattr(self.extractor.llm, "note", ""),
         )
 
     def suggest_sections(self, case_id: str, facts: dict[str, dict[str, str]], exclude: str = "") -> list[SectionResult]:

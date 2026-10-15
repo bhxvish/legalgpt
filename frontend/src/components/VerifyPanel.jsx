@@ -107,6 +107,11 @@ export function VerificationResultView({ result: r, className = 'space-y-5 round
             </span>
           </div>
           <p className="mt-1.5 text-sm text-slate-700">{st.text(r.cited_section)}</p>
+          {r.model_note && (
+            <p className="mt-1 text-xs text-slate-500" data-testid="verify-model-note">
+              Facts extracted by {r.model_id}: {r.model_note.split(';')[0]}.
+            </p>
+          )}
           <div className="mt-3 flex items-center gap-3">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/70 ring-1 ring-slate-900/5">
               <div className={`h-full origin-left rounded-full transition-transform duration-1000 ease-[cubic-bezier(0.2,0,0,1)] ${st.bar}`} style={{ transform: `scaleX(${shown})` }} />

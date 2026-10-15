@@ -104,15 +104,40 @@ def build_models(settings: Settings) -> tuple[dict[str, LLMClient], dict[str, st
     return models, notes, default
 
 
+# Hosted providers the fact check may fall back to: free tiers only (OpenAI and OpenRouter are paid).
+FREE_FALLBACK_PROVIDERS = ("gemini",)
+
+
+def verification_models(settings: Settings) -> list[LLMClient]:
+    """The fact check's models, in order: Groq, then the free hosted models in EXTRA_MODELS
+    (full models before "lite" ones). The local model is
+    added by create_app, sharing the chat's instance."""
+    from app.core.openai_compat import OpenAICompatClient, parse_spec, provider_key
+
+    models: list[LLMClient] = [GroqClient(settings.groq_api_key, settings.groq_model, max_tokens=4096, temperature=0.0)]
+    hosted = []
+    for spec in (x.strip() for x in settings.extra_models.split(",") if x.strip()):
+        try:
+            provider, model = parse_spec(spec)
+        except ValueError:
+            continue
+        if provider in FREE_FALLBACK_PROVIDERS and provider_key(provider):
+            hosted.append(OpenAICompatClient(provider, model, max_tokens=4096, temperature=0.0))
+    hosted.sort(key=lambda c: "lite" in c.model_id)  # full models extract more reliably than "lite" ones
+    return models + hosted
+
+
 def build_verification_service(settings: Settings) -> "VerificationService | None":
-    """Fact extraction always uses the hosted model: it must return reliable JSON for every
-    predicate, which the small local adapter cannot. None if SWI-Prolog is unavailable."""
+    """Fact extraction needs reliable JSON for every predicate: Groq's model first, then the free
+    hosted fallbacks (Gemini) and, last, the local model (FallbackClient), so the Verify tab keeps
+    working when Groq's free daily limit is used up. None if SWI-Prolog is unavailable."""
     try:
+        from app.core.fallback import FallbackClient
         from app.verification.fact_extractor import FactExtractor
         from app.verification.prolog_engine import PrologEngine
         from app.verification.verification_service import VerificationService
 
-        extractor = FactExtractor(GroqClient(settings.groq_api_key, settings.groq_model, max_tokens=4096, temperature=0.0))
+        extractor = FactExtractor(FallbackClient(verification_models(settings)))
         return VerificationService(extractor, PrologEngine(settings.prolog_rules_dir))
     except Exception:  # pyswip missing, SWI-Prolog not installed, or broken rules
         logger.exception("verification disabled: could not start the Prolog engine")
@@ -168,6 +193,9 @@ def create_app(chat_router: ChatRouter | None = None, annotation_router: Annotat
     settings = get_settings()
     verifier = build_verification_service(settings)
     chat_router = chat_router or build_chat_router(settings, verifier)
+    local = getattr(chat_router, "models", {}).get("adapter")
+    if verifier is not None and local is not None and hasattr(verifier.extractor.llm, "add"):
+        verifier.extractor.llm.add(local)  # last resort; the same instance as the chat's "Local (LoRA)"
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
