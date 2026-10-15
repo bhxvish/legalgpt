@@ -49,7 +49,11 @@ def select(retriever: Retriever, question: str, chunks: Sequence[Chunk], sims: S
     check, from the plain question's embedding), rerank and assembly."""
     order = sorted(range(len(chunks)), key=lambda i: sims[i], reverse=True)
     cands = [Candidate(chunks[i], float(sims[i])) for i in order[: retriever.top_k]]
-    for section in retriever.expander.section_refs(question):
+    from app.core.retriever import defined_sections, title_index
+
+    # the definition-question lookup, rebuilt from the committed chunks (as the live retriever does)
+    named = retriever.expander.section_refs(question) + defined_sections(question, title_index(chunks))
+    for section in named:
         same = [i for i in order if chunks[i].section == section][:3]
         cands += [Candidate(chunks[i], float(sims[i]), explicit=True) for i in same]
     ranked = retriever.rerank(cands)

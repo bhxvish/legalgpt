@@ -272,3 +272,21 @@ def test_zk_api_signs_and_checks_answers(tmp_path) -> None:
     r = client.post("/api/zk/prove/verdict", json={"facts": {}, "section": "304A"})
     assert r.status_code == 503 and "zk_setup" in r.json()["detail"]
     assert client.post("/api/zk/verify", json={"bundle": {"kind": "nonsense"}}).status_code == 422
+
+
+def test_selection_handles_definition_questions_like_the_retriever() -> None:
+    """The definition lookup (section titled with the asked term) is rebuilt from the committed chunks."""
+    from app.core.retriever import title_index
+
+    rng = np.random.default_rng(5)
+    dim, n = 16, 30
+    chunks = [Chunk(f"IPC:{i}:x", "IPC", f"text {i} " * 20, f"IPC > Section {i}", section=str(i), title=f"Offence {i}")
+              for i in range(n)]
+    E = rng.normal(size=(n, dim)); E /= np.linalg.norm(E, axis=1, keepdims=True)
+    emb = _Embedder(dim)
+    retr = Retriever(emb, _ExactStore(chunks, E), min_similarity=0.0, top_k=4, max_chunks=6, titles=title_index(chunks))
+    q = "What is offence 17 under the IPC?"
+    live = retr.retrieve(q)
+    sims = E @ emb.embed([retr.expander.search_query(q)])[0]
+    assert [s.chunk_id for s in select(retr, q, chunks, sims)] == [s.chunk_id for s in live]
+    assert live[0].section == "17"

@@ -123,3 +123,29 @@ def test_offence_parts_only_for_whoever_sections() -> None:
                        "out of the possession of any person without that person's consent, moves that property, is said to "
                        "commit theft.", "IPC > Section 378", section="378", title="Theft")
     assert offence_parts(definition) is None
+
+
+# ------------------------------------------------------------------ definition questions
+def test_defined_term_extraction() -> None:
+    from app.core.retriever import defined_term
+
+    assert defined_term("What is robbery under the IPC?") == "robbery"
+    assert defined_term("How does the Indian Penal Code define making a false document?") == "making a false document"
+    assert defined_term("Which IPC section defines abetment of a thing, and what does it say?") == "abetment of a thing"
+    assert defined_term("What is lurking house-trespass under the IPC?") == "lurking house trespass"
+    assert defined_term("Someone slapped me at the bus stop") is None
+
+
+def test_title_index_uses_each_sections_own_chunk() -> None:
+    from app.core.retriever import defined_sections, title_index
+
+    chunks = [Chunk("IPC:390:a", "IPC", "Section 390. Robbery ...", "IPC > Chapter XVII > Section 390", section="390", title="Robbery"),
+              Chunk("IPC:392:a", "IPC", "Section 392. Punishment for robbery ...", "IPC > Chapter XVII > Section 392",
+                    section="392", title="Punishment for robbery"),
+              Chunk("IPC:390:sa", "IPC", "amendment", "IPC > Chapter XVII > Section 390 > State Amendments", section="390",
+                    title="Robbery (State Amendment)")]
+    idx = title_index(chunks)
+    assert idx["robbery"] == ["390"] and idx["punishment for robbery"] == ["392"]
+    assert defined_sections("What is robbery under the IPC?", idx) == ["390"]
+    assert defined_sections("What is the punishment for robbery?", idx) == ["392"]
+    assert defined_sections("What is a succession certificate?", idx) == []

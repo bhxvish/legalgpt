@@ -2,6 +2,7 @@
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 from app.core.embeddings import Embedder
 from app.core.lay_terms import statutory_terms
@@ -98,6 +99,46 @@ class QueryExpander:
         return refs
 
 
+# "What is robbery?" retrieved the punishment sections (392, 393) above the definition (390): the
+# definition is the section *titled* with the term, so such questions also fetch that section.
+_DEFINITION_Q = [re.compile(p, re.IGNORECASE) for p in (
+    r"^(?:what is|what's|what are|define|meaning of)\s+(?:the\s+)?(?:offence\s+of\s+|term\s+)?(.+?)"
+    r"(?:\s+under\s+(?:the\s+)?(?:ipc|indian penal code))?\s*\??$",
+    r"^how does the (?:ipc|indian penal code) define\s+(.+?)\s*\??$",
+    r"^which (?:ipc )?section defines\s+(.+?)(?:,\s*and what does it say)?\s*\??$",
+)]
+
+
+def normalise_title(text: str) -> str:
+    text = re.sub(r"[-‐-—]", " ", text.lower())  # "house-trespass" = "house trespass"
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]+", "", text)).strip()
+
+
+def defined_term(question: str) -> str | None:
+    """The term a definition question asks about ("What is robbery under the IPC?" -> "robbery")."""
+    q = question.strip()
+    for pat in _DEFINITION_Q:
+        if m := pat.match(q):
+            return normalise_title(m.group(1)) or None
+    return None
+
+
+def title_index(chunks) -> dict[str, list[str]]:
+    """Normalised section title -> sections, from each section's own chunk (not amendments)."""
+    index: dict[str, list[str]] = {}
+    for c in chunks:
+        if c.section and c.title and c.citation_path.endswith(f"Section {c.section}"):
+            key = normalise_title(c.title.rstrip("."))
+            if c.section not in index.setdefault(key, []):
+                index[key].append(c.section)
+    return index
+
+
+def defined_sections(question: str, titles: dict[str, list[str]] | None) -> list[str]:
+    term = defined_term(question)
+    return list(titles.get(term, [])) if term and titles else []
+
+
 _REFUSE = 1.01  # a floor no similarity reaches (explicit section matches still pass)
 _FOLLOW_UP_MAX_WORDS = 5
 _ANAPHORA_MAX_WORDS = 12
@@ -149,7 +190,15 @@ def build_retriever(settings, embedder: Embedder | None = None, scope: bool = Tr
         scope=check,
         scope_floor=settings.retrieval_scope_floor,
         rewrite_gate=getattr(settings, "rewrite_gate", None),
+        titles=_titles(settings),
     )
+
+
+def _titles(settings) -> dict[str, list[str]] | None:
+    from app.core.corpus import load_chunks
+
+    path = getattr(settings, "corpus_chunks_path", None)
+    return title_index(load_chunks(path)) if path and Path(path).exists() else None
 
 
 class Retriever:
@@ -167,6 +216,7 @@ class Retriever:
         scope_floor: float = 0.40,
         boilerplate_pref: dict[str, float] | None = None,
         rewrite_gate: float | None = None,
+        titles: dict[str, list[str]] | None = None,
     ) -> None:
         """`scope` (app.core.scope.ScopeCheck): when nothing clears `min_similarity` but the
         question is about an IPC offence, sources down to `scope_floor` are used instead - for
@@ -185,6 +235,7 @@ class Retriever:
         # scope probability a question needs before an LLM rewrite may steer its retrieval; by
         # default the scope check's own threshold (set on validation civil questions, train_scope.py)
         self.rewrite_gate = rewrite_gate if rewrite_gate is not None else (scope.threshold if scope is not None else 0.5)
+        self.titles = titles  # normalised title -> sections (title_index), for definition questions
 
     def retrieve(self, question: str, context: str | None = None, rewrite=None) -> list[SourceEvidence]:
         """`context` is the previous user turn, if any. Follow-ups ("within how many years?")
@@ -218,7 +269,7 @@ class Retriever:
         cands: list[Candidate] = []
         for embedding in embeddings:
             cands += [Candidate(r.chunk, r.similarity) for r in self.store.query(embedding, self.top_k)]
-        for section in self.expander.section_refs(query):
+        for section in self.expander.section_refs(query) + defined_sections(question, self.titles):
             for r in self.store.query(embeddings[0], k=3, where={"section": section}):
                 cands.append(Candidate(r.chunk, r.similarity, explicit=True))
         ranked = self.rerank(cands)

@@ -182,6 +182,8 @@ function HowChosen({ r }) {
   if (r.named_sections.length) lines.push(`You named ${r.named_sections.map((s) => `s.${s}`).join(', ')}, so those sections were fetched directly.`)
   if (r.lexicon_terms.length)
     lines.push(`Everyday words in your question were matched to legal wording for the search: ${r.lexicon_terms.map((t) => `"${t.split(':')[0]}"`).join(', ')}.`)
+  if (r.defined_sections?.length)
+    lines.push(`Your question asks what a term means, so the section titled with it (${r.defined_sections.map((s) => `s.${s}`).join(', ')}) was fetched as well.`)
   if (r.used_context) lines.push('Your question looked like a follow-up, so the previous question was searched too.')
   const rw = r.rewrite
   if (rw?.used)

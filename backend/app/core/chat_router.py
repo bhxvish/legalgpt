@@ -197,7 +197,7 @@ class ChatRouter:
         patterns), the statutory wording the lexicon added, follow-up context, and per source its
         similarity and the weight applied by the reranker."""
         from app.core.lay_terms import statutory_terms
-        from app.core.retriever import QueryExpander
+        from app.core.retriever import QueryExpander, defined_sections
 
         named = QueryExpander.section_refs(question)
         return {
@@ -209,6 +209,8 @@ class ChatRouter:
             "lexicon_terms": statutory_terms(question),
             "rewrite": result.rewrite,  # the LLM's reading of the question, and whether it steered retrieval
             "named_sections": named,
+            # a definition question ("What is robbery?") also fetches the section titled with the term
+            "defined_sections": [s for s in defined_sections(question, getattr(self.retriever, "titles", None)) if s not in named],
             "sources": [{"marker": s.marker, "section": s.section, "similarity": s.similarity,
                          "weight": round(s.score / s.similarity, 2) if s.similarity else None,
                          "named": s.section in named} for s in result.sources],
