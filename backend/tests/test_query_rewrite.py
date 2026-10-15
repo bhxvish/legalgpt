@@ -144,3 +144,15 @@ def test_a_rate_limited_rewrite_does_not_fail_the_question() -> None:
             raise LLMRateLimitError("The hosted model's daily usage limit has been reached.")
 
     assert QueryRewriter().rewrite(QUESTION, _Limited()) is None
+
+
+def test_strict_rewrites_raise_instead_of_falling_back() -> None:
+    """Benchmarks use strict=True: a rate-limited rewrite must not silently become a no-rewrite answer."""
+    from app.core.llm_client import LLMRateLimitError
+
+    class _Limited(StubLLM):
+        def generate(self, messages):
+            raise LLMRateLimitError("too many requests")
+
+    with pytest.raises(LLMRateLimitError):
+        QueryRewriter().rewrite(QUESTION, _Limited(), strict=True)

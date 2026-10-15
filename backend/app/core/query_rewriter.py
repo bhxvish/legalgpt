@@ -88,10 +88,12 @@ class QueryRewriter:
         self._cache: OrderedDict[tuple[str, str], Rewrite | None] = OrderedDict()
         self.cache_size = cache_size
 
-    def rewrite(self, question: str, llm) -> Rewrite | None:
+    def rewrite(self, question: str, llm, strict: bool = False) -> Rewrite | None:
         """None when there is no usable rewrite (a failed call, a rate limit, an unreadable reply);
         retrieval then runs without one. A refusal needs no model, so a used-up quota must not
-        turn it into an error; failures are not cached, so the next question tries again."""
+        turn it into an error; failures are not cached, so the next question tries again.
+        `strict` (benchmarks): a failed call raises instead, so an answer is never silently made
+        without the rewrite it was meant to have."""
         key = (llm.model_id, question.strip())
         if key in self._cache:
             self._cache.move_to_end(key)
@@ -100,6 +102,8 @@ class QueryRewriter:
             ask = getattr(llm, "generate_brief", llm.generate)  # little hidden reasoning where supported
             reply = ask([Message("system", REWRITE_PROMPT), Message("user", question)])
         except Exception as exc:  # retrieval works without it
+            if strict:
+                raise
             logger.warning("query rewrite failed (%s): %s", llm.model_id, exc)
             return None
         out = parse(reply, llm.model_id)

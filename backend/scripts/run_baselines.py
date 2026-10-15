@@ -135,7 +135,9 @@ def make_system(spec: str, route: str | None = None, rewrite: bool = False):
         rewriter = QueryRewriter() if rewrite else None
 
         def run(q: str):
-            rw = rewriter.rewrite(q, llm) if rewriter and not retriever.expander.section_refs(q) else None
+            # strict: a rate-limited rewrite raises and the runner retries, instead of answering without it
+            rw = rewriter.rewrite(q, llm, strict=True) if rewriter and not retriever.expander.section_refs(q) else None
+            run.last_rewrite = rw.to_dict() if rw else None
             sources = retriever.retrieve(q, rewrite=rw)
             run.last_sources = [x.section for x in sources]  # saved with the answer (see run())
             if not sources:
@@ -261,6 +263,8 @@ def run(args) -> None:
                        "seconds": round(time.perf_counter() - t, 2)}
                 if getattr(system, "last_sources", None) is not None:  # the sections retrieval gave the model
                     row["sources"] = system.last_sources
+                if args.rewrite:  # what the rewrite said (None: no rewrite was made, e.g. a named section)
+                    row["rewrite"] = getattr(system, "last_rewrite", None)
                 if cache_spec:  # answered by another route than the file's name says
                     row["via"] = spec + (f" (host {args.route})" if args.route else "")
                 if usage:
