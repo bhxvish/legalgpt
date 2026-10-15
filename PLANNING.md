@@ -593,11 +593,19 @@ The weaknesses found by the evaluation, fixed and re-measured:
 - Not legal advice. The UI and the demo say so; the evidence-match band is not answer correctness.
 
 **Retrieval**
-- **Fact-pattern questions (improved 2026-10-14):** everyday narratives used to be refused (5% of
-  held-out scenarios found the right section). Lay-to-statutory query expansion plus a scope check
-  brought it to 80% on held-out questions, with 0 of 24 out-of-scope questions answered (see
-  "Fixes after evaluation"). Remaining gaps: passive phrasing ("my phone was taken"), offences the
-  20 lexicon rules don't cover, and a hand-written lexicon that a lawyer should review.
+- **Fact-pattern questions (improved 2026-10-14, again 2026-10-15):**
+  - Everyday narratives were refused at first: 5% of held-out scenarios found the right section.
+  - The lexicon and the scope check brought that to 45% on the benchmark's held-out scenarios.
+  - An LLM query rewrite, gated by a retrained scope check, brings retrieval to 88-95%, with 0 of 30
+    out-of-scope questions answered (`docs/reports/scenario_retrieval.md`).
+  - Remaining gaps:
+    - the rewrite is an unproven LLM step (it is disclosed in the ZK bundle and signed in the answer
+      record);
+    - without it (offline), retrieval stays at about 50%;
+    - the scope check and the 41 lexicon rules are AI-written and should be reviewed by a lawyer.
+- **Definition questions (fixed 2026-10-15):** "What is robbery?" used to rank the punishment
+  sections above the definition. It now also fetches the section titled with the term: held-out
+  50% -> 100%.
 - **Follow-up detection is heuristic (fixed leak, 2026-10-14):** a question uses the previous one as
   context only if it looks dependent (a pronoun, a connective opener, or a fragment of 5 words or
   fewer). A very short unrelated question after a legal one ("file tax online?") can still be
@@ -607,6 +615,10 @@ The weaknesses found by the evaluation, fixed and re-measured:
 **Answers and explanation**
 - Attribution catches off-topic or unsupported sentences, not subtle legal errors: a sentence about
   a neighbouring offence (§304 vs §304A) scores like a supported one.
+- Sentences that apply the law to a described situation rarely resemble the statute: 66% fall
+  below the support threshold, against 21% of legal claims. Similarity also cannot tell them from
+  off-topic sentences, so the Why panel flags unsupported legal claims in red and other unsupported
+  sentences in amber ("often the law applied to your facts"); neither is hidden.
 - `citation_accuracy` (Phase 4) measures grounding, not relevance or correctness.
 
 **Tuned model**
@@ -617,6 +629,12 @@ The weaknesses found by the evaluation, fixed and re-measured:
   provide" answers. It doesn't apply the law to facts, and still makes occasional wrong-section or
   citation slips. Not a replacement for the hosted model for reasoning; its targets are generated
   from the statute, not written by people.
+- v0.5 / v0.6 (2026-10-15, + scenario examples / + 51 refusals): held-out scenarios offline 13% ->
+  43%, but 22% cite only wrong sections (force-fitting when retrieval missed). The app stays on
+  v0.4, whose adapter the ZK manifest fingerprints.
+- v0.7 adds a distilled query rewrite and refusals made by removing the labelled section. Qwen2.5-3B
+  (everyday) and 7B (heavy, via llama.cpp) are trained on Colab (`backend/scripts/colab/`). Results
+  are pending.
 - Speed: float32 on CPU needs ~6 GB RAM; machines under 12 GB (including Docker's default VM) fall
   back to bfloat16, where reading the prompt takes ~30 s on CPUs without native bfloat16. Its 3 GB
   base model downloads at ~0.2 MB/s inside Docker here, so `HF_CACHE_DIR` mounts the host cache.

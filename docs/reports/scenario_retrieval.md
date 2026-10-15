@@ -60,3 +60,41 @@ punishment for murder?" → s.302.
 - 20 test questions is small, so the 80% has a wide confidence interval (about 58–92%).
 - The lexicon is hand-written and covers about 20 offence categories. Rarer offences described in
   everyday words will still be refused, safely.
+
+## Update 2026-10-15: LLM query rewrite, retrained scope check
+
+Evaluated on the benchmark's 60 held-out scenarios and 30 held-out out-of-scope questions
+(`benchmark/`). Design used only the other 248 scenarios (`eval_scenario_bench.py`).
+
+| retrieval | held-out scenarios: acceptable section among sources | out-of-scope answered |
+|---|---|---|
+| embedding only | 2% | 0/30 |
+| + lexicon (20 rules) + scope check (the 2026-10-14 system) | 45% | 0/30 |
+| + lexicon expanded to 41 rules | 50% | 0/30 |
+| + LLM query rewrite (`query_rewriter.py`), gate 0.50 | 83-90% | 0/30 |
+| + scope check retrained (486 examples), gate 0.58 | **88-95%** | **0/30** |
+
+The rewrite rows range over two models' rewrites (gpt-oss-120b, Gemini 3.5 flash-lite).
+
+**How the rewrite works.** The chat model names the likely IPC offences and sections as JSON. Their
+statute text is fetched; the answer must still be written from it and cite it.
+
+**When the rewrite is used.** Only when the model says the matter is criminal *and* the scope check
+gives at least the gate. The gate is the scope check's threshold, set 0.05 above the highest
+out-of-scope validation question, so no validation civil question reaches it whatever the LLM says.
+
+**Answer quality.** End to end (the full answer, scored by the benchmark), LegalGPT's held-out
+scenario accuracy rose from 43-45% to:
+
+| model | after the fix |
+|---|---|
+| gpt-5.4-mini | 88% |
+| gpt-oss-120b | 82% |
+| Gemini 3.5 flash-lite | 90% |
+
+Each rise is significant (p < 0.001), and each is at parity with the same model answering alone.
+Wrong punishments and civil questions treated as offences stay at 0%. These end-to-end runs used the
+scope check before retraining. Details: `paper_analysis.md`.
+
+The earlier evaluation set (`docs/eval/scenario_questions.json`) improved from 85% to 90% on dev
+and from 80% to 85% on test, with 0 of 24 out-of-scope questions answered.

@@ -75,7 +75,19 @@ out-of-scope questions.
 | + lay-term lexicon (original 20 rules) | 27% | 10% | 63% | 0% |
 | + scope check (floor 0.40 for crime questions) | 45% | 17% | 38% | 0% |
 | + lexicon expanded to 41 rules | 50% | 17% | 33% | 0% |
-| + LLM query rewrite (gate 0.5) | *pending: needs free-model rewrites for these 90 questions* | | | |
+| + LLM query rewrite (gate 0.50), Gemini's rewrites | 90% | 0% | 10% | 0% |
+| + LLM query rewrite (gate 0.50), gpt-oss-120b's rewrites | 83% | 7% | 10% | 0% |
+| + retrained scope check (gate 0.58), Gemini's rewrites | **95%** | 0% | 5% | 0% |
+| + retrained scope check (gate 0.58), gpt-oss-120b's rewrites | **88%** | 7% | 5% | 0% |
+
+The rewrite rows replay retrieval with the rewrites each model actually made in its benchmark run
+(saved with every answer), so no new LLM calls were needed. The retrained scope check
+(`train_scope.py`) uses:
+- 486 examples instead of 100;
+- the practice scenarios, never the held-out ones;
+- 138 AI-written civil and general questions.
+
+Its threshold is set 0.05 above the highest out-of-scope validation question.
 
 End-to-end, the answer stage adds the prompt rule ("applying a defined offence to the facts is
 answering from the sources"):
@@ -123,6 +135,29 @@ answering from the sources"):
 - Out-of-scope questions stay at 0% answered in every configuration. The gate is set so that no
   tuning-set out-of-scope question reaches it (highest scope probability 0.49 < 0.5), whatever the
   LLM says.
+
+### Fixes made after this analysis (retrieval only; end-to-end runs not repeated yet)
+
+**The six scenario refusals at the gate:** the retrained scope check (above) recovers retrieval for
+3 of the 6 with Gemini's rewrites. Held-out refusals fell from 10% to 5%, with 0 of 30 out-of-scope
+questions answered.
+
+**Definition questions:**
+- The fix: a question asking what a term is ("What is robbery?", "How does the IPC define X?") also
+  fetches the section **titled** with that term.
+- Designed on the 32 practice definition questions: 47% -> 97% retrieved.
+- Held-out 20 (checked once): the defined section is among the sources 50% -> **100%**, and ranked
+  first 10% -> **100%**.
+- Punishment questions are unchanged (97%).
+
+**Malformed items:**
+- ss.143 and 311 are titled just "Punishment", so their questions read "... prescribe for
+  punishment?". They are flagged `"invalid"` in `statute_qa.jsonl` and not scored, so statute n is
+  59, not 60.
+- They stay in the file, so every seeded sample is unchanged.
+
+The end-to-end numbers in sections 1-2 predate these two retrieval fixes. A re-run would show their
+effect on the answers.
 
 ## 3. Error analysis (LegalGPT + gpt-5.4-mini with the rewrite)
 
