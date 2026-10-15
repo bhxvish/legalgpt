@@ -286,7 +286,7 @@ export default function AnnotateView() {
           <button
             type="submit"
             disabled={!nameDraft.trim()}
-            className="mt-3 w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+            className="mt-3 w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-hover disabled:opacity-40"
           >
             Start annotating
           </button>

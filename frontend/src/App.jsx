@@ -4,11 +4,12 @@ import AnnotateView from './components/AnnotateView.jsx'
 import ChatWindow from './components/ChatWindow.jsx'
 import ReviewView from './components/ReviewView.jsx'
 import VerifyPanel from './components/VerifyPanel.jsx'
+import { useTheme } from './theme.js'
 
 const STYLES = {
-  loading: 'bg-slate-100 text-slate-600',
-  ok: 'bg-emerald-100 text-emerald-800',
-  error: 'bg-red-100 text-red-800',
+  loading: { badge: 'text-slate-500', dot: 'bg-slate-400 animate-pulse' },
+  ok: { badge: 'text-slate-600', dot: 'bg-emerald-500' },
+  error: { badge: 'text-red-700', dot: 'bg-red-500' },
 }
 
 function HealthBadge() {
@@ -29,8 +30,11 @@ function HealthBadge() {
   }, [])
 
   return (
-    <span data-testid="health-status" title={`${API_BASE_URL}/health`} className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STYLES[health.state]}`}>
-      {health.text}
+    <span data-testid="health-status" title={`${API_BASE_URL}/health`} role="status"
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium ${STYLES[health.state].badge}`}>
+      <span aria-hidden="true" className={`size-2 rounded-full ${STYLES[health.state].dot}`} />
+      <span className="hidden sm:inline">{health.text}</span>
+      <span className="sr-only sm:hidden">{health.text}</span>
     </span>
   )
 }
@@ -56,6 +60,36 @@ function AnnotateNote() {
   )
 }
 
+const THEMES = [
+  { id: 'system', label: 'System theme' },
+  { id: 'light', label: 'Light' },
+  { id: 'dark', label: 'Dark' },
+]
+
+function ThemeSelect() {
+  const [theme, setTheme] = useTheme()
+  return (
+    <label className="relative inline-flex items-center">
+      <span className="sr-only">Colour theme</span>
+      <select
+        value={theme}
+        onChange={(e) => setTheme(e.target.value)}
+        className="appearance-none rounded-md border border-slate-200 py-1 pl-2 pr-6 text-xs font-medium text-slate-700 hover:border-slate-300"
+        data-testid="theme-select"
+      >
+        {THEMES.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.label}
+          </option>
+        ))}
+      </select>
+      <svg aria-hidden="true" viewBox="0 0 12 12" className="pointer-events-none absolute right-1.5 size-3 text-slate-500">
+        <path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </label>
+  )
+}
+
 function Nav({ view, className }) {
   return (
     <nav className={`gap-1 ${className}`} aria-label="Sections">
@@ -65,7 +99,7 @@ function Nav({ view, className }) {
           href={`#${v.id}`}
           aria-current={view === v.id ? 'page' : undefined}
           className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium ${
-            view === v.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'
+            view === v.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
           }`}
         >
           {v.label}
@@ -90,25 +124,36 @@ export default function App() {
   }, [])
 
   return (
-    <div className="flex h-dvh flex-col bg-slate-50">
+    <div className="flex h-dvh flex-col bg-slate-50 text-slate-900">
+      <a href="#main" onClick={(e) => { e.preventDefault(); document.getElementById('main')?.focus() }}
+        className="sr-only z-50 rounded-md bg-accent px-3 py-2 text-sm font-medium text-on-accent focus:not-sr-only focus:absolute focus:left-3 focus:top-3">
+        Skip to content
+      </a>
       <header className="border-b border-slate-200 bg-white px-4 py-2 sm:py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-4">
-            <div className="min-w-0">
-              <h1 className="text-lg font-semibold leading-tight text-slate-900">LegalGPT</h1>
-              <p className="text-xs text-slate-500">
-                <span className="hidden sm:inline">Indian criminal law · legal information, not legal advice</span>
-                <span className="sm:hidden">Not legal advice</span>
-              </p>
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent font-serif text-lg font-bold text-on-accent">§</span>
+              <div className="min-w-0">
+                <h1 className="text-lg font-semibold leading-tight tracking-tight text-slate-900">LegalGPT</h1>
+                <p className="text-xs text-slate-500">
+                  <span className="hidden sm:inline">Indian criminal law · legal information, not legal advice</span>
+                  <span className="sm:hidden">Not legal advice</span>
+                </p>
+              </div>
             </div>
             <Nav view={view} className="hidden sm:flex" />
           </div>
-          <HealthBadge />
+          <div className="flex shrink-0 items-center gap-3">
+            <HealthBadge />
+            <ThemeSelect />
+          </div>
         </div>
         <Nav view={view} className="-mx-1 mt-2 flex overflow-x-auto sm:hidden" />
       </header>
       {/* The chat stays mounted on other tabs (only hidden), so the conversation and an answer that
           is still streaming survive switching to Review or Verify and back. */}
+      <main id="main" tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
       <div className={view === 'chat' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
         <ChatWindow />
       </div>
@@ -122,6 +167,7 @@ export default function App() {
       ) : view === 'verify' ? (
         <VerifyPanel />
       ) : null}
+      </main>
     </div>
   )
 }

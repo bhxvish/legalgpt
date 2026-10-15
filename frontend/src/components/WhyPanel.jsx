@@ -55,7 +55,7 @@ export default function WhyPanel({ explanation: ex, sources, retrieval, onOpenSo
           </span>
         )}
         {ex.warnings.length > 0 && (
-          <span className="rounded bg-red-600 px-1.5 py-0.5 font-semibold text-white">
+          <span className="rounded bg-red-600 px-1.5 py-0.5 font-semibold text-red-50">
             {ex.warnings.length} warning{ex.warnings.length > 1 ? 's' : ''}
           </span>
         )}

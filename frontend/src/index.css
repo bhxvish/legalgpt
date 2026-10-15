@@ -1,1 +1,170 @@
 @import "tailwindcss";
+
+/* Theme: <html data-theme="light|dark">, set before first paint by index.html and by the theme
+   menu in the header (System follows the operating system setting). */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@theme {
+  --font-sans: "Geist", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+  --color-indigo-50: oklch(96.6% 0.014 256);
+  --color-indigo-100: oklch(93.4% 0.026 256);
+  --color-indigo-200: oklch(87.2% 0.05 256);
+  --color-indigo-300: oklch(78.4% 0.08 256);
+  --color-indigo-400: oklch(67.2% 0.115 256);
+  --color-indigo-500: oklch(57.6% 0.135 256);
+  --color-indigo-600: oklch(49.8% 0.14 256);
+  --color-indigo-700: oklch(43.6% 0.13 256);
+  --color-indigo-800: oklch(37.4% 0.11 256);
+  --color-indigo-900: oklch(32.2% 0.085 256);
+  --color-indigo-950: oklch(23.8% 0.06 256);
+  /* fixed in both themes: text on accent or coloured fills, and modal backdrops */
+  --color-on-accent: #fff;
+  --color-scrim: oklch(14% 0.03 262);
+  --color-accent: var(--color-indigo-600);
+  --color-accent-hover: var(--color-indigo-700);
+}
+
+/* Dark: every scale is mirrored (50 <-> 950), so bg-*-50 tints become deep tints and text-*-800
+   becomes light text. "white" is the raised surface (cards, header). */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-white: oklch(18.6% 0.03 262);
+  --color-slate-50: oklch(12.9% 0.042 264.695);
+  --color-slate-100: oklch(20.8% 0.042 265.755);
+  --color-slate-200: oklch(27.9% 0.041 260.031);
+  --color-slate-300: oklch(37.2% 0.044 257.287);
+  --color-slate-400: oklch(50% 0.04 257);
+  --color-slate-500: oklch(64% 0.035 257);
+  --color-slate-600: oklch(74% 0.03 256);
+  --color-slate-700: oklch(86.9% 0.022 252.894);
+  --color-slate-800: oklch(92.9% 0.013 255.508);
+  --color-slate-900: oklch(96.8% 0.007 247.896);
+  --color-slate-950: oklch(98.4% 0.003 247.858);
+  --color-indigo-50: oklch(23% 0.027 256);
+  --color-indigo-100: oklch(28% 0.038 256);
+  --color-indigo-200: oklch(35% 0.061 256);
+  --color-indigo-300: oklch(43.6% 0.13 256);
+  --color-indigo-400: oklch(49.8% 0.14 256);
+  --color-indigo-500: oklch(57.6% 0.135 256);
+  --color-indigo-600: oklch(67.2% 0.115 256);
+  --color-indigo-700: oklch(78.4% 0.08 256);
+  --color-indigo-800: oklch(87.2% 0.05 256);
+  --color-indigo-900: oklch(93.4% 0.026 256);
+  --color-indigo-950: oklch(96.6% 0.014 256);
+  --color-red-50: oklch(23% 0.041 26.042);
+  --color-red-100: oklch(28% 0.063 25.723);
+  --color-red-200: oklch(35% 0.097 26.899);
+  --color-red-300: oklch(50.5% 0.213 27.518);
+  --color-red-400: oklch(57.7% 0.245 27.325);
+  --color-red-500: oklch(63.7% 0.237 25.331);
+  --color-red-600: oklch(70.4% 0.191 22.216);
+  --color-red-700: oklch(80.8% 0.114 19.571);
+  --color-red-800: oklch(88.5% 0.062 18.334);
+  --color-red-900: oklch(93.6% 0.032 17.717);
+  --color-red-950: oklch(97.1% 0.013 17.38);
+  --color-amber-50: oklch(23% 0.035 45.635);
+  --color-amber-100: oklch(28% 0.050 45.904);
+  --color-amber-200: oklch(35% 0.075 46.201);
+  --color-amber-300: oklch(55.5% 0.163 48.998);
+  --color-amber-400: oklch(66.6% 0.179 58.318);
+  --color-amber-500: oklch(76.9% 0.188 70.08);
+  --color-amber-600: oklch(82.8% 0.189 84.429);
+  --color-amber-700: oklch(87.9% 0.169 91.605);
+  --color-amber-800: oklch(92.4% 0.12 95.746);
+  --color-amber-900: oklch(96.2% 0.059 95.617);
+  --color-amber-950: oklch(98.7% 0.022 95.277);
+  --color-emerald-50: oklch(23% 0.023 172.552);
+  --color-emerald-100: oklch(28% 0.035 168.94);
+  --color-emerald-200: oklch(35% 0.052 166.913);
+  --color-emerald-300: oklch(50.8% 0.118 165.612);
+  --color-emerald-400: oklch(59.6% 0.145 163.225);
+  --color-emerald-500: oklch(69.6% 0.17 162.48);
+  --color-emerald-600: oklch(76.5% 0.177 163.223);
+  --color-emerald-700: oklch(84.5% 0.143 164.978);
+  --color-emerald-800: oklch(90.5% 0.093 164.15);
+  --color-emerald-900: oklch(95% 0.052 163.051);
+  --color-emerald-950: oklch(97.9% 0.021 166.113);
+  --color-violet-50: oklch(23% 0.063 291.089);
+  --color-violet-100: oklch(28% 0.085 293.745);
+  --color-violet-200: oklch(35% 0.128 292.759);
+  --color-violet-300: oklch(49.1% 0.27 292.581);
+  --color-violet-400: oklch(54.1% 0.281 293.009);
+  --color-violet-500: oklch(60.6% 0.25 292.717);
+  --color-violet-600: oklch(70.2% 0.183 293.541);
+  --color-violet-700: oklch(81.1% 0.111 293.571);
+  --color-violet-800: oklch(89.4% 0.057 293.283);
+  --color-violet-900: oklch(94.3% 0.029 294.588);
+  --color-violet-950: oklch(96.9% 0.016 293.756);
+  --color-sky-50: oklch(23% 0.030 243.157);
+  --color-sky-100: oklch(28% 0.041 240.876);
+  --color-sky-200: oklch(35% 0.061 240.79);
+  --color-sky-300: oklch(50% 0.134 242.749);
+  --color-sky-400: oklch(58.8% 0.158 241.966);
+  --color-sky-500: oklch(68.5% 0.169 237.323);
+  --color-sky-600: oklch(74.6% 0.16 232.661);
+  --color-sky-700: oklch(82.8% 0.111 230.318);
+  --color-sky-800: oklch(90.1% 0.058 230.902);
+  --color-sky-900: oklch(95.1% 0.026 236.824);
+  --color-sky-950: oklch(97.7% 0.013 236.62);
+  --color-rose-50: oklch(23% 0.047 12.094);
+  --color-rose-100: oklch(28% 0.072 10.272);
+  --color-rose-200: oklch(35% 0.103 13.697);
+  --color-rose-300: oklch(51.4% 0.222 16.935);
+  --color-rose-400: oklch(58.6% 0.253 17.585);
+  --color-rose-500: oklch(64.5% 0.246 16.439);
+  --color-rose-600: oklch(71.2% 0.194 13.428);
+  --color-rose-700: oklch(81% 0.117 11.638);
+  --color-rose-800: oklch(89.2% 0.058 10.001);
+  --color-rose-900: oklch(94.1% 0.03 12.58);
+  --color-rose-950: oklch(96.9% 0.015 12.422);
+  --color-accent: oklch(58% 0.13 256);
+  --color-accent-hover: oklch(52% 0.135 256);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: var(--color-slate-50);
+    color: var(--color-slate-900);
+    font-feature-settings: "ss01", "cv11";
+  }
+  p, li {
+    text-wrap: pretty;
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  /* visible keyboard focus everywhere; mouse clicks do not show it */
+  :focus-visible {
+    outline: 2px solid var(--color-indigo-500);
+    outline-offset: 2px;
+  }
+  a, button, select, input, textarea, summary {
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  button:not(:disabled):active {
+    transform: translateY(1px);
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  /* form fields get the surface colour, so they follow the theme; :where keeps utilities stronger */
+  :where(select, textarea, input:not([type=checkbox], [type=radio], [type=range], [type=file])) {
+    background-color: var(--color-white);
+    color: var(--color-slate-900);
+  }
+  ::selection {
+    background-color: var(--color-indigo-200);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; }
+  }
+}

@@ -129,7 +129,7 @@ function UploadPanel({ uploader, onFinished, onOpen }) {
         </div>
         <button
           onClick={() => inputRef.current?.click()}
-          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-on-accent hover:bg-accent-hover"
         >
           Choose files
         </button>
@@ -441,7 +441,7 @@ function CaseReview({ caseId, reviewer, scheme, onBack }) {
                 disabled={!done}
                 title={done ? 'Finish this judgment' : 'Check every highlighted sentence first'}
                 aria-label="Sign off"
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-hover disabled:opacity-40"
               >
                 Sign off
               </button>
@@ -497,7 +497,7 @@ export default function ReviewView() {
           placeholder="e.g. priya"
           className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
-        <button type="submit" disabled={!draft.trim()} className="mt-3 w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">
+        <button type="submit" disabled={!draft.trim()} className="mt-3 w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-hover disabled:opacity-40">
           Start reviewing
         </button>
       </form>

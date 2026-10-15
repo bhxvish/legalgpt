@@ -218,7 +218,7 @@ export default function VerifyPanel() {
             <button
               type="submit"
               disabled={busy || text.trim().length < 40 || !section}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-hover disabled:opacity-40"
             >
               {busy ? 'Checking…' : 'Check'}
             </button>

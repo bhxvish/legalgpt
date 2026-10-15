@@ -102,7 +102,7 @@ export function VerdictProof({ result }) {
           type="button"
           onClick={prove}
           disabled={!!busy}
-          className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900 disabled:opacity-50"
+          className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-50 hover:bg-slate-900 disabled:opacity-50"
           data-testid="zk-prove"
         >
           {busy === 'prove' ? 'Generating proof…' : bundle ? 'Generate again' : 'Generate proof'}
@@ -201,7 +201,7 @@ export function AnswerProof({ msg }) {
               type="button"
               onClick={proveSources}
               disabled={!!busy}
-              className="rounded-md bg-slate-800 px-2 py-1 font-medium text-white hover:bg-slate-900 disabled:opacity-50"
+              className="rounded-md bg-slate-800 px-2 py-1 font-medium text-slate-50 hover:bg-slate-900 disabled:opacity-50"
               data-testid="zk-prove-retrieval"
             >
               {busy === 'retr' ? 'Proving (about 10 s)…' : 'Prove the sources'}
