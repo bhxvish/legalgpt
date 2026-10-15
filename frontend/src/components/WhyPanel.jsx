@@ -124,7 +124,9 @@ export default function WhyPanel({ explanation: ex, sources, retrieval, onOpenSo
                         </span>
                       )}
                     </div>
-                    {lit && a.supported && (
+                    {/* only for the sentence under the mouse: opening quotes while hovering a source row
+                        pushed that list down under the cursor, which then hovered another row (the list jumped) */}
+                    {hoverSentence === a.sentence_idx && a.supported && (
                       <p className="mt-1 border-l-2 border-indigo-300 pl-2 italic text-slate-600">“{a.evidence}”</p>
                     )}
                   </li>
