@@ -23,11 +23,30 @@
   --color-scrim: oklch(14% 0.03 262);
   --color-accent: var(--color-indigo-600);
   --color-accent-hover: var(--color-indigo-700);
-  --animate-rise: rise 220ms cubic-bezier(0.2, 0, 0, 1);
+  --animate-rise: rise 420ms cubic-bezier(0.2, 0, 0, 1) backwards; /* not "both": a kept transform would trap position:fixed children */
+  --animate-caret: caret 1s steps(1) infinite;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-ping-soft: ping-soft 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+  --animate-float: float 9s ease-in-out infinite alternate;
   --animate-pop: pop 180ms cubic-bezier(0.2, 0, 0, 1);
   --animate-fade: fade 180ms ease-out;
   @keyframes rise {
-    from { opacity: 0; transform: translateY(6px); }
+    from { opacity: 0; transform: translateY(10px); }
+  }
+  @keyframes caret {
+    50% { opacity: 0; }
+  }
+  @keyframes shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+  }
+  @keyframes ping-soft {
+    0% { transform: scale(1); opacity: 0.55; }
+    70%, 100% { transform: scale(2.6); opacity: 0; }
+  }
+  @keyframes float {
+    from { transform: translate3d(-4%, -3%, 0) scale(1); }
+    to { transform: translate3d(5%, 4%, 0) scale(1.08); }
   }
   @keyframes pop {
     from { opacity: 0; transform: translateY(6px) scale(0.98); }
@@ -134,6 +153,29 @@
   --color-accent-hover: oklch(52% 0.135 256);
 }
 
+/* text that shimmers while the app is working ("Searching the IPC…") */
+@utility text-shimmer {
+  color: transparent;
+  background: linear-gradient(90deg, var(--color-slate-400) 0%, var(--color-slate-400) 35%, var(--color-slate-800) 50%, var(--color-slate-400) 65%, var(--color-slate-400) 100%);
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: var(--animate-shimmer);
+}
+
+/* <details> panels open smoothly where the browser supports it (Chrome/Edge 131+) */
+@supports selector(::details-content) {
+  :root { interpolate-size: allow-keywords; }
+  details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition: block-size 300ms cubic-bezier(0.2, 0, 0, 1), content-visibility 300ms allow-discrete;
+  }
+  details[open]::details-content {
+    block-size: auto;
+  }
+}
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
@@ -180,6 +222,6 @@
   }
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
-    *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; }
+    *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; }
   }
 }

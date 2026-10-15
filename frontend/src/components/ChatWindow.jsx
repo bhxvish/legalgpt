@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { API_BASE_URL, streamChat, verifyApi } from '../api.js'
 import { chatTitle, loadChats, newId, relativeTime, saveChats } from '../chatStore.js'
 import { NewChatIcon, SearchIcon, SendIcon, SidebarIcon, StopIcon, TrashIcon } from './icons.jsx'
+import { SlidingPill, stagger } from './motion.jsx'
 import SourceModal from './SourceModal.jsx'
 import { VerificationResultView } from './VerifyPanel.jsx'
 import WhyPanel from './WhyPanel.jsx'
@@ -75,7 +76,7 @@ const cells = (line) => line.trim().replace(/^\||\|$/g, '').split('|').map((c) =
 /** The answer text, line by line: paragraphs, "# " headings, "* " / "- " bullets, "---" rules and
  * markdown tables (a header row, a |---| rule, then body rows; a table still streaming in shows
  * its rows as they arrive). */
-function AnswerText({ text, sources, onCite }) {
+function AnswerText({ text, sources, onCite, caret = false }) {
   const byMarker = new Map((sources || []).map((s) => [s.marker, s]))
   const lines = text.split('\n')
   const blocks = []
@@ -136,6 +137,9 @@ function AnswerText({ text, sources, onCite }) {
     blocks.push(
       <p key={i} className={`min-h-[1em] break-words ${bullet ? 'relative my-1 pl-5 before:absolute before:left-1.5 before:top-[0.7em] before:size-1.5 before:rounded-full before:bg-slate-400' : ''}`}>
         <Inline text={body} byMarker={byMarker} onCite={onCite} />
+        {caret && i === lines.length - 1 && (
+          <span aria-hidden="true" className="ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[0.18em] animate-caret rounded-full bg-indigo-500" />
+        )}
       </p>,
     )
   }
@@ -147,8 +151,10 @@ function ModeToggle({ mode, setMode, disabled }) {
     { value: 'legal', label: 'Legal', hint: 'Answers only from the IPC, with citations' },
     { value: 'general', label: 'General', hint: 'Ungrounded general answer, no retrieval' },
   ]
+  const ref = useRef(null)
   return (
-    <div role="radiogroup" aria-label="Answer mode" className="inline-flex rounded-lg bg-slate-100 p-0.5">
+    <div ref={ref} role="radiogroup" aria-label="Answer mode" className="relative inline-flex rounded-lg bg-slate-100 p-0.5">
+      <SlidingPill containerRef={ref} selector='[aria-checked="true"]' deps={[mode]} className="rounded-md bg-white shadow-sm ring-1 ring-slate-900/5" />
       {options.map((o) => (
         <button
           key={o.value}
@@ -157,8 +163,8 @@ function ModeToggle({ mode, setMode, disabled }) {
           title={o.hint}
           disabled={disabled}
           onClick={() => setMode(o.value)}
-          className={`rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${
-            mode === o.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+          className={`relative rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${
+            mode === o.value ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'
           }`}
         >
           {o.label}
@@ -168,7 +174,7 @@ function ModeToggle({ mode, setMode, disabled }) {
   )
 }
 
-function AssistantMessage({ msg, onCite }) {
+function AssistantMessage({ msg, onCite, live = false }) {
   const cited = new Set([...(msg.content || '').matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])))
   const tone = msg.error
     ? 'bg-red-50 ring-red-200'
@@ -184,10 +190,10 @@ function AssistantMessage({ msg, onCite }) {
         {msg.refused && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">Out of scope</span>}
       </div>
       {msg.content ? (
-        <AnswerText text={msg.content} sources={msg.sources} onCite={onCite} />
+        <AnswerText text={msg.content} sources={msg.sources} onCite={onCite} caret={live} />
       ) : (
         !msg.error && (
-          <p className="animate-pulse text-slate-400">
+          <p className="text-shimmer font-medium">
             {msg.mode === 'legal' && !msg.sources?.length && !msg.model ? 'Searching the IPC…' : 'Writing the answer…'}
             {msg.model?.includes('+lora') && (
               <span className="mt-1 block text-xs">
@@ -206,8 +212,8 @@ function AssistantMessage({ msg, onCite }) {
             {cited.size > 0 && <span className="font-normal text-slate-400"> · highlighted = cited in the answer</span>}
           </p>
           <ul className="flex flex-wrap gap-1.5">
-            {msg.sources.map((s) => (
-              <li key={s.chunk_id}>
+            {msg.sources.map((s, si) => (
+              <li key={s.chunk_id} className="animate-rise" style={stagger(si, 45)}>
                 <button
                   onClick={() => onCite(s)}
                   title={cited.has(s.marker) ? 'Cited in the answer: open the IPC text' : 'Retrieved but not cited: open the IPC text'}
@@ -231,7 +237,7 @@ function AssistantMessage({ msg, onCite }) {
       {msg.explanation && <WhyPanel explanation={msg.explanation} sources={msg.sources} retrieval={msg.retrieval} onOpenSource={onCite} />}
       <AnswerProof msg={msg} />
       {msg.verifySection && !msg.verification && !msg.error && (
-        <p className="mt-3 animate-pulse text-xs text-slate-500">Checking the facts against s.{msg.verifySection}…</p>
+        <p className="text-shimmer mt-3 text-xs font-medium">Checking the facts against s.{msg.verifySection}…</p>
       )}
       {msg.verification &&
         (msg.verification.error ? (
@@ -380,6 +386,7 @@ export default function ChatWindow() {
   const abortRef = useRef(null)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
+  const modelRef = useRef(null)
 
   const streaming = streamingChatId !== null
   const messages = chats.find((c) => c.id === activeId)?.messages || []
@@ -626,23 +633,29 @@ export default function ChatWindow() {
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-6 sm:px-4 sm:py-8" data-testid="message-list">
           <div className="mx-auto flex max-w-3xl flex-col gap-5">
             {messages.length === 0 && (
-              <div className="mt-6 sm:mt-14">
-                <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Ask about the Indian Penal Code</h2>
-                <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-500">
+              <div className="relative mt-6 sm:mt-14">
+                <div aria-hidden="true" className="pointer-events-none absolute -left-24 -top-28 h-72 w-[34rem] max-w-[120%] animate-float rounded-full bg-[radial-gradient(closest-side,var(--color-indigo-200),transparent)] opacity-50 blur-2xl" />
+                <p className="relative mb-3 inline-flex animate-rise items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200 backdrop-blur">
+                  <span aria-hidden="true" className="size-1.5 rounded-full bg-emerald-500" />
+                  Grounded in the IPC text, with a source for every claim
+                </p>
+                <h2 className="relative animate-rise text-2xl font-semibold tracking-tight text-slate-900 sm:text-4xl" style={stagger(1)}>Ask about the Indian Penal Code</h2>
+                <p className="relative mt-3 max-w-xl animate-rise text-sm leading-relaxed text-slate-500 sm:text-[0.9375rem]" style={stagger(2)}>
                   Legal mode answers only from IPC text and cites each source, so you can open the section it relied on.
                   General mode skips retrieval. Describe what happened in plain words; you do not need section numbers.
                 </p>
-                <p className="mt-8 text-xs font-medium text-slate-500">Try one of these</p>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  {EXAMPLES.map((q) => (
+                <p className="relative mt-8 animate-rise text-xs font-medium text-slate-500" style={stagger(3)}>Try one of these</p>
+                <div className="relative mt-2 grid gap-2 sm:grid-cols-2">
+                  {EXAMPLES.map((q, qi) => (
                     <button
                       key={q}
+                      style={stagger(qi, 70, 240)}
                       onClick={() => send(q)}
                       disabled={streaming}
-                      className="group flex items-start justify-between gap-3 rounded-xl bg-white px-4 py-3 text-left text-sm text-slate-700 ring-1 ring-slate-200 hover:ring-indigo-300 hover:bg-indigo-50/40 disabled:opacity-50"
+                      className="group flex animate-rise items-start justify-between gap-3 rounded-xl bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-[0_1px_2px_rgb(15_23_42/0.04)] ring-1 ring-slate-200 transition-[transform,box-shadow,background-color] duration-200 hover:-translate-y-0.5 hover:bg-indigo-50/40 hover:shadow-[0_10px_24px_-14px_rgb(15_23_42/0.35)] hover:ring-indigo-300 disabled:opacity-50"
                     >
                       <span>{q}</span>
-                      <span aria-hidden="true" className="text-slate-400 group-hover:translate-x-0.5 group-hover:text-indigo-600 transition-transform">→</span>
+                      <span aria-hidden="true" className="text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-indigo-600">→</span>
                     </button>
                   ))}
                 </div>
@@ -657,7 +670,7 @@ export default function ChatWindow() {
                 </div>
               ) : (
                 <div key={m.id} className="flex animate-rise justify-start">
-                  <AssistantMessage msg={m} onCite={setOpenSource} />
+                  <AssistantMessage msg={m} onCite={setOpenSource} live={streamingChatId === activeId && m === messages.at(-1)} />
                 </div>
               ),
             )}
@@ -688,7 +701,8 @@ export default function ChatWindow() {
               <div className="flex flex-wrap items-center gap-2 px-2.5 pb-2.5 pt-1">
                 <ModeToggle mode={mode} setMode={setMode} disabled={streaming} />
               {models.length > 1 && (
-                <div role="radiogroup" aria-label="Answer model" className="inline-flex max-w-full overflow-x-auto rounded-lg bg-slate-100 p-0.5" data-testid="model-toggle">
+                <div ref={modelRef} role="radiogroup" aria-label="Answer model" className="relative inline-flex max-w-full overflow-x-auto rounded-lg bg-slate-100 p-0.5" data-testid="model-toggle">
+                  <SlidingPill containerRef={modelRef} selector='[aria-checked="true"]' deps={[model, models.length]} className="rounded-md bg-white shadow-sm ring-1 ring-slate-900/5" />
                   {models.map((m) => (
                     <button
                       key={m.id}
@@ -697,8 +711,8 @@ export default function ChatWindow() {
                       disabled={streaming || !m.available}
                       title={`${m.model_id || m.id}${m.note ? ` — ${m.note}` : ''}`}
                       onClick={() => setModel(m.id)}
-                      className={`shrink-0 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-40 ${
-                        model === m.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                      className={`relative shrink-0 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-40 ${
+                        model === m.id ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'
                       }`}
                     >
                       {modelLabel(m.id)}
@@ -742,7 +756,7 @@ export default function ChatWindow() {
                     <button
                       type="submit"
                       disabled={!input.trim()}
-                      className="grid size-9 place-items-center rounded-xl bg-accent text-on-accent shadow-sm hover:bg-accent-hover disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+                      className="grid size-9 place-items-center rounded-xl bg-accent text-on-accent shadow-sm transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-accent-hover disabled:translate-y-0 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
                       aria-label="Send"
                       title="Send (Enter)"
                     >

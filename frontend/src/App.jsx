@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { API_BASE_URL } from './api.js'
 import AnnotateView from './components/AnnotateView.jsx'
 import ChatWindow from './components/ChatWindow.jsx'
 import ReviewView from './components/ReviewView.jsx'
 import VerifyPanel from './components/VerifyPanel.jsx'
+import { SlidingPill } from './components/motion.jsx'
 import { useTheme } from './theme.js'
 
 const STYLES = {
@@ -46,7 +47,10 @@ function HealthBadge() {
   return (
     <span data-testid="health-status" title={`${API_BASE_URL}/health`} role="status"
       className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium ${STYLES[health.state].badge}`}>
-      <span aria-hidden="true" className={`size-2 rounded-full ${STYLES[health.state].dot}`} />
+      <span aria-hidden="true" className="relative inline-flex size-2">
+        {health.state === 'ok' && <span className="absolute inset-0 animate-ping-soft rounded-full bg-emerald-500" />}
+        <span className={`relative size-2 rounded-full ${STYLES[health.state].dot}`} />
+      </span>
       <span className="hidden sm:inline">{health.text}</span>
       <span className="sr-only sm:hidden">{health.text}</span>
     </span>
@@ -105,15 +109,17 @@ function ThemeSelect() {
 }
 
 function Nav({ view, className }) {
+  const ref = useRef(null)
   return (
-    <nav className={`gap-1 ${className}`} aria-label="Sections">
+    <nav ref={ref} className={`relative gap-1 ${className}`} aria-label="Sections">
+      <SlidingPill containerRef={ref} selector='[aria-current="page"]' deps={[view]} className="rounded-md bg-indigo-50" />
       {VIEWS.map((v) => (
         <a
           key={v.id}
           href={`#${v.id}`}
           aria-current={view === v.id ? 'page' : undefined}
-          className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium ${
-            view === v.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+          className={`relative shrink-0 rounded-md px-3 py-1.5 text-sm font-medium ${
+            view === v.id ? 'text-indigo-700' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           {v.label}
@@ -143,7 +149,7 @@ export default function App() {
         className="sr-only z-50 rounded-md bg-accent px-3 py-2 text-sm font-medium text-on-accent focus:not-sr-only focus:absolute focus:left-3 focus:top-3">
         Skip to content
       </a>
-      <header className="border-b border-slate-200 bg-white px-4 py-2 sm:py-3">
+      <header className="relative z-10 border-b border-slate-200 bg-white/85 px-4 py-2 backdrop-blur-md sm:py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-4">
             <div className="flex min-w-0 items-center gap-2.5">
@@ -172,14 +178,18 @@ export default function App() {
         <ChatWindow />
       </div>
       {view === 'annotate' ? (
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div key="annotate" className="flex min-h-0 flex-1 animate-rise flex-col">
           <AnnotateNote />
           <AnnotateView />
         </div>
       ) : view === 'review' ? (
-        <ReviewView />
+        <div key="review" className="flex min-h-0 flex-1 animate-rise flex-col">
+          <ReviewView />
+        </div>
       ) : view === 'verify' ? (
-        <VerifyPanel />
+        <div key="verify" className="flex min-h-0 flex-1 animate-rise flex-col">
+          <VerifyPanel />
+        </div>
       ) : null}
       </main>
     </div>
