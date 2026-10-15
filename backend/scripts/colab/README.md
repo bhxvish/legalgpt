@@ -19,21 +19,33 @@ This writes `data/colab/legalgpt_colab.zip` (~3 MB): code, IPC corpus and index,
 teacher rewrites. It contains **no keys and no judgments**. `--with-judgments` adds the Module 1
 judgment corpus, but only do that if you are allowed to upload those texts to Google Drive.
 
-## 2. On Colab
+## 2. On Colab (one session, both models)
 
 1. Upload `legalgpt_colab.zip` to Google Drive, folder `MyDrive/legalgpt/`.
 2. Open `backend/scripts/colab/LegalGPT_LoRA_Colab.ipynb` in Colab (File → Upload notebook).
-3. Runtime → Change runtime type → **T4 GPU**.
-4. Set `MODEL_SIZE = "3B"` and run all. When it finishes, change it to `"7B"` and run all again.
+3. Runtime → Change runtime type → **L4 GPU**. A100 also works; T4 is about 3× slower.
+4. **Run all.** The notebook:
+   - trains the 3B, then the 7B, with the same recipe and 2 passes each;
+   - benchmarks each one;
+   - converts the 7B adapter to GGUF;
+   - **disconnects the GPU** when done, so no units are spent idle.
 
-Checkpoints and benchmark answers are saved to Drive as they are made. If Colab disconnects,
-reconnect and run all again: both resume where they stopped.
+**Time and cost:** about 4-5 h on an L4, roughly 20-25 compute units. *View resources* shows the
+live rate.
+
+**Recipe:** on a 24 GB GPU it trains on 4 examples at a time with 2 accumulation steps. That is the
+same effective batch of 8 as the laptop's 1 × 8, only faster. If memory runs out, it retries with
+2 × 4, then 1 × 8.
+
+**If the session drops:** run all again. Finished steps are skipped, training resumes from its last
+checkpoint, and the benchmark from its last saved answer. Runs go to new `…-l4` folders, so older
+partial runs are left untouched.
 
 ## 3. Back on the laptop
 
 **3B (everyday):**
-- Download `MyDrive/legalgpt/lora/v0.7-3b`, without `_trainer/`, to `data/models/lora/v0.7-3b`.
-- In `.env`: `ADAPTER_PATH=data/models/lora/v0.7-3b`.
+- Download `MyDrive/legalgpt/lora/v0.7-3b-l4`, without `_trainer/`, to `data/models/lora/v0.7-3b-l4`.
+- In `.env`: `ADAPTER_PATH=data/models/lora/v0.7-3b-l4`.
 - The base model (Qwen2.5-3B-Instruct, ~6 GB) downloads once on first use.
 
 **7B (heavy):**
@@ -48,11 +60,11 @@ reconnect and run all again: both resume where they stopped.
    `Qwen2.5-7B-Instruct-Q4_K_M.gguf` from the Hugging Face repo `bartowski/Qwen2.5-7B-Instruct-GGUF`
    (or the official `Qwen/Qwen2.5-7B-Instruct-GGUF`). It must be the same model the adapter was
    trained on: Qwen2.5-7B-Instruct.
-3. Copy `MyDrive/legalgpt/lora/v0.7-7b.gguf` (the adapter) into `data/models/gguf/`.
+3. Copy `MyDrive/legalgpt/lora/v0.7-7b-l4.gguf` (the adapter) into `data/models/gguf/`.
 4. In `.env`:
    ```
    HEAVY_MODEL_GGUF=data/models/gguf/Qwen2.5-7B-Instruct-Q4_K_M.gguf
-   HEAVY_LORA_GGUF=data/models/gguf/v0.7-7b.gguf
+   HEAVY_LORA_GGUF=data/models/gguf/v0.7-7b-l4.gguf
    HEAVY_GPU_LAYERS=16
    ```
    Lower `HEAVY_GPU_LAYERS` if the GPU runs out of memory; raise it if there is room.
@@ -74,4 +86,4 @@ adapter's fingerprint. Until then they carry none.
 - The Colab benchmark runs the 7B through PyTorch (4-bit). The laptop runs it through llama.cpp
   (Q4_K_M), a different 4-bit format, so answers can differ slightly. The paper should name the
   configuration it reports.
-- Free Colab GPU time is limited per day. The 7B may need two sessions; checkpoints make that safe.
+- The free T4 tier ran out of GPU time partway through the 3B. The paid L4 session above fits both models.

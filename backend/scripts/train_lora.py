@@ -35,6 +35,9 @@ def main() -> int:
     ap.add_argument("--lora-alpha", type=int, default=d.lora_alpha)
     ap.add_argument("--lr", type=float, default=d.lr)
     ap.add_argument("--max-steps", type=int, default=-1)
+    ap.add_argument("--batch-size", type=int, default=d.batch_size,
+                    help="examples per step; with --grad-accum, keep batch-size x grad-accum = 8 for the same recipe")
+    ap.add_argument("--grad-accum", type=int, default=d.grad_accum)
     ap.add_argument("--save-steps", type=int, default=0, help="checkpoint every N steps and resume from the latest (Colab)")
     ap.add_argument("--no-judgments", action="store_true",
                     help="skip the judgment-based examples (Module 1 corpus), e.g. when the judgments are not uploaded")
@@ -118,7 +121,8 @@ def main() -> int:
         print(f"  {k:5}: {len(v):3} examples from {len(case_sets[k])} cases {sorted(case_sets[k]) if k != 'train' else ''}")
 
     cfg = TrainConfig(base_model=args.base_model, r=args.r, lora_alpha=args.lora_alpha, lr=args.lr,
-                      epochs=args.epochs, seed=args.seed, max_steps=args.max_steps, save_steps=args.save_steps)
+                      epochs=args.epochs, seed=args.seed, max_steps=args.max_steps, save_steps=args.save_steps,
+                      batch_size=args.batch_size, grad_accum=args.grad_accum)
     out = args.out or s.lora_dir / f"{args.version}-{datetime.now():%Y%m%d-%H%M%S}"
     out.mkdir(parents=True, exist_ok=True)
     with (out / "examples.jsonl").open("w", encoding="utf-8") as f:
