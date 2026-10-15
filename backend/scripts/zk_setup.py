@@ -47,8 +47,21 @@ SELF_TEST_QUESTION = "What is the punishment for causing death by negligence?"
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--skip-retrieval", action="store_true", help="only build the verdict circuit")
+    ap.add_argument("--rules-only", action="store_true",
+                    help="only refresh the published retrieval rules (e.g. a retrained scope check); the circuits, "
+                         "keys and corpus commitments are unchanged, so nothing is rebuilt")
     args = ap.parse_args()
     s = get_settings()
+    if args.rules_only:
+        path = s.zk_published_dir / "manifest.json"
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        old = manifest["retrieval"]["rules"]
+        manifest["retrieval"]["rules"] = retrieval_rules(build_retriever(s))
+        manifest["retrieval"]["rules_updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        path.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+        changed = [k for k in manifest["retrieval"]["rules"] if manifest["retrieval"]["rules"][k] != old.get(k)]
+        print(f"updated the retrieval rules in {path} (changed: {', '.join(changed) or 'nothing'})")
+        return 0
     import ezkl
 
     zk, pub = s.zk_dir, s.zk_published_dir

@@ -51,8 +51,9 @@ class Settings(BaseSettings):
     # Everyday fact patterns: the chat's LLM names the likely IPC offences, and their sections are
     # retrieved (app/core/query_rewriter.py). One extra short LLM call per new question.
     query_rewrite: bool = Field(default=True, alias="QUERY_REWRITE")
-    # scope-check probability a question needs before a rewrite may steer retrieval
-    rewrite_gate: float = Field(default=0.5, alias="REWRITE_GATE")
+    # scope-check probability a question needs before a rewrite may steer retrieval.
+    # Default: the scope check's own threshold (scope_model.json, set by train_scope.py)
+    rewrite_gate: float | None = Field(default=None, alias="REWRITE_GATE")
 
     # Module 2 — BERT-assisted annotation
     rrl_model_dir: Path = Field(default=REPO_ROOT / "data" / "models" / "rrl", alias="RRL_MODEL_DIR")

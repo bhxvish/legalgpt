@@ -148,7 +148,7 @@ def build_retriever(settings, embedder: Embedder | None = None, scope: bool = Tr
         min_similarity=settings.retrieval_min_similarity,
         scope=check,
         scope_floor=settings.retrieval_scope_floor,
-        rewrite_gate=getattr(settings, "rewrite_gate", 0.5),
+        rewrite_gate=getattr(settings, "rewrite_gate", None),
     )
 
 
@@ -166,7 +166,7 @@ class Retriever:
         scope=None,
         scope_floor: float = 0.40,
         boilerplate_pref: dict[str, float] | None = None,
-        rewrite_gate: float = 0.5,
+        rewrite_gate: float | None = None,
     ) -> None:
         """`scope` (app.core.scope.ScopeCheck): when nothing clears `min_similarity` but the
         question is about an IPC offence, sources down to `scope_floor` are used instead - for
@@ -182,8 +182,9 @@ class Retriever:
         self.scope = scope
         self.scope_floor = scope_floor
         self.boilerplate_pref = boilerplate_pref if boilerplate_pref is not None else dict(DEFAULT_BOILERPLATE_PREF)
-        # scope probability a question needs before an LLM rewrite may steer its retrieval
-        self.rewrite_gate = rewrite_gate
+        # scope probability a question needs before an LLM rewrite may steer its retrieval; by
+        # default the scope check's own threshold (set on validation civil questions, train_scope.py)
+        self.rewrite_gate = rewrite_gate if rewrite_gate is not None else (scope.threshold if scope is not None else 0.5)
 
     def retrieve(self, question: str, context: str | None = None, rewrite=None) -> list[SourceEvidence]:
         """`context` is the previous user turn, if any. Follow-ups ("within how many years?")
