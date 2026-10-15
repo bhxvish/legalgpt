@@ -162,6 +162,10 @@ def run(args) -> None:
                         attempt += 1
                         time.sleep(20 * attempt)
                     except Exception as e:  # extraction failure etc.: record and continue
+                        if re.search(r"HTTP (401|402|403)", str(e)):
+                            # a key or billing refusal says nothing about the case: stop, record nothing
+                            print(f"  stopped (provider refused: {str(e)[:160]})")
+                            return
                         err = f"{type(e).__name__}: {e}"[:300]
                         break
                 row = {"id": c["id"], "pred": pred, "elements": els, "error": err, "seconds": round(time.perf_counter() - t, 1)}
