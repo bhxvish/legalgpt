@@ -74,8 +74,8 @@ themselves, and nothing is sent to Groq or any other service. Fact-checking (Mod
 the hosted model.
 
 **Signed answers (ZK):** the published manifest fingerprints one adapter (v0.4 today). After
-switching `ADAPTER_PATH`, re-run `backend/scripts/zk_setup.py` so that signed answers carry the new
-adapter's fingerprint. Until then they carry none.
+switching `ADAPTER_PATH`, run `backend/scripts/zk_setup.py --adapter-only` so that signed answers carry the
+new adapter's fingerprint (circuits and keys are not rebuilt). Until then they carry none.
 
 **Results:** copy `MyDrive/legalgpt/bench/legalgpt-lora_v0.7-*.jsonl` into
 `data/reports/bench/baselines/` and run `backend/scripts/run_baselines.py score` and

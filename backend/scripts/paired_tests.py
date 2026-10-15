@@ -73,9 +73,14 @@ def outcomes(name: str, items: dict, ipc: set[str]) -> dict[str, dict[str, bool]
     return out
 
 
+def items_and_ipc(seed: int = 7) -> tuple[dict, set[str]]:
+    """The benchmark sample by id, and every citable IPC section (incl. state-amendment sections)."""
+    return ({it["id"]: it for it in sample(seed, 40, 20, 60, 30)},
+            known_sections(load_chunks(get_settings().corpus_chunks_path)))
+
+
 def main() -> int:
-    ipc = known_sections(load_chunks(get_settings().corpus_chunks_path))  # incl. state-amendment sections
-    items = {it["id"]: it for it in sample(7, 40, 20, 60, 30)}
+    items, ipc = items_and_ipc()
     print("| A | B | measure | n | A | B | only A | only B | p (exact McNemar) |")
     print("|---|---|---|---|---|---|---|---|---|")
     for a, b, metrics in PAIRS:

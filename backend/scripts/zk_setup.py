@@ -50,8 +50,23 @@ def main() -> int:
     ap.add_argument("--rules-only", action="store_true",
                     help="only refresh the published retrieval rules (e.g. a retrained scope check); the circuits, "
                          "keys and corpus commitments are unchanged, so nothing is rebuilt")
+    ap.add_argument("--adapter-only", action="store_true",
+                    help="only refresh the published LoRA adapter fingerprint (after changing ADAPTER_PATH); signed "
+                         "answers from that adapter then carry it. Circuits and keys are unchanged")
     args = ap.parse_args()
     s = get_settings()
+    if args.adapter_only:
+        path = s.zk_published_dir / "manifest.json"
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        adapter = s.adapter_path or latest_adapter(s.lora_dir)
+        if adapter is None:
+            raise SystemExit("no adapter: set ADAPTER_PATH in .env")
+        old = (manifest.get("adapter") or {}).get("name")
+        manifest["adapter"] = adapter_hash(adapter)
+        manifest["adapter_updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        path.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+        print(f"published adapter fingerprint: {old} -> {manifest['adapter']['name']} ({manifest['adapter']['sha256'][:16]}...)")
+        return 0
     if args.rules_only:
         path = s.zk_published_dir / "manifest.json"
         manifest = json.loads(path.read_text(encoding="utf-8"))
