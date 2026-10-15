@@ -32,6 +32,14 @@ class TrainConfig:
     max_length: int = 1536  # tokens; the longest example is ~1,300
     seed: int = 13
     max_steps: int = -1  # >0 caps optimizer steps (smoke tests)
+    save_steps: int = 0  # >0 checkpoints every N steps and resumes from the latest (Colab sessions disconnect)
+
+
+def compute_dtype():
+    """bfloat16 where the GPU supports it (RTX 30xx and newer), else float16 (T4, V100)."""
+    import torch
+
+    return torch.bfloat16 if not torch.cuda.is_available() or torch.cuda.is_bf16_supported() else torch.float16
 
 
 @dataclass
@@ -66,13 +74,14 @@ class LoRATrainer:
         self.tokenizer = AutoTokenizer.from_pretrained(self.cfg.base_model)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
-        kwargs: dict[str, Any] = {"dtype": torch.bfloat16}
+        dtype = compute_dtype()
+        kwargs: dict[str, Any] = {"dtype": dtype}
         if self.cfg.load_in_4bit:
             kwargs["quantization_config"] = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_quant_type="nf4",
                 bnb_4bit_use_double_quant=True,
-                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_compute_dtype=dtype,
             )
             kwargs["device_map"] = {"": 0}
         self.model = AutoModelForCausalLM.from_pretrained(self.cfg.base_model, **kwargs)
@@ -135,11 +144,14 @@ class LoRATrainer:
             max_length=self.cfg.max_length,
             completion_only_loss=True,  # loss on the answer only, never on the prompt
             gradient_checkpointing=True,
-            bf16=torch.cuda.is_available(),
+            bf16=torch.cuda.is_available() and compute_dtype() == torch.bfloat16,
+            fp16=torch.cuda.is_available() and compute_dtype() == torch.float16,  # T4 (Colab) has no bfloat16
             optim="paged_adamw_8bit" if self.cfg.load_in_4bit else "adamw_torch",
             logging_steps=5,
             eval_strategy="epoch",
-            save_strategy="no",
+            save_strategy="steps" if self.cfg.save_steps > 0 else "no",
+            save_steps=self.cfg.save_steps if self.cfg.save_steps > 0 else 500,
+            save_total_limit=2,
             report_to="none",
             seed=self.cfg.seed,
         )
@@ -154,7 +166,8 @@ class LoRATrainer:
             torch.cuda.reset_peak_memory_stats()
         eval_before = trainer.evaluate()["eval_loss"] if eval_ds else None
         start = time.perf_counter()
-        result = trainer.train()
+        checkpoints = sorted((adapter_path / "_trainer").glob("checkpoint-*")) if self.cfg.save_steps > 0 else []
+        result = trainer.train(resume_from_checkpoint=str(checkpoints[-1]) if checkpoints else None)
         seconds = time.perf_counter() - start
         eval_after = trainer.evaluate()["eval_loss"] if eval_ds else None
 

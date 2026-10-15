@@ -69,9 +69,17 @@ class Settings(BaseSettings):
     # More chat models for the model switch, comma-separated <provider>:<model> (app/core/openai_compat.py),
     # e.g. "gemini:gemini-3.5-flash-lite,openai:gpt-4o-mini". Each needs its key (GEMINI_API_KEY, OPENAI_API_KEY ...).
     extra_models: str = Field(default="", alias="EXTRA_MODELS")
+    # A larger local model for harder questions ("Local heavy" in the model switch), run through
+    # llama.cpp: the base model as GGUF (e.g. Qwen2.5-7B-Instruct Q4_K_M) and the LoRA adapter
+    # converted to GGUF (backend/scripts/colab/README.md). Layers that fit go on the GPU.
+    heavy_model_gguf: Path | None = Field(default=None, alias="HEAVY_MODEL_GGUF")
+    heavy_lora_gguf: Path | None = Field(default=None, alias="HEAVY_LORA_GGUF")
+    heavy_gpu_layers: int = Field(default=16, alias="HEAVY_GPU_LAYERS")
+    # Local models also do their own query rewrite, so nothing is sent to a hosted model.
+    offline_mode: bool = Field(default=False, alias="OFFLINE_MODE")
     # How the local (LoRA) model is loaded: auto | float32 | bfloat16 | 4bit. auto = bfloat16 on a GPU
     # (4-bit if it does not fit), float32 on a CPU with >= 12 GB RAM, else bfloat16.
-    local_llm_dtype: str = Field(default="auto", alias="LOCAL_LLM_DTYPE", pattern="^(auto|float32|bfloat16|4bit)$")
+    local_llm_dtype: str = Field(default="auto", alias="LOCAL_LLM_DTYPE", pattern="^(auto|float32|bfloat16|float16|4bit)$")
 
     # Module 4 — explainability. Bands describe how well the evidence matched the question,
     # NOT whether the answer is correct. Defaults calibrated on this corpus (PLANNING.md, Phase 5).

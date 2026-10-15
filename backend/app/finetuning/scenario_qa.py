@@ -95,7 +95,41 @@ class ScenarioQaBuilder:
                     task="scenario_answer" if text else "scenario_refusal", system=LEGAL_SYSTEM_PROMPT,
                 )
                 (out if text else misses).append(ex)
+                if text:
+                    # the same question with its labelled sections removed from the sources: the
+                    # correct reply is now a refusal, not the nearest remaining offence (v0.7)
+                    rest = [s for s in sources if s.section not in set(sc["acceptable"])]
+                    if rest:
+                        rest = [s.model_copy(update={"marker": i + 1}) for i, s in enumerate(rest)]
+                        misses.append(InstructionExample(
+                            instruction=f"SOURCES:\n{PromptBuilder.format_sources(rest)}\n\nQUESTION: {sc['question']}",
+                            input="", output=NOT_COVERED_REPLY, source_case_id=f"scenario:{sc['id']}",
+                            task="scenario_refusal", system=LEGAL_SYSTEM_PROMPT))
         if refusal_share > 0 and misses:
             n = round(len(out) * refusal_share / (1 - refusal_share))
             out += self.rng.sample(misses, min(n, len(misses)))
+        return out
+
+    @staticmethod
+    def rewrite_examples(scenarios: Sequence[dict], rewrite_for: Callable[[str], object],
+                         civil_questions: Sequence[str] = ()) -> list[InstructionExample]:
+        """Teach the local model the query rewrite (query_rewriter.REWRITE_PROMPT) by distillation:
+        a larger model's cached rewrite is a target only if it names a labelled section (the wrong
+        ones are dropped). Civil questions get {"criminal": false} - their label is known."""
+        import json
+
+        from app.core.query_rewriter import REWRITE_PROMPT
+
+        out: list[InstructionExample] = []
+        for sc in scenarios:
+            rw = rewrite_for(sc["question"])
+            if rw is None or not rw.criminal or not {s for _, s in rw.offences} & set(sc["acceptable"]):
+                continue
+            target = json.dumps({"criminal": True, "offences": [{"name": n, "section": s} for n, s in rw.offences]},
+                                ensure_ascii=False)
+            out.append(InstructionExample(instruction=sc["question"], input="", output=target,
+                                          source_case_id=f"scenario:{sc['id']}", task="rewrite", system=REWRITE_PROMPT))
+        for i, q in enumerate(civil_questions):
+            out.append(InstructionExample(instruction=q, input="", output='{"criminal": false, "offences": []}',
+                                          source_case_id=f"civil:{i}", task="rewrite", system=REWRITE_PROMPT))
         return out

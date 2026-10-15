@@ -130,7 +130,9 @@ def make_system(spec: str, route: str | None = None, rewrite: bool = False):
 
         from app.core.query_rewriter import QueryRewriter
 
-        rewriter = QueryRewriter() if rewrite and kind == "legalgpt" else None  # the answering model rewrites, as in the app
+        # the answering model rewrites, as in the app; for legalgpt-lora that is the local model itself
+        # (fully offline, as with OFFLINE_MODE=true)
+        rewriter = QueryRewriter() if rewrite else None
 
         def run(q: str):
             rw = rewriter.rewrite(q, llm) if rewriter and not retriever.expander.section_refs(q) else None

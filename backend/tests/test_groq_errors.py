@@ -88,5 +88,5 @@ def _error_message(models: dict, model: str | None = None) -> str:
 
 def test_chat_suggests_the_local_model_only_when_it_exists() -> None:
     with_adapter = _error_message({"groq": RateLimitedLLM(), "adapter": StubLLM()})
-    assert with_adapter.startswith("The hosted model's daily usage limit") and "Tuned (LoRA)" in with_adapter
-    assert "Tuned (LoRA)" not in _error_message({"groq": RateLimitedLLM()})
+    assert with_adapter.startswith("The hosted model's daily usage limit") and "Local (LoRA)" in with_adapter
+    assert "Local (LoRA)" not in _error_message({"groq": RateLimitedLLM()})

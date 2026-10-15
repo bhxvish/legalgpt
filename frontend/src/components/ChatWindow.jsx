@@ -12,7 +12,8 @@ const PROVIDER_NAMES = { gemini: 'Gemini', openai: 'OpenAI', openrouter: 'OpenRo
 
 /** Short name for the model switch: "gemini:gemini-2.5-flash" -> "Gemini 2.5 flash". */
 function modelLabel(id) {
-  if (id === 'adapter') return 'Tuned (LoRA)'
+  if (id === 'adapter') return 'Local (LoRA)'
+  if (id === 'local-heavy') return 'Local heavy (7B)'
   if (id === 'groq') return 'Base (Groq)'
   const [provider, model = ''] = id.split(/:(.*)/s)
   const name = model.split('/').pop().replace(/^gemini-/, '').replace(/-/g, ' ')

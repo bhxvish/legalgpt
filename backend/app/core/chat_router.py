@@ -85,6 +85,7 @@ class ChatRouter:
         model_notes: dict[str, str] | None = None,
         verifier: "VerificationService | None" = None,
         rewriter: "QueryRewriter | None" = None,
+        offline: bool = False,
     ) -> None:
         """`llm` is the default model. `models` adds named alternatives a request can choose with
         `model` (the base-vs-tuned toggle); `model_notes` explains slow or unavailable ones."""
@@ -100,6 +101,7 @@ class ChatRouter:
         self.explainer = explainer
         self.verifier = verifier
         self.rewriter = rewriter  # LLM query rewrite for everyday fact patterns (query_rewriter.py)
+        self.offline = offline  # OFFLINE_MODE: local models rewrite for themselves; nothing goes to a hosted model
         self.router = APIRouter(prefix="/api", tags=["chat"])
         self.router.add_api_route("/chat", self.chat, methods=["POST"], response_class=StreamingResponse)
         self.router.add_api_route("/models", self.list_models, methods=["GET"], response_model=list[ModelInfo])
@@ -132,7 +134,7 @@ class ChatRouter:
                     yield from self._verification(req.question, req.verify_section)
         except LLMRateLimitError as exc:  # expected on the free tier: no traceback, say what to do
             logger.warning("chat request rate-limited: %s", exc)
-            hint = (" You can switch to the Tuned (LoRA) model, which runs on this server."
+            hint = (" You can switch to the Local (LoRA) model, which runs on this server."
                     if "adapter" in self.models and name != "adapter" else "")
             yield sse("error", {"message": f"{exc}{hint}"})
         except Exception as exc:  # surface failures to the client instead of a dropped connection
@@ -148,11 +150,12 @@ class ChatRouter:
         yield sse("token", {"text": GENERAL_CAUTION})
 
     def _rewrite_llm(self, llm: LLMClient) -> LLMClient:
-        """The model that rewrites the query: the chat's model, except that the local LoRA model
-        (small and slow) hands the rewrite to a hosted model when one is configured."""
-        if type(llm).__name__ != "AdapterClient":
+        """The model that rewrites the query: the chat's model, except that a local model hands the
+        rewrite to a hosted model when one is configured - unless OFFLINE_MODE, where it rewrites for
+        itself (v0.7 adapters are trained for it)."""
+        if self.offline or not getattr(llm, "is_local", False):
             return llm
-        return next((m for m in self.models.values() if type(m).__name__ != "AdapterClient"), llm)
+        return next((m for m in self.models.values() if not getattr(m, "is_local", False)), llm)
 
     def _retrieve(self, question: str, context: str | None, llm: LLMClient | None = None) -> RetrievalResult:
         if hasattr(self.retriever, "retrieve_with_diagnostics"):

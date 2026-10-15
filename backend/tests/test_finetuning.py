@@ -170,6 +170,18 @@ def test_local_model_precision_choice() -> None:
     assert choose_dtype("cpu", "4bit") == "4bit" and choose_dtype("cuda", "float32") == "float32"
 
 
+def test_t4_gets_float16(monkeypatch) -> None:
+    """Colab's T4 has no bfloat16: training and inference there use float16."""
+    import torch
+
+    from app.core.llm_client import choose_dtype
+    from app.finetuning.lora_trainer import compute_dtype
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "is_bf16_supported", lambda *a, **k: False)
+    assert choose_dtype("cuda") == "float16" and compute_dtype() == torch.float16
+
+
 def test_ipc_qa_examples_mirror_the_chat_and_hold_out_eval_sections() -> None:
     from app.core.models import Chunk, SourceEvidence
     from app.core.prompt_builder import NOT_COVERED_REPLY

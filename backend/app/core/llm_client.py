@@ -142,7 +142,7 @@ def total_ram_gb() -> float:
 
 
 def choose_dtype(device: str, setting: str = "auto", ram_gb: float | None = None) -> str:
-    """How to load a local model: "4bit" | "bfloat16" | "float32".
+    """How to load a local model: "4bit" | "bfloat16" | "float16" | "float32".
 
     Measured with the 1.5B LoRA model on an RTX 3050 Ti / i7-12700H (781-token legal prompt):
     GPU bfloat16 with the adapter merged answers 2.4x faster than 4-bit (1.2 s vs 2.9 s). On a CPU
@@ -152,7 +152,10 @@ def choose_dtype(device: str, setting: str = "auto", ram_gb: float | None = None
     if setting != "auto":
         return setting
     if device == "cuda":
-        return "bfloat16"
+        import torch
+
+        t4_like = torch.cuda.is_available() and not torch.cuda.is_bf16_supported()  # T4/V100 lack bfloat16
+        return "float16" if t4_like else "bfloat16"
     ram = total_ram_gb() if ram_gb is None else ram_gb
     return "float32" if ram >= 12 else "bfloat16"
 
@@ -161,6 +164,8 @@ class LocalHFClient(LLMClient):
     """A Hugging Face causal LM run in-process. Loads lazily on first use; see choose_dtype() for
     the precision (LOCAL_LLM_DTYPE overrides it). With `adapter_path`, a PEFT LoRA adapter is
     applied and, unless the model is 4-bit, merged into the weights (no per-layer adapter cost)."""
+
+    is_local = True  # chat_router: hands the query rewrite to a hosted model unless OFFLINE_MODE
 
     def __init__(
         self,
@@ -210,11 +215,11 @@ class LocalHFClient(LLMClient):
         if dtype == "4bit":
             kwargs["quantization_config"] = BitsAndBytesConfig(
                 load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True,
-                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_compute_dtype=torch.float16 if choose_dtype("cuda") == "float16" else torch.bfloat16,
             )
             kwargs["device_map"] = {"": 0}
         else:
-            kwargs["dtype"] = {"bfloat16": torch.bfloat16, "float32": torch.float32}[dtype]
+            kwargs["dtype"] = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}[dtype]
         model = AutoModelForCausalLM.from_pretrained(self.base_model, **kwargs)
         if dtype != "4bit" and device == "cuda":
             model.to("cuda")

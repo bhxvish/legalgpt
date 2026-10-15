@@ -86,8 +86,9 @@ class ZkService:
     def attest_answer(self, *, question, prompt, answer, sources, model_id, refused, follow_up, rewrite=None) -> dict[str, Any]:
         m = self.manifest
         record_context = {"corpus_merkle_root": m.get("corpus", {}).get("merkle_root") or self.tree.root}
-        if "+lora" in model_id and m.get("adapter"):
-            record_context["adapter_sha256"] = m["adapter"]["sha256"]
+        adapter = m.get("adapter") or {}
+        if "+lora" in model_id and adapter and model_id.endswith(f":{adapter.get('name')}"):
+            record_context["adapter_sha256"] = adapter["sha256"]  # only for the adapter the manifest publishes
         self.attestor.context = record_context
         return self.attestor.answer_record(question=question, prompt=prompt, answer=answer, sources=sources,
                                            model_id=model_id, refused=refused, follow_up=follow_up, leaf_of=self.leaf_of,

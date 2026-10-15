@@ -68,9 +68,17 @@ def build_models(settings: Settings) -> tuple[dict[str, LLMClient], dict[str, st
     adapter = settings.adapter_path or latest_adapter(settings.lora_dir)
     if adapter is not None:
         models["adapter"] = AdapterClient(adapter, dtype=settings.local_llm_dtype)
-        notes["adapter"] = "LoRA-tuned Qwen2.5-1.5B, runs on this machine (GPU if available, otherwise slow on CPU)"
+        base = models["adapter"].base_model.split("/")[-1]
+        notes["adapter"] = f"LoRA-tuned {base}, runs on this machine (GPU if available, otherwise slow on CPU)"
     else:
         notes["adapter"] = f"no LoRA adapter found in {settings.lora_dir} (train one with backend/scripts/train_lora.py)"
+    if settings.heavy_model_gguf:
+        from app.core.llamacpp_client import LlamaCppClient
+
+        models["local-heavy"] = LlamaCppClient(settings.heavy_model_gguf, settings.heavy_lora_gguf,
+                                               n_gpu_layers=settings.heavy_gpu_layers)
+        notes["local-heavy"] = (f"{settings.heavy_model_gguf.stem} with the LoRA adapter, via llama.cpp on this machine "
+                                "(slower; for harder questions)")
     from app.core.openai_compat import PROVIDERS, OpenAICompatClient, parse_spec, provider_key
 
     for spec in (x.strip() for x in settings.extra_models.split(",") if x.strip()):
@@ -117,7 +125,7 @@ def build_chat_router(settings: Settings, verifier: "VerificationService | None"
 
     return ChatRouter(retriever, models[default], explainer=explainer, models=models, default_model=default,
                       model_notes=notes, verifier=verifier,
-                      rewriter=QueryRewriter() if settings.query_rewrite else None)
+                      rewriter=QueryRewriter() if settings.query_rewrite else None, offline=settings.offline_mode)
 
 
 def build_zk_service(settings: Settings, chat_router: ChatRouter) -> "ZkService | None":
