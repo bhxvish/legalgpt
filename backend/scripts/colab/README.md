@@ -83,7 +83,7 @@ adapter's fingerprint. Until then they carry none.
 
 ## Notes
 
-- The Colab benchmark runs the 7B through PyTorch (4-bit). The laptop runs it through llama.cpp
-  (Q4_K_M), a different 4-bit format, so answers can differ slightly. The paper should name the
-  configuration it reports.
+- On an L4 the Colab benchmark runs both models through PyTorch in bfloat16 (the 7B fits in 24 GB).
+  On the laptop the 3B runs in 4-bit and the 7B through llama.cpp (Q4_K_M), so answers can differ
+  slightly. The paper should name the configuration it reports.
 - The free T4 tier ran out of GPU time partway through the 3B. The paid L4 session above fits both models.
