@@ -51,6 +51,10 @@
   @keyframes pop {
     from { opacity: 0; transform: translateY(6px) scale(0.98); }
   }
+  @keyframes slide {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(300%); }
+  }
   @keyframes fade {
     from { opacity: 0; }
   }
