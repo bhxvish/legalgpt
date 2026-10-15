@@ -672,7 +672,7 @@ export default function ChatWindow() {
             </button>
           )}
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-6 sm:px-4 sm:py-8" data-testid="message-list">
+        <div className="fade-edges min-h-0 flex-1 overflow-y-auto px-3 py-6 sm:px-4 sm:py-8" data-testid="message-list">
           <div className="mx-auto flex max-w-3xl flex-col gap-5">
             {messages.length === 0 && (
               <div className="relative mt-6 sm:mt-14">
