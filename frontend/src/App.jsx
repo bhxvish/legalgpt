@@ -4,6 +4,7 @@ import AnnotateView from './components/AnnotateView.jsx'
 import ChatWindow from './components/ChatWindow.jsx'
 import ReviewView from './components/ReviewView.jsx'
 import VerifyPanel from './components/VerifyPanel.jsx'
+import { LogoMark, TabIcons } from './components/LawArt.jsx'
 import { SlidingPill } from './components/motion.jsx'
 import ThemeMenu from './components/ThemeMenu.jsx'
 
@@ -76,10 +77,11 @@ function Nav({ view, className }) {
           key={v.id}
           href={`#${v.id}`}
           aria-current={view === v.id ? 'page' : undefined}
-          className={`relative shrink-0 rounded-md px-3 py-1.5 text-sm font-medium ${
+          className={`relative inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${
             view === v.id ? 'text-indigo-700' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
+          <span className={view === v.id ? "text-indigo-600" : "text-slate-400"}>{TabIcons[v.id]}</span>
           {v.label}
         </a>
       ))}
@@ -111,7 +113,7 @@ export default function App() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-4">
             <div className="flex min-w-0 items-center gap-2.5">
-              <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent font-serif text-lg font-bold text-on-accent">§</span>
+              <LogoMark />
               <div className="min-w-0">
                 <h1 className="text-lg font-semibold leading-tight tracking-tight text-slate-900">LegalGPT</h1>
                 <p className="text-xs text-slate-500">

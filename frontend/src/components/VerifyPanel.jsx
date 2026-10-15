@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { verifyApi } from '../api.js'
+import { HeaderArt, ScalesArt } from './LawArt.jsx'
 import { stagger } from './motion.jsx'
 import { VerdictProof } from './ZkProof.jsx'
 
@@ -279,6 +280,9 @@ export default function VerifyPanel() {
       <div className="mx-auto max-w-4xl space-y-6">
         <header className="relative">
           <div aria-hidden="true" className="pointer-events-none absolute -left-24 -top-24 -z-10 h-64 w-[30rem] max-w-[120%] animate-float rounded-full bg-[radial-gradient(closest-side,var(--color-indigo-200),transparent)] opacity-50 blur-2xl" />
+          <HeaderArt>
+            <ScalesArt />
+          </HeaderArt>
           <p className="mb-3 inline-flex animate-rise items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200 backdrop-blur">
             <span aria-hidden="true" className="size-1.5 rounded-full bg-indigo-500" />
             Rule engine · {meta ? meta.sections.length : '…'} IPC sections encoded

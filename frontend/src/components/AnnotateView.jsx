@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { annotationApi } from '../api.js'
+import { HeaderArt, BookArt } from './LawArt.jsx'
 import { stagger } from './motion.jsx'
 
 // One colour per label, in LabelScheme order (Facts, Law Applied, Precedent, Argument, Ruling, None).
@@ -465,6 +466,9 @@ export default function AnnotateView() {
       <div className="mx-auto max-w-4xl space-y-5">
         <header className="relative flex flex-wrap items-end justify-between gap-4">
           <div aria-hidden="true" className="pointer-events-none absolute -left-24 -top-24 -z-10 h-64 w-[30rem] max-w-[120%] animate-float rounded-full bg-[radial-gradient(closest-side,var(--color-indigo-200),transparent)] opacity-50 blur-2xl" />
+          <HeaderArt>
+            <BookArt />
+          </HeaderArt>
           <div>
             <p className="mb-3 inline-flex animate-rise items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200 backdrop-blur">
               <span aria-hidden="true" className="size-1.5 rounded-full bg-indigo-500" />

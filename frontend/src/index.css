@@ -157,6 +157,21 @@
   --color-accent-hover: oklch(52% 0.135 256);
 }
 
+/* law illustrations (LawArt.jsx): scales sway, gavel taps, art bobs */
+@keyframes sway {
+  from { transform: rotate(-3deg); }
+  to { transform: rotate(3deg); }
+}
+@keyframes tap {
+  0%, 70%, 100% { transform: rotate(0deg); }
+  78% { transform: rotate(-7deg); }
+  86% { transform: rotate(1.5deg); }
+}
+@keyframes bob {
+  from { transform: translateY(0); }
+  to { transform: translateY(10px); }
+}
+
 /* a faint dot grid behind the conversation, fading out towards the bottom */
 @utility bg-dots {
   background-image: radial-gradient(color-mix(in oklab, var(--color-slate-400) 45%, transparent) 1px, transparent 1.2px);

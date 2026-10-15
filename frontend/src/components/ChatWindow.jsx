@@ -3,6 +3,7 @@ import { API_BASE_URL, streamChat, verifyApi } from '../api.js'
 import { chatTitle, loadChats, newId, relativeTime, saveChats } from '../chatStore.js'
 import { CloseIcon, NewChatIcon, SearchIcon, SendIcon, SidebarIcon, StopIcon, TrashIcon } from './icons.jsx'
 import { ChakraBackdrop } from './Chakra.jsx'
+import { LogoMark } from './LawArt.jsx'
 import { SlidingPill, stagger } from './motion.jsx'
 import SourceModal from './SourceModal.jsx'
 import { VerificationResultView } from './VerifyPanel.jsx'
@@ -185,7 +186,7 @@ function AssistantMessage({ msg, onCite, live = false }) {
   return (
     <div className={`w-full min-w-0 rounded-2xl px-4 py-3.5 text-[0.9375rem] leading-relaxed text-slate-800 shadow-[0_1px_2px_rgb(15_23_42/0.04)] ring-1 sm:px-5 sm:py-4 ${tone}`} data-testid="assistant-message">
       <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-        <span aria-hidden="true" className="grid size-6 place-items-center rounded-md bg-accent font-serif text-sm font-bold text-on-accent">§</span>
+        <LogoMark className="size-6 rounded-md" />
         <span className="font-medium text-slate-700">{msg.mode === 'general' ? 'General answer' : 'Legal answer'}</span>
         {msg.model && <span className="max-w-full truncate rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px]" data-testid="answer-model">{msg.model}</span>}
         {msg.refused && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">Out of scope</span>}
