@@ -58,25 +58,13 @@ function HealthBadge() {
 }
 
 // Review comes before Annotate: new judgments are labelled by checking the classifier's
-// suggestions; full manual annotation is for the cases listed in ANNOTATE_NOTE.
+// suggestions; full manual annotation is for the cases listed in the Annotate tab ("When to annotate by hand").
 const VIEWS = [
   { id: 'chat', label: 'Chat' },
   { id: 'review', label: 'Review' },
   { id: 'annotate', label: 'Annotate' },
   { id: 'verify', label: 'Verify' },
 ]
-
-function AnnotateNote() {
-  return (
-    <p className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900" data-testid="annotate-note">
-      <b>When to annotate by hand:</b> new judgments normally go through the <a href="#review" className="font-medium underline">Review</a> tab,
-      where you only check the computer's suggestions. Use this tab for (1) cases the Review tab sent back because too many
-      spot checks were wrong, (2) a small "gold" sample — about 1 case in 10, labelled without seeing suggestions, so we can
-      keep measuring how accurate the computer is — and (3) the same case labelled by two people, to check that the
-      label guideline is applied consistently.
-    </p>
-  )
-}
 
 function Nav({ view, className }) {
   const ref = useRef(null)
@@ -149,7 +137,6 @@ export default function App() {
       </div>
       {view === 'annotate' ? (
         <div key="annotate" className="flex min-h-0 flex-1 animate-rise flex-col">
-          <AnnotateNote />
           <AnnotateView />
         </div>
       ) : view === 'review' ? (
