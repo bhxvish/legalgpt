@@ -634,7 +634,7 @@ export default function ChatWindow() {
 
       <div className="relative isolate flex min-h-0 min-w-0 flex-1 flex-col">
         <div aria-hidden="true" className="bg-dots pointer-events-none absolute inset-0 -z-10" />
-        <div className="flex h-12 shrink-0 items-center gap-1 border-b border-slate-200/70 px-2 sm:px-3">
+        <div className="flex h-12 shrink-0 items-center gap-1 px-2 sm:px-3">
           <button
             type="button"
             onClick={toggleHistory}
