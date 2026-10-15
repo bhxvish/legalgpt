@@ -2,7 +2,7 @@
 
   fig1_safety     wrong punishments and civil questions answered as offences: each model alone vs
                   inside LegalGPT (95% Wilson intervals)
-  fig2_scenarios  held-out everyday scenarios: model alone, LegalGPT before the scenario fix, after it
+  fig2_scenarios  held-out everyday scenarios: model alone, LegalGPT's first version, the final system
   fig3_ablation   retrieval on the held-out scenarios as each component is added
   fig4_size       the local models by size (1.5B / 3B / 7B), once their benchmark runs exist
 
@@ -34,10 +34,10 @@ from paired_tests import items_and_ipc, outcomes  # noqa: E402
 OUT = REPO_ROOT / "docs" / "figures"
 SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 SERIES = ["#2a78d6", "#eb6834", "#1baf7a"]  # categorical slots 1-3 (blue, orange, aqua)
-MODELS = [("gpt-5.4-mini", "closed_openai_gpt-5.4-mini", "legalgpt_openai_gpt-5.4-mini", "legalgpt_openai_gpt-5.4-mini_rw"),
+MODELS = [("gpt-5.4-mini", "closed_openai_gpt-5.4-mini", "legalgpt_openai_gpt-5.4-mini", "legalgpt_openai_gpt-5.4-mini_final"),
           ("Gemini 3.5 flash-lite", "closed_gemini_gemini-3.5-flash-lite", "legalgpt_gemini_gemini-3.5-flash-lite",
-           "legalgpt_gemini_gemini-3.5-flash-lite_rw"),
-          ("gpt-oss-120b", "closed_openai_gpt-oss-120b", "legalgpt_openai_gpt-oss-120b", "legalgpt_openai_gpt-oss-120b_rw")]
+           "legalgpt_gemini_gemini-3.5-flash-lite_final"),
+          ("gpt-oss-120b", "closed_openai_gpt-oss-120b", "legalgpt_openai_gpt-oss-120b", "legalgpt_openai_gpt-oss-120b_final")]
 
 
 def wilson(k: int, n: int) -> tuple[float, float, float]:
@@ -118,8 +118,8 @@ def fig_scenarios(items, ipc) -> None:
     style(ax, "Held-out everyday scenarios: an acceptable IPC section cited (60 questions; higher is better)")
     grouped(ax, [m[0] for m in MODELS], [
         ("Model alone", [rate(outcomes(m[1], items, ipc), metric) for m in MODELS]),
-        ("LegalGPT, before the scenario fix", [rate(outcomes(m[2], items, ipc), metric) for m in MODELS]),
-        ("LegalGPT, with the scenario fix", [rate(outcomes(m[3], items, ipc), metric) for m in MODELS]),
+        ("LegalGPT, first version", [rate(outcomes(m[2], items, ipc), metric) for m in MODELS]),
+        ("LegalGPT, final system", [rate(outcomes(m[3], items, ipc), metric) for m in MODELS]),
     ], ymax=110)
     ax.legend(frameon=False, fontsize=9, loc="upper center", bbox_to_anchor=(0.5, -0.1), ncol=3)
     save(fig, "fig2_scenarios")

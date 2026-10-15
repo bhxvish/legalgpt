@@ -15,6 +15,51 @@ All numbers come from the benchmark runs in `data/reports/bench/baselines/` (see
 20 definition questions, 60 held-out scenarios, 30 out-of-scope questions). Scenario and out-of-scope
 labels are **silver** (AI-written) and still need legal review. Scripts are named in each section.
 
+## 0. Headline: the final system (runs `*_final`, 2026-10-15)
+
+These are the numbers for the paper. The final system has every retrieval fix: the lexicon, the
+query rewrite, the retrained scope check and the definition lookup. Each hosted model is compared
+with itself answering alone, on the same questions (exact McNemar tests).
+
+| model | measure | n | model alone | LegalGPT | only alone right | only LegalGPT right | p |
+|---|---|---|---|---|---|---|---|
+| gpt-5.4-mini | right section (statute) | 59 | 75% | **100%** | 0 | 15 | <0.001 |
+| | acceptable section (scenario) | 60 | 83% | **93%** | 4 | 10 | 0.18 |
+| | wrong punishment ↓ | 39 | 15% | **0%** | 6 | 0 | 0.031 |
+| | civil question answered as an offence ↓ | 30 | 47% | **0%** | 14 | 0 | <0.001 |
+| Gemini 3.5 flash-lite | right section (statute) | 59 | 81% | **98%** | 0 | 10 | 0.002 |
+| | acceptable section (scenario) | 60 | 78% | **93%** | 3 | 12 | **0.035** |
+| | wrong punishment ↓ | 39 | 15% | **0%** | 6 | 0 | 0.031 |
+| | civil question answered as an offence ↓ | 30 | 47% | **0%** | 14 | 0 | <0.001 |
+| gpt-oss-120b | right section (statute) | 59 | 41% | **100%** | 0 | 35 | <0.001 |
+| | acceptable section (scenario) | 60 | 85% | 82% | 8 | 6 | 0.79 |
+| | wrong punishment ↓ | 39 | 54% | **0%** | 21 | 0 | <0.001 |
+| | civil question answered as an offence ↓ | 30 | 90% | **0%** | 27 | 0 | <0.001 |
+
+For "only alone right" / "only LegalGPT right" on the ↓ rows, read "only that system made the
+error".
+
+**Claims the tests support:**
+- With all three models, LegalGPT states **no wrong punishments** and treats **no civil question as
+  an offence**; each model alone does both often (p ≤ 0.031).
+- On statute questions LegalGPT is **significantly more accurate** for all three models (98-100% vs
+  41-81%, p ≤ 0.002).
+- On everyday scenarios LegalGPT is **at least at parity**:
+  - significantly better with Gemini (93% vs 78%);
+  - ahead but not significantly with gpt-5.4-mini (93% vs 83%);
+  - level with gpt-oss-120b (82% vs 85%).
+- Scenario accuracy: LegalGPT's first version scored 43-45%; the final system scores 82-93%.
+
+**Final-system details:**
+- Scenario answers citing only wrong sections: 2% / 2% / 13% (gpt-5.4-mini / Gemini / gpt-oss).
+- Scenarios refused: 5% for each model.
+- Cost of the gpt-5.4-mini run: $0.29 for 150 answers.
+- Answers came from Groq and Gemini free tiers. The last 106 gpt-oss answers and the last 34
+  Gemini answers used a second account's key: the same model and host.
+
+Sections 1-2 below were measured on earlier versions (`*_rw`: before the retrained scope check and
+the definition lookup). They are kept because they show what each step changed.
+
 ## 1. Paired significance tests (`backend/scripts/paired_tests.py`)
 
 Every system answers the same questions, so each comparison is paired. Only the questions on which
