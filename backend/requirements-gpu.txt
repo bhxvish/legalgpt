@@ -6,3 +6,8 @@ torch==2.14.1+cu130
 -r requirements.txt
 bitsandbytes  # 4-bit (QLoRA) loading
 accelerate
+
+# Optional: the "Local heavy (7B)" model through llama.cpp (app/core/llamacpp_client.py). The CUDA
+# wheel needs the CUDA 12 runtime and cuBLAS DLLs, installed here as pip packages (no CUDA toolkit):
+#   pip install --only-binary=:all: llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
+#   pip install "nvidia-cuda-runtime-cu12==12.4.*" "nvidia-cublas-cu12==12.4.*"

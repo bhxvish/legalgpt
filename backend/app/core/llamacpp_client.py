@@ -18,6 +18,35 @@ from app.core.llm_client import LLMClient, LLMClientError
 from app.core.models import Message
 
 
+def add_windows_dll_dirs() -> None:
+    """On Windows, the CUDA build of llama-cpp-python needs the CUDA 12 runtime and cuBLAS DLLs
+    (pip packages nvidia-cuda-runtime-cu12 / nvidia-cublas-cu12, so no CUDA toolkit install) and its
+    own lib folder on the DLL search path; Windows does not search a DLL's folder for its dependencies."""
+    import os
+    import sys
+
+    if sys.platform != "win32":
+        return
+    import importlib.util
+
+    dirs = []
+    for pkg in ("nvidia.cuda_runtime", "nvidia.cublas", "llama_cpp"):
+        try:
+            spec = importlib.util.find_spec(pkg)
+        except ModuleNotFoundError:
+            continue
+        if spec and spec.submodule_search_locations:
+            base = Path(next(iter(spec.submodule_search_locations)))
+            dirs.append(base / ("lib" if pkg == "llama_cpp" else "bin"))
+    for d in dirs:
+        if d.is_dir():
+            os.add_dll_directory(str(d))
+            # llama_cpp loads with winmode=0 (the classic search order), which reads PATH, not the
+            # directories above
+            if str(d) not in os.environ.get("PATH", ""):
+                os.environ["PATH"] = f"{d}{os.pathsep}{os.environ.get('PATH', '')}"
+
+
 class LlamaCppClient(LLMClient):
     is_local = True  # chat_router: hands the query rewrite to a hosted model unless OFFLINE_MODE
 
@@ -33,6 +62,7 @@ class LlamaCppClient(LLMClient):
 
     def _model(self) -> Any:
         if self._llama is None:
+            add_windows_dll_dirs()
             try:
                 from llama_cpp import Llama
             except ImportError as exc:
