@@ -54,7 +54,8 @@ def main() -> int:
     ipc = known_sections(load_chunks(get_settings().corpus_chunks_path))  # incl. state-amendment sections
     items = {it["id"]: it for it in rb.sample(7, 40, 20, 60, 30)}
     for path in sorted((BENCH / "baselines").glob("*.jsonl")):
-        allans = [a for a in load_jsonl(path) if a["id"] in items and not a["answer"].startswith("ERROR")]
+        allans = [a for a in load_jsonl(path) if a["id"] in items and not a["answer"].startswith("ERROR")
+                  and not items[a["id"]].get("invalid")]  # flagged benchmark items are not scored
         ans = [a for a in allans if a["answer"].strip()]
         st = [score_statute(items[a["id"]], a["answer"], a["extra_cited"], ipc) | {"kind": items[a["id"]]["kind"]}
               for a in ans if a["set"] == "statute"]

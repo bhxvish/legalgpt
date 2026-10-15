@@ -56,7 +56,8 @@ def outcomes(name: str, items: dict, ipc: set[str]) -> dict[str, dict[str, bool]
     path = OUT / f"{name}.jsonl"
     if not path.exists():
         return {}
-    rows = [r for r in load_jsonl(path) if r["id"] in items and not r["answer"].startswith("ERROR")]
+    rows = [r for r in load_jsonl(path) if r["id"] in items and not r["answer"].startswith("ERROR")
+            and not items[r["id"]].get("invalid")]  # flagged benchmark items are not scored
     out: dict[str, dict[str, bool]] = {m: {} for m in METRICS}
     for r in rows:
         it = items[r["id"]]

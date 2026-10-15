@@ -286,7 +286,8 @@ def score(args) -> None:
     items = {it["id"]: it for it in sample(args.seed, *args.sample)}
     rows = []
     for path in sorted(OUT.glob("*.jsonl")):
-        allans = [a for a in load_jsonl(path) if a["id"] in items and not a["answer"].startswith("ERROR")]
+        allans = [a for a in load_jsonl(path) if a["id"] in items and not a["answer"].startswith("ERROR")
+                  and not items[a["id"]].get("invalid")]  # flagged benchmark items are not scored
         ans = [a for a in allans if a["answer"].strip()]
         if not ans:
             continue

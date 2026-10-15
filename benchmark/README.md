@@ -10,6 +10,10 @@ It was built for LegalGPT but works with any system. It has four parts and 1,056
 | `out_of_scope.jsonl` | 54 | Civil, family, consumer or general questions: are they wrongly answered as IPC offences? | Silver |
 | `fact_patterns.jsonl` | 329 | Given facts and a section: CONSISTENT, INCONSISTENT or INSUFFICIENT? Includes **one-fact counterfactuals** and **paraphrases** | **Rule-computed** verdicts for 306 generated cases (their wording is to be confirmed by reviewers); silver for the 23 hand-written cases |
 
+Two punishment questions are flagged `"invalid"` and not scored: ss.143 and 311 are titled just
+"Punishment", which gave questions like "What penalty does the Indian Penal Code prescribe for
+punishment?". They stay in the file so that every seeded sample is unchanged.
+
 `stats.json` has the counts. `ipc_bns_map.json` maps common IPC offences to BNS numbers. It was
 written from memory and is **unverified**; it is used only to flag one kind of IPC/BNS confusion.
 
