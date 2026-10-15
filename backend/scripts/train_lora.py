@@ -38,6 +38,8 @@ def main() -> int:
     ap.add_argument("--batch-size", type=int, default=d.batch_size,
                     help="examples per step; with --grad-accum, keep batch-size x grad-accum = 8 for the same recipe")
     ap.add_argument("--grad-accum", type=int, default=d.grad_accum)
+    ap.add_argument("--examples-from", type=Path, metavar="EXAMPLES_JSONL",
+                    help="train on exactly the examples (and split) another run saved, e.g. data/models/lora/v0.7-3b-l4/examples.jsonl")
     ap.add_argument("--save-steps", type=int, default=0, help="checkpoint every N steps and resume from the latest (Colab)")
     ap.add_argument("--no-judgments", action="store_true",
                     help="skip the judgment-based examples (Module 1 corpus), e.g. when the judgments are not uploaded")
@@ -113,7 +115,18 @@ def main() -> int:
         print(f"scenarios: {len(scen)} examples from {len({e.source_case_id for e in scen})} of {len(train_scen)} questions "
               f"(held-out benchmark scenarios excluded: {len(held_out)})")
         examples += scen
-    splits = builder.split_by_case(examples, seed=args.seed)
+    if args.examples_from:
+        # exactly another run's training data (its train/val/test split too): e.g. to compare model sizes
+        from app.finetuning.instruction_builder import InstructionExample
+
+        splits = {"train": [], "val": [], "test": []}
+        for line in Path(args.examples_from).read_text(encoding="utf-8").splitlines():
+            row = json.loads(line)
+            splits[row.pop("split")].append(InstructionExample(**row))
+        examples = [e for exs in splits.values() for e in exs]
+        print(f"examples from {args.examples_from}: {', '.join(f'{k} {len(v)}' for k, v in splits.items())}")
+    else:
+        splits = builder.split_by_case(examples, seed=args.seed)
     case_sets = {k: {e.source_case_id for e in v} for k, v in splits.items()}
     assert not (case_sets["train"] & case_sets["val"] or case_sets["train"] & case_sets["test"] or case_sets["val"] & case_sets["test"])
     print(f"corpus {args.version} (sha256 {corpus_sha[:12]}…): {len(examples)} examples {dict(Counter(e.task for e in examples))}")

@@ -39,6 +39,8 @@ PAIRS = [  # (system A, system B, metrics)
     ("legalgpt-lora_v2", "legalgpt-lora_v3", list(METRICS)),
     ("legalgpt-lora_v3", "legalgpt-lora_v4", list(METRICS)),
     ("legalgpt-lora_v2", "legalgpt-lora_v4", list(METRICS)),
+    ("legalgpt-lora_v2", "legalgpt-lora_v0.7-3b", list(METRICS)),
+    ("legalgpt-lora_v0.7-3b", "legalgpt-heavy_v0.7-7b", list(METRICS)),
 ]
 
 
