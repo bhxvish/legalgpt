@@ -195,7 +195,7 @@ def recite(args) -> None:
         for r in rows:
             if r["answer"].startswith("ERROR") or r["id"] not in items:
                 continue
-            if not re.search("[\u3010\uff3b]|\[\d+[\u2020\u2021]", r["answer"]):
+            if not re.search(r"[\u3010\uff3b]|\[\d+[\u2020\u2021]", r["answer"]):  # re reads \uXXXX
                 continue  # plain [n] only: already scored correctly
             if r.get("recited") or "sources" in r:
                 continue  # done once already, or the run saved its sources: never re-derive with a newer retriever
@@ -280,6 +280,9 @@ def run(args) -> None:
                     spent += cost(row["tokens"])
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
                 f.flush()
+                done_now = len(done) + todo.index(it) + 1
+                if not args.smoke and (done_now % 10 == 0 or done_now == len(items)):
+                    print(f"  {spec}: {done_now}/{len(items)} answered", flush=True)
                 if args.smoke:
                     ok = "FAILED" if answer.startswith("ERROR") or not answer.strip() else "ok"
                     print(f"  [{ok}] {it['set']}: {it['question'][:60]}\n        -> {answer[:160]!r}")
