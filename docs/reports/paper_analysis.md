@@ -30,6 +30,7 @@ Within LegalGPT, before vs after the scenario fix:
 | system | measure | n | before | after | only before | only after | p |
 |---|---|---|---|---|---|---|---|
 | LegalGPT + gpt-5.4-mini | acceptable section (scenario) | 60 | 45% | 88% | 0 | 26 | <0.001 |
+| LegalGPT + gpt-oss-120b | acceptable section (scenario) | 60 | 45% | 82% | 0 | 22 | <0.001 |
 | LegalGPT-LoRA v0.4 (new prompt and lexicon only) | acceptable section (scenario) | 60 | 8% | 13% | 0 | 3 | 0.25 |
 | LoRA v0.4 → v0.5 (retrained with scenario examples) | acceptable section (scenario) | 60 | 13% | 43% | 0 | 18 | <0.001 |
 
@@ -46,8 +47,13 @@ Within LegalGPT, before vs after the scenario fix:
     model alone (83%, p = 0.61). The claim is parity on scenarios together with the safety gains,
     not superiority.
   - The fix itself (45% → 88%) is highly significant: 26 questions improved, none got worse.
-- **Gemini and gpt-oss-120b** have not yet been re-run with the fix. Their scenario rows above are
-  the old pipeline, so the scenario comparison for them is still pending.
+- **gpt-oss-120b with the fix:**
+  - LegalGPT 82% vs the model alone 85% on scenarios (p = 0.77, parity).
+  - Right section on statute questions: 82% vs 40% (p < 0.001).
+  - Wrong punishment: 0% vs 55% (p < 0.001).
+  - Civil questions answered as offences: 0% vs 90% (p < 0.001).
+  - Its last 84 answers came through OpenRouter, pinned to Groq as host, with the same settings.
+- **Gemini** has not yet been re-run with the fix (free tier, pending).
 
 ## 2. Retrieval ablation (`backend/scripts/ablation_retrieval.py`)
 
@@ -70,6 +76,8 @@ answering from the sources"):
 |---|---|
 | gpt-5.4-mini, original pipeline | 45% |
 | gpt-5.4-mini, + expanded lexicon + rewrite + prompt rule | **88%** |
+| gpt-oss-120b, original pipeline | 45% |
+| gpt-oss-120b, + expanded lexicon + rewrite + prompt rule | **82%** |
 | LoRA v0.4, original pipeline | 8% |
 | LoRA v0.4, + expanded lexicon + prompt rule (offline, no rewrite) | 13% |
 | LoRA v0.5 (retrained with 355 scenario examples, no refusals), offline | 43%, but 22% cite only wrong sections |
@@ -158,3 +166,7 @@ given.
 - The LegalGPT gpt-oss-120b answers were partly re-cited: 69 answers used `【n】` citation markers,
   which were mapped back to sources with the app's own canonicalization (see
   `benchmark_results.md`).
+- "Invented sections" (a cited number not in the IPC) originally counted sections inserted by state
+  amendments (Gujarat's s.379A/379B on snatching, Chhattisgarh's s.509B) as invented. LegalGPT cited
+  them from the State Amendments text it was given. With those sections recognised
+  (`metrics.known_sections`), every LegalGPT configuration has 0% invented sections.
