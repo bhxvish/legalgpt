@@ -73,8 +73,20 @@ def _parse_direct(text: str) -> tuple[str | None, dict]:
     return v, {}
 
 
-def make_arm(arm: str, model: str, runs: int):
+def make_client(model: str, provider: str = "groq", route: str | None = None):
+    """The model on Groq (default), or the same model through OpenRouter pinned to one host (`route`),
+    e.g. when the Groq free tier is used up. Rows record the route (`via`)."""
     from app.core.llm_client import GroqClient
+
+    if provider == "groq":
+        return GroqClient(get_settings().groq_api_key, model, max_tokens=4096, temperature=0.0)
+    from app.core.openai_compat import OpenAICompatClient
+
+    pin = {"provider": {"order": [route], "allow_fallbacks": False}} if route else None
+    return OpenAICompatClient(provider, model, max_tokens=4096, temperature=0.0, extra_body=pin)
+
+
+def make_arm(arm: str, model: str, runs: int, provider: str = "groq", route: str | None = None):
     from app.core.models import Message
     from app.verification.fact_extractor import FactExtractor
     from app.verification.prolog_engine import PrologEngine
@@ -84,20 +96,22 @@ def make_arm(arm: str, model: str, runs: int):
     engine = PrologEngine(s.prolog_rules_dir)
     sections = {sec.section: sec for sec in engine.sections()}
     if arm == "pipeline":
-        svc = VerificationService(FactExtractor(GroqClient(s.groq_api_key, model, max_tokens=4096, temperature=0.0)),
-                                  engine, extraction_runs=runs)
+        client = make_client(model, provider, route)
+        svc = VerificationService(FactExtractor(client), engine, extraction_runs=runs)
 
         def run(case):
             r = svc.verify(case["text"], case["section"])
             return r.status, {e.predicate: e.status for e in r.elements}
+        run.llm = client
         return run
-    llm = GroqClient(s.groq_api_key, model, max_tokens=4096, temperature=0.0)
+    llm = make_client(model, provider, route)
 
     def run(case):
         sec = sections[case["section"]]
         elements = "\n".join(f"- {e.predicate}: {e.description}" for e in sec.elements)
         user = f"Section {sec.section} ({sec.title}). Elements:\n{elements}\n\nFacts:\n{case['text']}"
         return _parse_direct(llm.generate([Message("system", DIRECT_SYSTEM), Message("user", user)]))
+    run.llm = llm
     return run
 
 
@@ -125,9 +139,14 @@ def run(args) -> None:
         print(f"{args.model} {arm}: {len(done)} cached, {len(todo)} to run")
         if not todo:
             continue
-        fn = make_arm(arm, args.model, args.runs)
+        fn = make_arm(arm, args.model, args.runs, args.provider, args.route)
+        usage = getattr(getattr(fn, "llm", None), "usage", None)  # OpenAI-compatible providers count tokens
+        cost = lambda: (usage["in"] * args.price[0] + usage["out"] * args.price[1]) / 1e6 if usage else 0.0
         with path.open("a", encoding="utf-8") as f:
             for c in todo:
+                if args.budget_usd is not None and cost() + 0.02 > args.budget_usd:
+                    print(f"  stopped: ${cost():.3f} spent, the ${args.budget_usd} budget is nearly reached")
+                    return
                 t, pred, els, err = time.perf_counter(), None, {}, ""
                 attempt = 0
                 while attempt < 6:
@@ -145,9 +164,13 @@ def run(args) -> None:
                     except Exception as e:  # extraction failure etc.: record and continue
                         err = f"{type(e).__name__}: {e}"[:300]
                         break
-                f.write(json.dumps({"id": c["id"], "pred": pred, "elements": els, "error": err,
-                                    "seconds": round(time.perf_counter() - t, 1)}, ensure_ascii=False) + "\n")
+                row = {"id": c["id"], "pred": pred, "elements": els, "error": err, "seconds": round(time.perf_counter() - t, 1)}
+                if args.provider != "groq":
+                    row["via"] = args.provider + (f" (host {args.route})" if args.route else "")
+                f.write(json.dumps(row, ensure_ascii=False) + "\n")
                 f.flush()
+            if usage:
+                print(f"  {arm}: {usage['in']} input + {usage['out']} output tokens; ${cost():.3f}")
 
 
 def score(args) -> None:
@@ -200,6 +223,12 @@ def main() -> int:
     ap.add_argument("--natural", action="store_true", help="also run the 23 hand-written cases")
     ap.add_argument("--patient", action="store_true", help="wait out daily limits instead of stopping")
     ap.add_argument("--max-wait-hours", type=float, default=12.0)
+    ap.add_argument("--provider", default="groq", choices=["groq", "openrouter"],
+                    help="where the model runs; openrouter when the Groq free tier is used up")
+    ap.add_argument("--route", help="OpenRouter host to pin, no fallbacks (e.g. Cerebras)")
+    ap.add_argument("--budget-usd", type=float, help="stop before spending more than this (needs --price)")
+    ap.add_argument("--price", type=float, nargs=2, default=[0.0, 0.0], metavar=("IN", "OUT"),
+                    help="USD per million input / output tokens")
     args = ap.parse_args()
     {"run": run, "score": score}[args.step](args)
     return 0
