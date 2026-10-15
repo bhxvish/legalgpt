@@ -193,6 +193,8 @@ def create_app(chat_router: ChatRouter | None = None, annotation_router: Annotat
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
+        # the dev server on this machine, on any port (Vite moves to 5174+ when 5173 is taken)
+        allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
