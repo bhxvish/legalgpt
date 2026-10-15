@@ -38,45 +38,108 @@ function readSidebar() {
   }
 }
 
-/** Renders inline [n] citation markers as buttons, plus **bold** / *italic* and "* " / "- " bullets, line by line. */
+/** Inline markdown: [n] citation markers as buttons, plus **bold** and *italic*. */
+function Inline({ text, byMarker, onCite }) {
+  return text.split(/(\[\d+\]|\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g).map((part, pi) => {
+    const cite = /^\[(\d+)\]$/.exec(part)
+    if (cite) {
+      const source = byMarker.get(Number(cite[1]))
+      return source ? (
+        <button
+          key={pi}
+          onClick={() => onCite(source)}
+          className="mx-0.5 rounded bg-indigo-50 px-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-100"
+          title={source.citation_path}
+          aria-label={`Source ${source.marker}: ${source.citation_path}`}
+          data-testid="citation-marker"
+        >
+          {part}
+        </button>
+      ) : (
+        // A marker the model produced that matches no retrieved source.
+        <span key={pi} className="mx-0.5 rounded bg-red-50 px-1 text-xs text-red-700 ring-1 ring-red-200" title="No retrieved source has this number">
+          {part}
+        </span>
+      )
+    }
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) return <strong key={pi}>{part.slice(2, -2)}</strong>
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2) return <em key={pi}>{part.slice(1, -1)}</em>
+    return part
+  })
+}
+
+const isTableRow = (line) => /^\s*\|.*\|\s*$/.test(line)
+const isTableRule = (line) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(line)
+const cells = (line) => line.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim())
+
+/** The answer text, line by line: paragraphs, "# " headings, "* " / "- " bullets, "---" rules and
+ * markdown tables (a header row, a |---| rule, then body rows; a table still streaming in shows
+ * its rows as they arrive). */
 function AnswerText({ text, sources, onCite }) {
   const byMarker = new Map((sources || []).map((s) => [s.marker, s]))
-  return text.split('\n').map((line, li) => {
-    if (line.trim() === '---') return <hr key={li} className="my-2 border-slate-200" />
+  const lines = text.split('\n')
+  const blocks = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (isTableRow(line)) {
+      const rows = []
+      while (i < lines.length && (isTableRow(lines[i]) || isTableRule(lines[i]))) rows.push(lines[i++])
+      i--
+      const hasHeader = rows.length > 1 && isTableRule(rows[1])
+      const body = rows.filter((r) => !isTableRule(r)).map(cells)
+      const head = hasHeader ? body.shift() : null
+      blocks.push(
+        <div key={i} className="my-3 overflow-x-auto rounded-xl ring-1 ring-slate-200" data-testid="answer-table">
+          <table className="w-full border-collapse text-left text-sm">
+            {head && (
+              <thead className="bg-slate-50 text-slate-700">
+                <tr>
+                  {head.map((c, ci) => (
+                    <th key={ci} scope="col" className="border-b border-slate-200 px-3 py-2 font-semibold">
+                      <Inline text={c} byMarker={byMarker} onCite={onCite} />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+            )}
+            <tbody>
+              {body.map((r, ri) => (
+                <tr key={ri} className="align-top [&:not(:last-child)>td]:border-b [&>td]:border-slate-100">
+                  {r.map((c, ci) => (
+                    <td key={ci} className={`px-3 py-2 ${ci === 0 ? 'font-medium text-slate-800' : 'text-slate-700'}`}>
+                      <Inline text={c} byMarker={byMarker} onCite={onCite} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+      )
+      continue
+    }
+    if (line.trim() === '---') {
+      blocks.push(<hr key={i} className="my-3 border-slate-200" />)
+      continue
+    }
+    const heading = /^\s*#{1,6}\s+(.*)$/.exec(line)
+    if (heading) {
+      blocks.push(
+        <p key={i} className="mb-1 mt-3 font-semibold text-slate-900" role="heading" aria-level={3}>
+          <Inline text={heading[1]} byMarker={byMarker} onCite={onCite} />
+        </p>,
+      )
+      continue
+    }
     const bullet = /^\s*[*-]\s+/.exec(line)
-    if (bullet) line = line.slice(bullet[0].length)
-    const parts = line.split(/(\[\d+\]|\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g)
-    return (
-      <p key={li} className={`min-h-[1em] break-words ${bullet ? 'relative my-1 pl-5 before:absolute before:left-1.5 before:top-[0.7em] before:size-1.5 before:rounded-full before:bg-slate-400' : ''}`}>
-        {parts.map((part, pi) => {
-          const cite = /^\[(\d+)\]$/.exec(part)
-          if (cite) {
-            const source = byMarker.get(Number(cite[1]))
-            return source ? (
-              <button
-                key={pi}
-                onClick={() => onCite(source)}
-                className="mx-0.5 rounded bg-indigo-50 px-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-100"
-                title={source.citation_path}
-                aria-label={`Source ${source.marker}: ${source.citation_path}`}
-                data-testid="citation-marker"
-              >
-                {part}
-              </button>
-            ) : (
-              // A marker the model produced that matches no retrieved source.
-              <span key={pi} className="mx-0.5 rounded bg-red-50 px-1 text-xs text-red-700 ring-1 ring-red-200" title="No retrieved source has this number">
-                {part}
-              </span>
-            )
-          }
-          if (part.startsWith('**') && part.endsWith('**') && part.length > 4) return <strong key={pi}>{part.slice(2, -2)}</strong>
-          if (part.startsWith('*') && part.endsWith('*') && part.length > 2) return <em key={pi}>{part.slice(1, -1)}</em>
-          return part
-        })}
-      </p>
+    const body = bullet ? line.slice(bullet[0].length) : line
+    blocks.push(
+      <p key={i} className={`min-h-[1em] break-words ${bullet ? 'relative my-1 pl-5 before:absolute before:left-1.5 before:top-[0.7em] before:size-1.5 before:rounded-full before:bg-slate-400' : ''}`}>
+        <Inline text={body} byMarker={byMarker} onCite={onCite} />
+      </p>,
     )
-  })
+  }
+  return blocks
 }
 
 function ModeToggle({ mode, setMode, disabled }) {
