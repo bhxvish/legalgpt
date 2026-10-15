@@ -24,7 +24,9 @@ See `benchmark/README.md` for the sets. Statute questions have gold answers from
 | closed_openai_gpt-5.4-mini | 75% [62–84] (n=59) | 79% [64–89] (n=39) | 18% [9–33] (n=39) | 83% [72–91] (n=60) | 47% [30–64] (n=30) | 0 of 149 |
 | closed_openai_gpt-oss-120b | 41% [29–53] (n=59) | 38% [25–54] (n=39) | 56% [41–71] (n=39) | 85% [74–92] (n=60) | 90% [74–97] (n=30) | 0 of 149 |
 | closed_openai_gpt-oss-20b_low | 15% [8–27] (n=59) | 26% [15–41] (n=39) | 64% [48–77] (n=39) | 48% [36–61] (n=60) | 80% [63–90] (n=30) | 0 of 149 |
+| legalgpt-heavy_v0.7-7b | 98% [91–100] (n=59) | 97% [87–100] (n=39) | 0% [0–9] (n=39) | 65% [52–76] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
 | legalgpt-lora | 80% [68–88] (n=59) | 95% [83–99] (n=39) | 0% [0–9] (n=39) | 8% [4–18] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
+| legalgpt-lora_v0.7-3b | 100% [94–100] (n=59) | 92% [80–97] (n=39) | 3% [0–13] (n=39) | 60% [47–71] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
 | legalgpt-lora_v2 | 80% [68–88] (n=59) | 95% [83–99] (n=39) | 0% [0–9] (n=39) | 13% [7–24] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
 | legalgpt-lora_v3 | 80% [68–88] (n=59) | 95% [83–99] (n=39) | 0% [0–9] (n=39) | 43% [32–56] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
 | legalgpt-lora_v4 | 81% [70–89] (n=59) | 92% [80–97] (n=39) | 3% [0–13] (n=39) | 43% [32–56] (n=60) | 0% [0–11] (n=30) | 0 of 149 |
@@ -42,7 +44,25 @@ See `benchmark/README.md` for the sets. Statute questions have gold answers from
 | model | arm | n | accuracy | flip correct | omit correct | paraphrase stable | unsafe errors | cautious errors |
 |---|---|---|---|---|---|---|---|---|
 | qwen_qwen3.8-27b | direct | 147 | 92% [86–95] (n=147) | 95% | 77% | 100% | 6% | 2% |
-| qwen_qwen3.8-27b | pipeline__runs1 | 89 | 96% [89–98] (n=89) | 95% | 86% | 93% | 4% | 0% |
+| qwen_qwen3.8-27b | pipeline__runs1 | 147 | 95% [90–98] (n=147) | 97% | 85% | 95% | 5% | 0% |
+
+### Counterfactual test: paired result (complete, 147 fact patterns)
+
+| | LLM alone (direct) | LLM + Prolog rules (pipeline) |
+|---|---|---|
+| accuracy | 92% | 95% |
+| a one-fact flip changes the verdict correctly | 95% | 100% |
+| an omitted element gives INSUFFICIENT | 77% | 85% |
+| same verdict for a paraphrase | 100% | 95% |
+| unsafe errors (wrong definite verdict) | 6% | 5% |
+
+**Paired test.** 8 cases are right only with the rules and 3 only without them. Exact McNemar
+p = 0.23, so the gain is a trend, not significant at this n. The rules' clearest effect is on the
+cases they are built for: flips (100%) and omissions (85% vs 77%).
+
+**Provenance.** The model is qwen3.8-27b. 144 pipeline answers came from Groq. 3 came from
+OpenRouter's Cerebras host (fp16) when the Groq free tier ran out, and each is marked `via`. Without
+them the result is identical (n = 144, same p).
 
 ### Reading section 1
 
