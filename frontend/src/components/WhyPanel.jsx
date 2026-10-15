@@ -26,7 +26,14 @@ export default function WhyPanel({ explanation: ex, sources, retrieval, onOpenSo
   const [hoverSource, setHoverSource] = useState(null)
   const byMarker = new Map((sources || []).map((s) => [s.marker, s]))
   const atts = ex.attributions || []
-  const supported = atts.filter((a) => a.supported).length
+  // legal claims (section numbers, punishments, quotes) must be backed by a source: unsupported ones
+  // are red. Other unsupported sentences are amber: often the law applied to the user's facts, which
+  // text similarity cannot verify, but possibly off-topic (attribution_analyzer.sentence_kind)
+  const isAnalysis = (a) => a.kind === 'analysis'
+  const claims = atts.filter((a) => !isAnalysis(a))
+  const supported = claims.filter((a) => a.supported).length
+  const others = atts.filter(isAnalysis)
+  const othersMatched = others.filter((a) => a.supported).length
   const highlightedSource = hoverSentence != null ? atts[hoverSentence]?.source_marker : null
   const highlightedSentences = hoverSource != null ? new Set(ex.sources.find((s) => s.marker === hoverSource)?.supports || []) : new Set()
 
@@ -37,9 +44,14 @@ export default function WhyPanel({ explanation: ex, sources, retrieval, onOpenSo
         <span className={`rounded px-1.5 py-0.5 font-semibold ring-1 ${BAND[ex.band]}`} data-testid="why-band">
           Evidence match: {ex.band} ({ex.relevance.toFixed(2)})
         </span>
-        {!ex.refused && atts.length > 0 && (
-          <span className={supported === atts.length ? 'text-emerald-700' : 'text-red-700'} data-testid="why-support">
-            {supported} of {atts.length} sentences supported by a source
+        {!ex.refused && claims.length > 0 && (
+          <span className={supported === claims.length ? 'text-emerald-700' : 'text-red-700'} data-testid="why-support">
+            {supported} of {claims.length} legal statements supported by a source
+          </span>
+        )}
+        {!ex.refused && others.length > 0 && (
+          <span className={othersMatched === others.length ? 'text-slate-500' : 'text-amber-700'} data-testid="why-analysis">
+            · {othersMatched} of {others.length} other sentences matched to a source
           </span>
         )}
         {ex.warnings.length > 0 && (
@@ -69,6 +81,7 @@ export default function WhyPanel({ explanation: ex, sources, retrieval, onOpenSo
             <ol className="space-y-1">
               {atts.map((a) => {
                 const mismatch = a.supported && a.cited_supported === false
+                const applied = !a.supported && isAnalysis(a)
                 const lit = hoverSentence === a.sentence_idx || highlightedSentences.has(a.sentence_idx)
                 return (
                   <li
@@ -78,7 +91,7 @@ export default function WhyPanel({ explanation: ex, sources, retrieval, onOpenSo
                     data-testid="why-sentence"
                     data-supported={a.supported}
                     className={`rounded-md px-2 py-1.5 ring-1 ${
-                      !a.supported ? 'bg-red-50 ring-red-200' : mismatch ? 'bg-amber-50 ring-amber-200' : 'bg-white ring-slate-200'
+                      applied ? 'bg-amber-50 ring-amber-200' : !a.supported ? 'bg-red-50 ring-red-200' : mismatch ? 'bg-amber-50 ring-amber-200' : 'bg-white ring-slate-200'
                     } ${lit ? 'outline outline-2 outline-indigo-400' : ''}`}
                   >
                     <p className="text-slate-800">{a.sentence}</p>
@@ -94,6 +107,11 @@ export default function WhyPanel({ explanation: ex, sources, retrieval, onOpenSo
                           </button>
                           <span>{pct(a.similarity)} similar</span>
                         </>
+                      ) : applied ? (
+                        <span className="font-medium text-amber-800" data-testid="why-applied">
+                          Not matched to a source (closest: [{a.source_marker}] at {pct(a.similarity)}). In a scenario
+                          answer this is often the law applied to your facts, so check it against the cited source.
+                        </span>
                       ) : (
                         <span className="font-medium text-red-700">
                           No retrieved source supports this sentence (closest: [{a.source_marker}] at {pct(a.similarity)}, needs{' '}

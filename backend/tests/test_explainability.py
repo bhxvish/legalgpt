@@ -226,3 +226,19 @@ def test_refusal_despite_good_evidence_is_flagged(builder: ExplanationBuilder) -
     rec = builder.build("Punishment under section 304A?", SOURCES, NOT_COVERED_REPLY, "stub")
     assert rec.refused and rec.support_ratio is None and rec.attributions == []
     assert any("said the sources do not cover this" in w and "high evidence match" in w for w in rec.warnings)
+
+
+def test_sentence_kinds() -> None:
+    from app.explainability.attribution_analyzer import sentence_kind
+
+    assert sentence_kind("Section 420 is punishable with imprisonment up to seven years [1].") == "claim"
+    assert sentence_kind('It says "whoever cheats" [2].') == "claim"
+    assert sentence_kind("Deception: a caller pretended to be from your bank [5].") == "analysis"
+    assert sentence_kind("What would still need to be established:") == "analysis"
+
+
+def test_unsupported_claims_and_other_sentences_are_both_flagged(builder: ExplanationBuilder) -> None:
+    """Analysis sentences cannot be told from off-topic ones by similarity, so neither is hidden."""
+    rec = builder.build("Punishment for negligent death?", SOURCES, OFF_TOPIC, "stub")
+    assert all(a.kind == "analysis" for a in rec.attributions)  # no section numbers or punishments in OFF_TOPIC
+    assert any("other sentences are not supported" in w for w in rec.warnings)

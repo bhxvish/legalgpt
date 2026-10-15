@@ -5,6 +5,15 @@ every *sentence* of every source — not whole chunks, which MiniLM would trunca
 so the best match also yields the supporting excerpt. A sentence is "supported" when its best
 match reaches `support_threshold`. Separately, a sentence that cites [n] is checked against
 source n itself: well supported by another source but not by the one it cites is worth flagging.
+
+Sentences are of two kinds. A *claim* states the law - a section number, a punishment, a quoted
+rule - and must be backed by a source. An *analysis* sentence applies the law to the user's facts
+("the caller deceived you by pretending to be from the bank") or structures the answer ("what
+would still need to be established:"). It resembles neither the statute nor the question closely,
+so text similarity cannot verify it: in everyday-scenario answers 66% of analysis sentences scored
+below the threshold against 21% of claims (Gemini, 60 held-out scenarios). Nor can similarity tell
+such a sentence from an off-topic one (their scores overlap at every threshold tried), so both
+kinds are still flagged when unsupported; the kind only sets how strongly (explanation_builder).
 """
 
 import re
@@ -21,6 +30,16 @@ from app.core.text_utils import split_sentences
 _MARKER = re.compile(r"\[(\d+)\]")
 _MARKUP = re.compile(r"\*\*|__|`|^[#>*\-\s]+", re.M)
 MIN_WORDS = 4  # shorter fragments ("Section 279 [1].") carry too little meaning to attribute
+# a statement of law: a section number, a punishment term, or a quotation
+_CLAIM = re.compile(r"\b(sections?|s\.)\s*\d|\bpunish|\bimprisonment|\bfine\b|\byears?\b|\bshall\b|[\"“]", re.I)
+
+
+def sentence_kind(sentence: str) -> str:
+    """"claim" (states the law: must be backed by a source) or "analysis" (applies it to the facts)."""
+    text = _MARKER.sub("", sentence).strip()
+    if text.endswith(":") or not _CLAIM.search(text):
+        return "analysis"
+    return "claim"
 
 
 @dataclass
@@ -34,6 +53,7 @@ class Attribution:
     cited_markers: list[int]
     cited_similarity: float | None  # best match within the sources this sentence cites
     cited_supported: bool | None  # None when the sentence cites nothing
+    kind: str = "claim"  # "claim" (states the law) or "analysis" (applies it to the facts); see sentence_kind
 
 
 class AttributionAnalyzer:
@@ -86,6 +106,7 @@ class AttributionAnalyzer:
                 cited_markers=cited,
                 cited_similarity=None if cited_sim is None else round(cited_sim, 4),
                 cited_supported=None if cited_sim is None else cited_sim >= self.support_threshold,
+                kind=sentence_kind(sentence),
             ))
         return out
 

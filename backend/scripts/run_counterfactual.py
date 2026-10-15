@@ -113,6 +113,10 @@ def run(args) -> None:
 
     waiter = QuotaWaiter(args.patient, args.max_wait_hours)
     cases = select(args.frames, args.natural)
+    if args.match_direct:  # only the cases the direct arm answered, so the two arms are paired
+        direct = OUT / f"{args.model.replace('/', '_')}__direct.jsonl"
+        done = {r["id"] for r in load_jsonl(direct)} if direct.exists() else set()
+        cases = [c for c in cases if c["id"] in done]
     OUT.mkdir(parents=True, exist_ok=True)
     for arm in args.arms:
         path = cache_path(args.model, arm, args.runs)
@@ -191,6 +195,8 @@ def main() -> int:
     ap.add_argument("--arms", nargs="+", default=["direct", "pipeline"], choices=["direct", "pipeline"])
     ap.add_argument("--runs", type=int, default=1, help="extraction runs for the pipeline arm (the app uses 2)")
     ap.add_argument("--frames", type=int, nargs="*", default=None, help="frame indices to include (default: all)")
+    ap.add_argument("--match-direct", action="store_true",
+                    help="run only the cases the direct arm already answered (a paired comparison)")
     ap.add_argument("--natural", action="store_true", help="also run the 23 hand-written cases")
     ap.add_argument("--patient", action="store_true", help="wait out daily limits instead of stopping")
     ap.add_argument("--max-wait-hours", type=float, default=12.0)

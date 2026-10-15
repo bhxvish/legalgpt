@@ -109,9 +109,15 @@ class ExplanationBuilder:
         if check.unresolved:
             w.append(f"The answer cites {', '.join(f'[{m}]' for m in check.unresolved)}, which "
                      f"{'is' if len(check.unresolved) == 1 else 'are'} not among the retrieved sources.")
-        unsupported = [a for a in attributions if not a.supported]
-        if unsupported:
-            w.append(f"{len(unsupported)} of {len(attributions)} answer sentences are not supported by any retrieved source.")
+        claims = [a for a in attributions if a.kind == "claim"]
+        other = [a for a in attributions if a.kind != "claim"]
+        if unsupported := [a for a in claims if not a.supported]:
+            w.append(f"{len(unsupported)} of {len(claims)} legal statements in the answer (section numbers, punishments, "
+                     f"quoted rules) are not supported by any retrieved source.")
+        if unsupported_other := [a for a in other if not a.supported]:
+            w.append(f"{len(unsupported_other)} of {len(other)} other sentences are not supported by any retrieved source. "
+                     f"In an answer about a described situation these are often the law applied to your facts; "
+                     f"check them against the cited sources.")
         mis = [a for a in attributions if a.supported and a.cited_supported is False]
         if mis:
             w.append(f"{len(mis)} sentence(s) cite a source that does not support them (a different source does).")
