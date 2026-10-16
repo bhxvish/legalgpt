@@ -45,15 +45,20 @@ function HealthBadge() {
     }
   }, [])
 
+  const label = { loading: 'Connecting', ok: 'Online', error: 'Offline' }[health.state]
   return (
-    <span data-testid="health-status" title={`${API_BASE_URL}/health`} role="status"
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium ${STYLES[health.state].badge}`}>
+    <span
+      data-testid="health-status"
+      title={`${health.text} (${API_BASE_URL}/health)`}
+      role="status"
+      className={`inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-full bg-white/70 px-2.5 text-xs font-medium ring-1 ring-slate-200 ${STYLES[health.state].badge}`}
+    >
       <span aria-hidden="true" className="relative inline-flex size-2">
         {health.state === 'ok' && <span className="absolute inset-0 animate-ping-soft rounded-full bg-emerald-500" />}
         <span className={`relative size-2 rounded-full ${STYLES[health.state].dot}`} />
       </span>
-      <span className="hidden sm:inline">{health.text}</span>
-      <span className="sr-only sm:hidden">{health.text}</span>
+      <span className="hidden sm:inline">{label}</span>
+      <span className="sr-only">{health.text}</span>
     </span>
   )
 }
@@ -70,18 +75,25 @@ const VIEWS = [
 function Nav({ view, className }) {
   const ref = useRef(null)
   return (
-    <nav ref={ref} className={`relative gap-1 ${className}`} aria-label="Sections">
-      <SlidingPill containerRef={ref} selector='[aria-current="page"]' deps={[view]} className="rounded-md bg-indigo-50" />
+    <nav ref={ref} className={`relative gap-0.5 rounded-full bg-slate-100/80 p-1 ring-1 ring-slate-200/70 ${className}`} aria-label="Sections">
+      <SlidingPill
+        containerRef={ref}
+        selector='[aria-current="page"]'
+        deps={[view]}
+        className="rounded-full bg-white shadow-[0_1px_2px_rgb(15_23_42/0.08),0_2px_8px_-2px_rgb(15_23_42/0.12)] ring-1 ring-slate-900/5"
+      />
       {VIEWS.map((v) => (
         <a
           key={v.id}
           href={`#${v.id}`}
           aria-current={view === v.id ? 'page' : undefined}
-          className={`relative inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${
-            view === v.id ? 'text-indigo-700' : 'text-slate-600 hover:text-slate-900'
+          className={`group relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium max-md:min-w-0 max-md:flex-1 max-md:px-1.5 ${
+            view === v.id ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'
           }`}
         >
-          <span className={view === v.id ? "text-indigo-600" : "text-slate-400"}>{TabIcons[v.id]}</span>
+          <span className={`transition-[color,transform] duration-200 group-hover:scale-110 ${view === v.id ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
+            {TabIcons[v.id]}
+          </span>
           {v.label}
         </a>
       ))}
@@ -109,27 +121,30 @@ export default function App() {
         className="sr-only z-50 rounded-md bg-accent px-3 py-2 text-sm font-medium text-on-accent focus:not-sr-only focus:absolute focus:left-3 focus:top-3">
         Skip to content
       </a>
-      <header className="relative z-10 border-b border-slate-200 bg-white/85 px-4 py-2 backdrop-blur-md sm:py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-4">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <LogoMark />
-              <div className="min-w-0">
-                <h1 className="text-lg font-semibold leading-tight tracking-tight text-slate-900">LegalGPT</h1>
-                <p className="text-xs text-slate-500">
-                  <span className="hidden sm:inline">Indian criminal law · legal information, not legal advice</span>
-                  <span className="sm:hidden">Not legal advice</span>
-                </p>
-              </div>
-            </div>
-            <Nav view={view} className="hidden sm:flex" />
-          </div>
-          <div className="flex shrink-0 items-center gap-3">
+      <header className="relative z-10 bg-white/75 px-3 backdrop-blur-xl backdrop-saturate-150 sm:px-5">
+        <div className="flex h-14 items-center justify-between gap-3 md:grid md:grid-cols-[1fr_auto_1fr]">
+          <a href="#chat" className="group flex min-w-0 items-center gap-2.5 justify-self-start rounded-xl pr-2" aria-label="LegalGPT, go to Chat">
+            <LogoMark className="size-9 transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-105" />
+            <span className="min-w-0">
+              <h1 className="text-[1.05rem] font-semibold leading-none tracking-tight text-slate-900">
+                Legal<span className="text-indigo-600">GPT</span>
+              </h1>
+              <span className="mt-1 hidden truncate text-[11px] font-medium leading-none tracking-wide text-slate-500 sm:block">
+                Indian Penal Code assistant
+              </span>
+            </span>
+          </a>
+          <Nav view={view} className="hidden md:flex" />
+          <div className="flex shrink-0 items-center gap-2 justify-self-end">
             <HealthBadge />
             <ThemeMenu />
           </div>
         </div>
-        <Nav view={view} className="-mx-1 mt-2 flex overflow-x-auto sm:hidden" />
+        <Nav view={view} className="mb-2.5 flex w-full md:hidden" />
+        {/* hairline with a slow travelling highlight */}
+        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-px bg-slate-200/80">
+          <div className="h-full w-full animate-[sheen_9s_linear_infinite] bg-[linear-gradient(90deg,transparent_0%,transparent_35%,var(--color-indigo-400)_50%,transparent_65%,transparent_100%)] bg-[length:200%_100%] opacity-70" />
+        </div>
       </header>
       {/* The chat stays mounted on other tabs (only hidden), so the conversation and an answer that
           is still streaming survive switching to Review or Verify and back. */}

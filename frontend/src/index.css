@@ -167,6 +167,10 @@
   78% { transform: rotate(-7deg); }
   86% { transform: rotate(1.5deg); }
 }
+@keyframes sheen {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
 @keyframes bob {
   from { transform: translateY(0); }
   to { transform: translateY(10px); }

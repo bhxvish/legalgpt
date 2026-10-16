@@ -96,7 +96,7 @@ export default function ThemeMenu() {
         aria-controls={`${id}-list`}
         aria-label={`Colour theme: ${current.label}`}
         title="Colour theme"
-        className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100 hover:text-slate-900 ${open ? 'bg-slate-100 text-slate-900' : ''}`}
+        className={`inline-flex h-8 items-center gap-1.5 rounded-full bg-white/70 px-2.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200 hover:bg-white hover:text-slate-900 ${open ? 'bg-white text-slate-900 ring-slate-300' : ''}`}
         data-testid="theme-select"
       >
         {current.icon}
