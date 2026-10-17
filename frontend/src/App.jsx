@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { API_BASE_URL } from './api.js'
 import AnnotateView from './components/AnnotateView.jsx'
+import CaseAnalysisView from './components/CaseAnalysisView.jsx'
 import ChatWindow from './components/ChatWindow.jsx'
 import ReviewView from './components/ReviewView.jsx'
 import VerifyPanel from './components/VerifyPanel.jsx'
@@ -67,6 +68,7 @@ function HealthBadge() {
 // suggestions; full manual annotation is for the cases listed in the Annotate tab ("When to annotate by hand").
 const VIEWS = [
   { id: 'chat', label: 'Chat' },
+  { id: 'case', label: 'Case analysis', short: 'Case' },
   { id: 'review', label: 'Review' },
   { id: 'annotate', label: 'Annotate' },
   { id: 'verify', label: 'Verify' },
@@ -91,10 +93,17 @@ function Nav({ view, className }) {
             view === v.id ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'
           }`}
         >
-          <span className={`transition-[color,transform] duration-200 group-hover:scale-110 ${view === v.id ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
+          <span className={`transition-[color,transform] duration-200 group-hover:scale-110 max-md:hidden ${view === v.id ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
             {TabIcons[v.id]}
           </span>
-          {v.label}
+          {v.short ? (
+            <>
+              <span className="md:hidden">{v.short}</span>
+              <span className="hidden md:inline">{v.label}</span>
+            </>
+          ) : (
+            v.label
+          )}
         </a>
       ))}
     </nav>
@@ -159,6 +168,10 @@ export default function App() {
       ) : view === 'review' ? (
         <div key="review" className="flex min-h-0 flex-1 animate-rise flex-col">
           <ReviewView />
+        </div>
+      ) : view === 'case' ? (
+        <div key="case" className="flex min-h-0 flex-1 animate-rise flex-col">
+          <CaseAnalysisView />
         </div>
       ) : view === 'verify' ? (
         <div key="verify" className="flex min-h-0 flex-1 animate-rise flex-col">

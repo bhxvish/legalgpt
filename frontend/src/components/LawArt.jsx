@@ -64,6 +64,13 @@ export const TabIcons = {
     </svg>
   ),
   verify: <ScalesGlyph strokeWidth={1.4} className="size-4 shrink-0" />,
+  case: (
+    // a case file (folder with a document)
+    <svg {...tab}>
+      <path d="M2.75 6.25A1.5 1.5 0 0 1 4.25 4.75h3.5l1.5 1.75h6.5a1.5 1.5 0 0 1 1.5 1.5v6.75a1.5 1.5 0 0 1-1.5 1.5H4.25a1.5 1.5 0 0 1-1.5-1.5Z" />
+      <path d="M7 10.25h6M7 12.75h4" />
+    </svg>
+  ),
 }
 
 /* ---------- large faint header illustrations ---------- */
@@ -121,6 +128,24 @@ export function BookArt({ className }) {
       <text x="137" y="117" textAnchor="middle" fontFamily="Georgia, serif" fontSize="22" fill="currentColor" stroke="none">
         §
       </text>
+    </svg>
+  )
+}
+
+/** A bundle of case papers, tied, with a seal. */
+export function CaseFileArt({ className }) {
+  return (
+    <svg viewBox="0 0 200 200" {...art} className={className}>
+      <path d="M46 52h86l22 22v92a6 6 0 0 1-6 6H46a6 6 0 0 1-6-6V58a6 6 0 0 1 6-6Z" />
+      <path d="M132 52v22h22" />
+      <path d="M38 64h-4a6 6 0 0 0-6 6v100a6 6 0 0 0 6 6h102" opacity="0.6" />
+      <path d="M58 92h60M58 106h76M58 120h70M58 134h44" />
+      <path d="M40 150h114" strokeWidth="2.2" opacity="0.7" />
+      <g className="origin-[132px_150px] animate-[bob_6s_ease-in-out_infinite_alternate]">
+        <circle cx="132" cy="150" r="16" />
+        <circle cx="132" cy="150" r="10" />
+        <path d="M124 164l-4 18 12-6 12 6-4-18" />
+      </g>
     </svg>
   )
 }

@@ -249,6 +249,16 @@ def create_app(chat_router: ChatRouter | None = None, annotation_router: Annotat
             chat_router.attest = zk.attest_answer
     if verifier is not None:
         app.include_router(VerifyRouter(verifier, zk).router)
+    if hasattr(chat_router, "retriever"):  # case analysis (app/case_analysis): needs the real chat router's parts
+        from app.case_analysis.router import CaseRouter
+
+        def local_verifier(llm):  # local-only analyses: fact extraction by that model alone, same rules
+            from app.verification.fact_extractor import FactExtractor
+            from app.verification.verification_service import VerificationService
+
+            return VerificationService(FactExtractor(llm), verifier.engine) if verifier is not None else None
+
+        app.include_router(CaseRouter(chat_router, local_verifier).router)
     return app
 
 

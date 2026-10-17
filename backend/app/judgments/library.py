@@ -88,11 +88,14 @@ class JudgmentSearch:
             return False
 
     def search(self, query: str, roles: Sequence[str] = CITE_ROLES, k: int | None = None,
-               min_similarity: float | None = None, exclude_cases: Sequence[str] = ()) -> list[tuple[Chunk, float]]:
+               min_similarity: float | None = None, exclude_cases: Sequence[str] = (),
+               within_case: str | None = None) -> list[tuple[Chunk, float]]:
         k = k or self.k
         floor = self.min_similarity if min_similarity is None else min_similarity
         vec = np.asarray(self.embedder.embed([query]))[0]
-        where = {"role": {"$in": list(roles)}} if len(roles) > 1 else {"role": roles[0]}
+        where: dict = {"role": {"$in": list(roles)}} if len(roles) > 1 else {"role": roles[0]}
+        if within_case:
+            where = {"$and": [where, {"doc_id": within_case}]}
         hits = self.store.query(vec, k=max(20, 6 * k), where=where)
         out, per = [], {}
         for h in sorted(hits, key=lambda h: -h.similarity):

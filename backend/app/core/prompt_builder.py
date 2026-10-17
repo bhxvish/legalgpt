@@ -59,7 +59,8 @@ class PromptBuilder:
         """Sources are numbered by `marker`, in order — the same numbers the model must cite."""
         def head(s: SourceEvidence) -> str:
             if s.kind == "judgment":
-                return f"[{s.marker}] (JUDGMENT: {s.citation_path}; {s.role} passage)"
+                court = s.court or "court not recorded"  # so the model cannot guess "the Supreme Court"
+                return f"[{s.marker}] (JUDGMENT: {s.citation_path}; {court}; {s.role} passage)"
             return f"[{s.marker}] ({s.citation_path})"
 
         return "\n\n".join(f"{head(s)}\n{s.text}" for s in sources)

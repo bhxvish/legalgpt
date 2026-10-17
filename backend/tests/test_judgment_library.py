@@ -35,7 +35,8 @@ class FakeStore:
         return len(self.hits)
 
     def query(self, embedding, k, where=None):
-        roles = where["role"]["$in"] if "$in" in where["role"] else [where["role"]]
+        w = where["$and"][0] if "$and" in where else where
+        roles = w["role"]["$in"] if "$in" in w["role"] else [w["role"]]
         return [h for h in self.hits if h.chunk.role in roles]
 
 
@@ -68,7 +69,7 @@ def test_prompt_marks_judgments_and_states_the_rule():
                         similarity=0.7, score=0.7, role="Ruling", kind="judgment", title="A v. B", year=2023)]
     text = PromptBuilder.format_sources(s)
     assert "[1] (IPC > Section 304A)" in text
-    assert "[2] (JUDGMENT: A v. B (SC, 2023), sentence 3; Ruling passage)" in text
+    assert "[2] (JUDGMENT: A v. B (SC, 2023), sentence 3; court not recorded; Ruling passage)" in text
     assert "Sources marked JUDGMENT" in LEGAL_SYSTEM_PROMPT
 
 

@@ -37,26 +37,64 @@ _PARTY_STATE = re.compile(r"\bSTATE\b|\bUNION TERRITORY\b|C\.?B\.?I\b|\bN\.?C\.?
 _NON_CRIMINAL = re.compile(r"TAX|REVENUE|BANK|LIMITED|LTD|INSURANCE|ELECTRICITY|MUNICIPAL|AUTHORITY|UNIVERSITY|COMMISSIONER|CORPORATION", re.I)
 
 
+_client = None
+_resolved: dict[str, str] = {}
+
+
 def fetch(url: str, start: int | None = None, length: int | None = None) -> bytes:
+    """One kept-alive HTTPS connection (httpx) and each URL's redirect (Hugging Face -> its file
+    store) resolved once: the tar walk makes ~2 small range requests per judgment, and a new
+    connection plus a redirect for each made a year's walk take over an hour."""
+    global _client
     headers = dict(UA)
     if start is not None:
         headers["Range"] = f"bytes={start}-{start + length - 1}"  # type: ignore[operator]
-    with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=120) as r:
-        return r.read()
+    try:
+        import httpx
+    except ImportError:  # the plain way still works, slowly
+        with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=120) as r:
+            return r.read()
+    if _client is None:
+        _client = httpx.Client(timeout=120, follow_redirects=True, headers=UA)
+    target = _resolved.get(url, url)
+    for attempt in range(3):
+        try:
+            r = _client.get(target, headers=headers)
+            if r.status_code in (401, 403) and target != url:  # a signed redirect expired: resolve again
+                _resolved.pop(url, None)
+                target = url
+                continue
+            r.raise_for_status()
+            if start is not None and r.history:
+                _resolved[url] = str(r.url)
+            return r.content
+        except httpx.TransportError:
+            if attempt == 2:
+                raise
+    raise RuntimeError(f"could not fetch {url}")
 
 
 def tar_locations(tar_url: str, wanted: set[str]) -> dict[str, tuple[int, int]]:
-    """(data offset, size) of each wanted member, read header by header from the start."""
+    """(data offset, size) of each wanted member, read header by header from the start.
+    Each request reads 4 KB from a header, which usually also holds the PAX record and the real
+    header after it, so a member costs one request instead of two or three."""
     found: dict[str, tuple[int, int]] = {}
-    offset, pax_name = 0, None
+    offset, pax_name, buf, buf_at, n = 0, None, b"", 0, 0
+
+    def block(at: int, length: int) -> bytes:
+        nonlocal buf, buf_at
+        if not (buf_at <= at and at + length <= buf_at + len(buf)):
+            buf, buf_at = fetch(tar_url, at, max(length, 4096)), at
+        return buf[at - buf_at: at - buf_at + length]
+
     while len(found) < len(wanted):
-        h = fetch(tar_url, offset, 512)
-        if not h.strip(b"\0"):
+        h = block(offset, 512)
+        if len(h) < 512 or not h.strip(b"\0"):
             break
         size = int(h[124:136].rstrip(b"\0 ") or b"0", 8)
         data_at = offset + 512
         if h[156:157] == b"x":  # PAX header: may hold the next member's path
-            for rec in fetch(tar_url, data_at, size).decode("utf-8", "replace").split("\n"):
+            for rec in block(data_at, size).decode("utf-8", "replace").split("\n"):
                 if " path=" in rec:
                     pax_name = rec.split(" path=", 1)[1]
         else:
@@ -64,6 +102,9 @@ def tar_locations(tar_url: str, wanted: set[str]) -> dict[str, tuple[int, int]]:
             if name in wanted:
                 found[name] = (data_at, size)
             pax_name = None
+            n += 1
+            if n % 100 == 0:
+                print(f"  scanned {n} files of the archive, {len(found)}/{len(wanted)} wanted found", flush=True)
         offset = data_at + ((size + 511) // 512) * 512
     return found
 

@@ -8,8 +8,13 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localho
  * @param {(event: string, data: any) => void} onEvent
  * @param {AbortSignal} [signal]
  */
-export async function streamChat(body, onEvent, signal) {
-  const res = await fetch(`${API_BASE_URL}/api/chat`, {
+export function streamChat(body, onEvent, signal) {
+  return streamSSE('/api/chat', body, onEvent, signal)
+}
+
+/** POST `body` as JSON and call onEvent(event, data) for each Server-Sent Event in the reply. */
+export async function streamSSE(path, body, onEvent, signal) {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
     body: JSON.stringify(body),
@@ -122,4 +127,11 @@ export const zkApi = {
   // rewrite: the LLM rewrite the answer's retrieval used (signed in the attestation), if any
   proveRetrieval: (question, rewrite) => post('/api/zk/prove/retrieval', { question, rewrite: rewrite || null }),
   verify: (bundle, extra = {}) => post('/api/zk/verify', { bundle, ...extra }),
+}
+
+/** Case analysis (app/case_analysis): a structured, cited analysis of a case file; never a verdict. */
+export const caseApi = {
+  info: () => fetch(`${API_BASE_URL}/api/case/info`).then(json),
+  models: () => fetch(`${API_BASE_URL}/api/models`).then(json),
+  analyze: (body, onEvent, signal) => streamSSE('/api/case/analyze', body, onEvent, signal),
 }

@@ -78,7 +78,7 @@ const cells = (line) => line.trim().replace(/^\||\|$/g, '').split('|').map((c) =
 /** The answer text, line by line: paragraphs, "# " headings, "* " / "- " bullets, "---" rules and
  * markdown tables (a header row, a |---| rule, then body rows; a table still streaming in shows
  * its rows as they arrive). */
-function AnswerText({ text, sources, onCite, caret = false }) {
+export function AnswerText({ text, sources, onCite, caret = false }) {
   const byMarker = new Map((sources || []).map((s) => [s.marker, s]))
   const lines = text.split('\n')
   const blocks = []
