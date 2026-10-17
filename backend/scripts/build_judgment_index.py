@@ -74,12 +74,21 @@ def main() -> int:
         clf = EnsembleClassifier.load(ckpt) if is_ensemble(ckpt) else RRLClassifier.load(ckpt)
         segmenter = AssistedSegmenter()
         print(f"labelling {len(fetched)} fetched judgments with {ckpt.name}")
+        cache_dir = LIBRARY / "roles"  # labels per judgment and model: a rebuild only labels new judgments
+        cache_dir.mkdir(parents=True, exist_ok=True)
         for n, (case_id, title, court, year, text) in enumerate(fetched, 1):
-            sentences = segmenter.segment(text, case_id)
-            if len(sentences) < 5:
-                continue
-            preds = clf.predict([RRLExample(f"{case_id}::{i}", case_id, i, t) for i, t in enumerate(sentences)])
-            docs.append(JudgmentDoc(case_id, title, court, year, sentences, [p.label for p in preds], "library"))
+            cache = cache_dir / f"{case_id}.{ckpt.name}.json"
+            if cache.exists():
+                c = json.loads(cache.read_text(encoding="utf-8"))
+                sentences, roles = c["sentences"], c["roles"]
+            else:
+                sentences = segmenter.segment(text, case_id)
+                if len(sentences) < 5:
+                    continue
+                preds = clf.predict([RRLExample(f"{case_id}::{i}", case_id, i, t) for i, t in enumerate(sentences)])
+                roles = [p.label for p in preds]
+                cache.write_text(json.dumps({"sentences": sentences, "roles": roles}), encoding="utf-8")
+            docs.append(JudgmentDoc(case_id, title, court, year, sentences, roles, "library"))
             if n % 25 == 0:
                 print(f"  {n}/{len(fetched)} ({time.time() - t0:.0f}s)", flush=True)
 

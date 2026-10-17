@@ -484,3 +484,32 @@ by people (training still included the 4):
 The improvement does not depend on the AI-made labels. The paper should state the provenance. A
 clean re-run without the 4 judgments, or after a person re-checks their labels in the Review tab,
 would remove the caveat entirely.
+
+## 8. Judgment library (citations in the chat and case analysis)
+
+**Contents (2026-10-18):** 349 judgments, split into 28,055 role-labelled passages:
+- 312 Supreme Court criminal judgments from 2020-2023 (CC-BY-4.0, `labofsahil/Indian-Supreme-Court-Judgments`):
+  - only those citing the IPC were kept: 312 of 580 fetched;
+  - their sentence roles were predicted by the deployed ensemble;
+- the 37 annotated judgments, with their stored labels.
+
+| Role | Passages |
+|---|---|
+| Precedent | 9,140 |
+| Facts | 8,056 |
+| Ruling | 5,393 |
+| Law Applied | 3,098 |
+| Argument | 2,368 |
+
+**How it is used:**
+- **Chat:** cites at most 2 passages (Ruling / Law Applied / Precedent, one per judgment) with
+  cosine similarity ≥ 0.60, only when the IPC retrieval found sources.
+- **Case analysis:** compares the file's facts with Facts passages to find similar cases, and cites
+  their Ruling passage.
+
+**Example:** the dowry-death question cites s.304B and s.498A, plus *Charan Singh v. State of
+Uttarakhand* (SC, 2023) and *Satbir Singh v. State of Haryana* (SC, 2021). The answer quotes what the
+court said about the ingredients of s.304B.
+
+**Not yet measured:** how often a cited judgment is truly on point. A labelled set of
+question-to-relevant-judgment pairs would be needed; future work.

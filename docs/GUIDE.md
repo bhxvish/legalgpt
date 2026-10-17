@@ -346,7 +346,7 @@ unchanged. Roles come from human labels where they exist and from the sentence-r
 otherwise.
 
 **In the chat**, after the IPC sources, up to `JUDGMENT_K` (2) passages are added: Ruling, Law
-Applied or Precedent passages, one per judgment, above `JUDGMENT_MIN_SIMILARITY` (0.55). Rules:
+Applied or Precedent passages, one per judgment, above `JUDGMENT_MIN_SIMILARITY` (0.60). Rules:
 - The answer may cite a judgment only for what that court said, and must name the case (prompt rule 7).
 - Judgment chips show a scales icon and the case. The source window shows the court, the year and the passage's role.
 - The retrieval proof covers the IPC sources only, and says so.

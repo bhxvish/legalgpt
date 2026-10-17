@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     # Cite real judgments next to the IPC (app/judgments/library.py; build_judgment_index.py builds
     # the index). Passages below the similarity floor are never shown; at most K per answer.
     judgment_citations: bool = Field(default=True, alias="JUDGMENT_CITATIONS")
-    judgment_min_similarity: float = Field(default=0.55, alias="JUDGMENT_MIN_SIMILARITY")
+    judgment_min_similarity: float = Field(default=0.60, alias="JUDGMENT_MIN_SIMILARITY")
     judgment_k: int = Field(default=2, alias="JUDGMENT_K")
     # scope-check probability a question needs before a rewrite may steer retrieval.
     # Default: the scope check's own threshold (scope_model.json, set by train_scope.py)
