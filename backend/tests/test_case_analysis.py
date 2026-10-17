@@ -91,3 +91,25 @@ def test_full_analysis_streams_every_step_without_a_verdict():
     assert model["status"] == "INSUFFICIENT"
     assert "".join(d["text"] for e, d in events if e == "token").startswith("The facts may engage")
     assert "not a prediction of the outcome" in dict(events)["done"]["disclaimer"]
+
+
+def test_sticky_fallback_switches_once_and_stays():
+    from app.case_analysis.router import StickyFallback
+    from app.core.llm_client import LLMClientError
+
+    class Refuses:
+        model_id = "groq"
+
+        def generate(self, messages):
+            raise LLMClientError("403")
+
+        def stream(self, messages):
+            raise LLMClientError("403")
+            yield ""
+
+    gem = FakeLLM(["a", "b"])
+    gem.model_id = "gemini:x"
+    fb = StickyFallback([Refuses(), gem])
+    assert fb.generate([]) == "a" and fb.model_id == "gemini:x" and "groq refused" in fb.note
+    assert fb.generate([]) == "b"  # stays on the backup
+    assert "".join(fb.stream([])).startswith("The facts")

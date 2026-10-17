@@ -187,6 +187,7 @@ export default function CaseAnalysisView() {
             })
           } else if (event === 'token') update((p) => ({ ...p, answer: p.answer + data.text }))
           else if (event === 'done') update((p) => ({ ...p, done: data, steps: Object.fromEntries(STEPS.map((s) => [s.id, 'done'])) }))
+          else if (event === 'error') update((p) => ({ ...p, error: String(data?.message || data) }))
           else update((p) => ({ ...p, [event]: data }))
         },
         controller.signal,
@@ -343,7 +344,7 @@ export default function CaseAnalysisView() {
         </section>
 
         <div ref={reportRef} className="scroll-mt-4 space-y-5" aria-live="polite">
-          {run && !run.error && <Stepper steps={run.steps || {}} />}
+          {run?.steps && <Stepper steps={run.steps} />}
           {run?.error && (
             <p className="animate-rise rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{run.error}</p>
           )}
@@ -454,6 +455,7 @@ export default function CaseAnalysisView() {
             <p className="flex animate-rise gap-2 rounded-xl bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900 ring-1 ring-amber-200">
               <svg {...stroke} className="mt-px size-4 shrink-0"><circle cx="10" cy="10" r="7.25" /><path d="M10 6.5v4.5M10 13.6v.1" /></svg>
               {run.done.disclaimer} Model: {run.done.model}{run.done.local_only ? ' (local only)' : ''}.
+              {run.done.model_note ? ` Note: ${run.done.model_note}.` : ''}
             </p>
           )}
         </div>

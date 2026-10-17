@@ -214,7 +214,8 @@ class CaseAnalyzer:
                 yield "explanation", rec.to_dict()
             except Exception:  # explainability is best-effort; the analysis already reached the user
                 pass
-        yield "done", {"disclaimer": DISCLAIMER, "model": llm.model_id, "local_only": local_only}
+        yield "done", {"disclaimer": DISCLAIMER, "model": llm.model_id, "local_only": local_only,
+                       "model_note": getattr(llm, "note", "")}
 
     def _model_check(self, name: str, sec: str, sec_sources: list, facts: CaseFacts, llm: Any) -> dict:
         section_text = "\n".join(s.text for s in sec_sources)[:3000]

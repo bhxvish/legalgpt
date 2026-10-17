@@ -64,6 +64,9 @@ def groq_error(exc: Exception) -> Exception:
         return LLMRateLimitError(f"{what}. {retry}.")
     if isinstance(exc, groq.AuthenticationError):
         return LLMClientError("Groq rejected GROQ_API_KEY; check the key in .env and restart the backend.")
+    if isinstance(exc, groq.PermissionDeniedError):  # 403 "Access denied. Please check your network settings."
+        return LLMClientError("Groq refused access from this network (HTTP 403). A VPN or a temporary block can "
+                              "cause this; choose Gemini or a local model meanwhile.")
     if isinstance(exc, groq.APIConnectionError):
         return LLMClientError("Could not reach Groq (network error); check the internet connection.")
     return exc

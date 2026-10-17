@@ -49,6 +49,55 @@ def ipc_sections() -> dict[str, str] | None:
         return None
 
 
+class StickyFallback:
+    """For one analysis: try the chosen hosted model, and if it refuses (quota, a 403 from the
+    provider, an outage) switch to the next free hosted model and stay with it for the rest of the
+    analysis, so the steps do not mix models. `note` says what happened."""
+
+    is_local = False
+
+    def __init__(self, clients: list) -> None:
+        self.clients, self.i, self.note = clients, 0, ""
+
+    @property
+    def model_id(self) -> str:
+        return self.clients[self.i].model_id
+
+    def _call(self, method: str, *args):
+        from app.core.llm_client import LLMClientError
+
+        while True:
+            try:
+                return getattr(self.clients[self.i], method)(*args)
+            except LLMClientError as e:
+                if self.i + 1 >= len(self.clients):
+                    raise
+                failed = self.clients[self.i].model_id
+                self.i += 1
+                self.note = f"{failed} refused ({str(e)[:120]}); continued with {self.model_id}"
+                logger.warning("case analysis: %s", self.note)
+
+    def generate(self, messages):
+        return self._call("generate", messages)
+
+    def generate_brief(self, messages):
+        c = self.clients[self.i]
+        return self._call("generate_brief" if hasattr(c, "generate_brief") else "generate", messages)
+
+    def stream(self, messages):
+        try:
+            first = self.clients[self.i]
+            yield from first.stream(messages)
+        except Exception as e:  # nothing streamed yet in practice: fall back to a whole answer
+            from app.core.llm_client import LLMClientError
+
+            if not isinstance(e, LLMClientError) or self.i + 1 >= len(self.clients):
+                raise
+            self.i += 1
+            self.note = f"{first.model_id} refused; continued with {self.model_id}"
+            yield self.clients[self.i].generate(messages)
+
+
 def sse(event: str, data: Any) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
@@ -97,6 +146,11 @@ class CaseRouter:
             raise HTTPException(422, f"unknown model {name!r}")
         llm = self.chat.models[name]
         local_only = req.local_only
+        if not local_only and not getattr(llm, "is_local", False):
+            # free hosted models to fall back on (Groq, Gemini); paid providers are never added
+            backups = [m for k, m in self.chat.models.items() if m is not llm and not getattr(m, "is_local", False)
+                       and (k == "groq" or str(getattr(m, "model_id", "")).startswith("gemini:"))]
+            llm = StickyFallback([llm] + backups)
         if local_only and not getattr(llm, "is_local", False):
             raise HTTPException(422, "local-only analysis needs a local model (Local (LoRA) or Local heavy)")
         return StreamingResponse(self._stream(text, llm, local_only), media_type="text/event-stream",

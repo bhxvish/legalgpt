@@ -85,3 +85,10 @@ def test_chat_adds_judgments_after_statute_sources_only_when_statute_found():
     assert [s.marker for s in got] == [4] and got[0].kind == "judgment"
     router.judgments = None
     assert router._judgment_sources("q", res, 3) == []
+
+
+def test_the_same_judgment_under_two_ids_is_cited_once():
+    a, b = hit("sc-2023-mukesh-singh", "Ruling", 0.8), hit("sc-2023-mukesh-singh-2023-3-1", "Ruling", 0.79)
+    b.chunk.title = a.chunk.title = "Mukesh Singh v. the State (Nct of Delhi)"
+    got = JudgmentSearch(FakeStore([a, b, hit("Other", "Ruling", 0.7)]), FakeEmbedder(), k=3).search("q")
+    assert [c.doc_id for c, _ in got] == ["sc-2023-mukesh-singh", "Other"]

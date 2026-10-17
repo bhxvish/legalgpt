@@ -100,9 +100,11 @@ class JudgmentSearch:
         out, per = [], {}
         for h in sorted(hits, key=lambda h: -h.similarity):
             c = h.chunk
-            if h.similarity < floor or c.doc_id in exclude_cases or per.get(c.doc_id, 0) >= self.per_case:
+            # one judgment can be in the library twice (annotated copy + fetched copy): count by title
+            key = re.sub(r"[^a-z0-9]+", "", c.title.lower())[:40] or c.doc_id
+            if h.similarity < floor or c.doc_id in exclude_cases or per.get(key, 0) >= self.per_case:
                 continue
-            per[c.doc_id] = per.get(c.doc_id, 0) + 1
+            per[key] = per.get(key, 0) + 1
             out.append((c, float(h.similarity)))
             if len(out) >= k:
                 break

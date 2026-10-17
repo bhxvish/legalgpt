@@ -3,6 +3,7 @@ import { API_BASE_URL } from './api.js'
 import AnnotateView from './components/AnnotateView.jsx'
 import CaseAnalysisView from './components/CaseAnalysisView.jsx'
 import ChatWindow from './components/ChatWindow.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import ReviewView from './components/ReviewView.jsx'
 import VerifyPanel from './components/VerifyPanel.jsx'
 import { LogoMark, TabIcons } from './components/LawArt.jsx'
@@ -159,7 +160,9 @@ export default function App() {
           is still streaming survive switching to Review or Verify and back. */}
       <main id="main" tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
       <div className={view === 'chat' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
-        <ChatWindow />
+        <ErrorBoundary>
+          <ChatWindow />
+        </ErrorBoundary>
       </div>
       {view === 'annotate' ? (
         <div key="annotate" className="flex min-h-0 flex-1 animate-rise flex-col">
@@ -171,7 +174,9 @@ export default function App() {
         </div>
       ) : view === 'case' ? (
         <div key="case" className="flex min-h-0 flex-1 animate-rise flex-col">
-          <CaseAnalysisView />
+          <ErrorBoundary>
+            <CaseAnalysisView />
+          </ErrorBoundary>
         </div>
       ) : view === 'verify' ? (
         <div key="verify" className="flex min-h-0 flex-1 animate-rise flex-col">
