@@ -5,6 +5,8 @@
   fig2_scenarios  held-out everyday scenarios: model alone, LegalGPT's first version, the final system
   fig3_ablation   retrieval on the held-out scenarios as each component is added
   fig4_size       the local models by size (1.5B / 3B / 7B), once their benchmark runs exist
+  fig5_rrl        the sentence-role classifier ablation (InLegalBERT, 5-fold CV), from
+                  rrl_ablation_report.py --json-out data/models/rrl_cv/v0.3-ablation-report.json
 
 Colours: the first three categorical slots of the reference palette (validated all-pairs for colour
 vision deficiency); every bar carries its value, so identity never rests on colour alone.
@@ -207,6 +209,26 @@ def fig_size(items, ipc) -> None:
     save(fig, "fig4_size")
 
 
+def fig_rrl() -> None:
+    src = REPO_ROOT / "data" / "models" / "rrl_cv" / "v0.3-ablation-report.json"
+    if not src.exists():
+        print("fig5_rrl: skipped (run rrl_ablation_report.py --json-out first)")
+        return
+    rows = json.loads(src.read_text(encoding="utf-8"))["rows"]
+    fig, ax = plt.subplots(figsize=(8, 3.4))
+    style(ax, f"Sentence roles in judgments: macro-F1 on held-out judgments (5-fold CV, 36 judgments)")
+    ax.xaxis.grid(True, color=GRID, linewidth=0.8)
+    ax.yaxis.grid(False)
+    labels, vals = [r["model"] for r in rows][::-1], [100 * r["macro_f1"] for r in rows][::-1]
+    colours = [SERIES[1] if lab.startswith("Ensemble") else SERIES[0] for lab in labels]
+    ax.barh(labels, vals, height=0.6, color=colours, edgecolor=SURFACE, linewidth=1)
+    for y, v in enumerate(vals):
+        ax.text(v + 0.6, y, f"{v:.1f}", va="center", fontsize=8, color=INK)
+    ax.set_xlim(50, 85)
+    ax.set_xlabel("macro-F1 x 100 (axis starts at 50)", color=INK2, fontsize=8)
+    save(fig, "fig5_rrl")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--skip-ablation", action="store_true", help="skip fig3 (it re-runs retrieval, a few minutes)")
@@ -217,6 +239,7 @@ def main() -> int:
     if not args.skip_ablation:
         fig_ablation()
     fig_size(items, ipc)
+    fig_rrl()
     return 0
 
 

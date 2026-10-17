@@ -338,3 +338,58 @@ most scenarios. The v0.7 recipe trades some of that caution for coverage.
 - 8 cases are right only with the rules and 3 only without them: exact McNemar p = 0.23, a trend.
 - The rules help most on what they encode: flips and omissions.
 - 3 answers came from another host (Cerebras via OpenRouter); without them the result is identical.
+
+## 7. Sentence roles in judgments: InLegalBERT ablation (Module 1)
+
+The labelling assistant tags every sentence of a judgment as Facts, Law Applied, Precedent,
+Argument or Ruling (InLegalBERT, `law-ai/InLegalBERT`, fine-tuned).
+
+**Setup:**
+- Corpus snapshot v0.3: 36 judgments, 4,823 human-checked sentences.
+- 5-fold cross-validation grouped by judgment (no judgment is in training and test at once).
+- Identical settings in every fine-tuned row: max length 256, all layers trained, 6 epochs, seed 13.
+- Runs on a Colab L4: `train_rrl_classifier.py --save-predictions`, `rrl_sequence_model.py`.
+- Tests: `rrl_ablation_report.py`. Every held-out sentence is predicted once, so rows are compared on the
+  same sentences: exact McNemar test, plus a 95% CI for the macro-F1 difference from a bootstrap
+  that resamples whole judgments.
+
+| Model | Macro-F1 | Accuracy | Facts | Law Applied | Precedent | Argument | Ruling |
+|---|---|---|---|---|---|---|---|
+| Sentence only | 0.667 | 70.7% | 0.841 | 0.582 | 0.636 | 0.620 | 0.656 |
+| + position only | 0.702 | 74.0% | 0.854 | 0.610 | 0.684 | 0.667 | 0.695 |
+| + neighbours only | 0.729 | 75.9% | 0.865 | 0.628 | 0.729 | 0.749 | 0.672 |
+| + position + neighbours (deployed) | 0.739 | 77.1% | 0.888 | 0.632 | 0.716 | 0.758 | 0.701 |
+| BiLSTM sequence model | 0.720 | 76.6% | 0.869 | 0.556 | 0.754 | 0.727 | 0.697 |
+| **Ensemble: deployed + sequence** | **0.782** | **80.7%** | **0.896** | **0.696** | **0.782** | **0.803** | **0.730** |
+
+(Pooled over all held-out sentences. The fold means are similar; for example, the ensemble's is
+0.782 ± 0.024 and the deployed model's 0.741 ± 0.032.)
+
+| Comparison | Macro-F1 change (95% CI) | Fixed / broken sentences | McNemar p |
+|---|---|---|---|
+| + position vs sentence only | +0.035 (+0.013 to +0.056) | 473 / 312 | 1e-8 |
+| neighbours only vs position only | +0.027 (+0.003 to +0.050) | 498 / 407 | 0.003 |
+| both vs neighbours only | +0.010 (-0.014 to +0.036) | 359 / 301 | 0.026 |
+| sequence model vs deployed | -0.019 (-0.076 to +0.030) | 481 / 507 | 0.43 |
+| **ensemble vs deployed** | **+0.043 (+0.020 to +0.066)** | **329 / 154** | **1e-15** |
+| ensemble vs sentence only | +0.115 (+0.080 to +0.149) | 773 / 288 | 9e-52 |
+
+**What this shows:**
+- **Context matters.**
+  - Where a sentence sits in the judgment and the sentences around it each help on their own (+3.5 and +6.2 macro-F1 points over the sentence alone).
+  - Together they give +7.2.
+  - Adding position on top of the neighbours is a small extra step (+1.0; the per-sentence test is significant, but the judgment-level CI includes 0).
+- **The whole judgment, in order, helps when combined.**
+  - The BiLSTM reads every sentence in order but uses frozen InLegalBERT vectors. Alone it is no better than the fine-tuned model (p = 0.43), but it makes different mistakes.
+  - Averaging the two models' probabilities gains +4.3 points (CI +2.0 to +6.6). It fixes 329 sentences for every 154 it breaks.
+  - The biggest gains are on the weakest classes: Law Applied +6.4, Precedent +6.6, Argument +4.5.
+- **No tuning on test data.**
+  - The ensemble weight is a fixed 0.5.
+  - The BiLSTM's early stopping uses 3 validation judgments from each fold's training cases.
+  - Both models are trained independently on the same folds; there is no stacking on held-out predictions.
+
+**Caveats:**
+- 36 judgments is a small corpus; the judgment-level intervals are the honest measure of uncertainty.
+- The deployed Review-tab model is still the fine-tuned one (0.739). Using the ensemble in the app means training the BiLSTM on all judgments and checking its confidence calibration for the review queue.
+
+Figure: `docs/figures/fig5_rrl.png`.
