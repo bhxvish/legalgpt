@@ -154,9 +154,16 @@ def build_chat_router(settings: Settings, verifier: "VerificationService | None"
     models, notes, default = build_models(settings)
     from app.core.query_rewriter import QueryRewriter
 
+    judgments = None
+    if settings.judgment_citations:  # an empty index (build_judgment_index.py not run yet) is skipped per question
+        from app.judgments.library import COLLECTION, JudgmentSearch
+
+        judgments = JudgmentSearch(VectorStore(settings.chroma_persist_dir, COLLECTION), embedder,
+                                   min_similarity=settings.judgment_min_similarity, k=settings.judgment_k)
     return ChatRouter(retriever, models[default], explainer=explainer, models=models, default_model=default,
                       model_notes=notes, verifier=verifier,
-                      rewriter=QueryRewriter() if settings.query_rewrite else None, offline=settings.offline_mode)
+                      rewriter=QueryRewriter() if settings.query_rewrite else None, offline=settings.offline_mode,
+                      judgments=judgments)
 
 
 def build_zk_service(settings: Settings, chat_router: ChatRouter) -> "ZkService | None":

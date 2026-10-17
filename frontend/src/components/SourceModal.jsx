@@ -27,11 +27,19 @@ export default function SourceModal({ source, onClose }) {
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Source [{source.marker}]</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Source [{source.marker}]{source.kind === 'judgment' ? ' · judgment' : ''}
+            </p>
             <h2 id="source-modal-title" className="mt-1 text-base font-semibold text-slate-900">
-              {source.section ? `Section ${source.section}` : source.citation_path}
-              {source.title ? ` — ${source.title}` : ''}
+              {source.kind === 'judgment'
+                ? `${source.title}${source.year ? ` (${source.court?.includes('Supreme') ? 'SC, ' : ''}${source.year})` : ''}`
+                : `${source.section ? `Section ${source.section}` : source.citation_path}${source.title ? ` — ${source.title}` : ''}`}
             </h2>
+            {source.kind === 'judgment' && (
+              <p className="mt-1 text-xs text-slate-500">
+                {source.court || 'Court not recorded'} · passage labelled <b>{source.role}</b> by the sentence-role model (InLegalBERT ensemble)
+              </p>
+            )}
             <p className="mt-1 break-words font-mono text-xs text-slate-600" data-testid="source-citation-path">
               {source.citation_path}
             </p>
@@ -52,7 +60,7 @@ export default function SourceModal({ source, onClose }) {
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-200 px-5 py-3 text-xs text-slate-500">
           <span>Retrieval similarity: {source.similarity.toFixed(2)}</span>
-          <span>Role: {source.role}</span>
+          <span>{source.kind === 'judgment' ? 'Passage' : 'Role'}: {source.role}</span>
           <span className="text-slate-400">Similarity measures how well this text matched the question, not whether the answer is correct.</span>
         </div>
       </div>

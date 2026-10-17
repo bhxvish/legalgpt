@@ -39,3 +39,6 @@ data/rrl_public/
 /v0.3-ensemble-*.zip
 benchmark/*.zip
 benchmark/metrics.json
+
+# judgment library for citations (fetched texts; CC-BY-4.0 source, kept out of the repo for size)
+data/judgment_library/

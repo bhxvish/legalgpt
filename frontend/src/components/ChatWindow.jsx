@@ -176,6 +176,12 @@ function ModeToggle({ mode, setMode, disabled }) {
   )
 }
 
+const ScalesMini = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="size-3.5 shrink-0">
+    <path d="M12 3.5v16M8 20.5h8M4.5 6.5h15M4.5 6.5 2 13M4.5 6.5 7 13M1.8 13a2.7 2.7 0 0 0 5.4 0ZM19.5 6.5 17 13M19.5 6.5 22 13M16.8 13a2.7 2.7 0 0 0 5.4 0Z" />
+  </svg>
+)
+
 function AssistantMessage({ msg, onCite, live = false }) {
   const cited = new Set([...(msg.content || '').matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])))
   const tone = msg.error
@@ -218,18 +224,33 @@ function AssistantMessage({ msg, onCite, live = false }) {
               <li key={s.chunk_id} className="animate-rise" style={stagger(si, 45)}>
                 <button
                   onClick={() => onCite(s)}
-                  title={cited.has(s.marker) ? 'Cited in the answer: open the IPC text' : 'Retrieved but not cited: open the IPC text'}
-                  className={`rounded-md px-2 py-1 text-left text-xs ring-1 hover:brightness-95 ${
-                    cited.has(s.marker)
-                      ? 'bg-indigo-50 font-medium text-indigo-900 ring-indigo-200'
-                      : 'bg-white text-slate-500 ring-slate-200'
+                  title={`${cited.has(s.marker) ? 'Cited in the answer' : 'Retrieved but not cited'}: open the ${s.kind === 'judgment' ? 'judgment passage' : 'IPC text'}`}
+                  className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-left text-xs ring-1 hover:brightness-95 ${
+                    s.kind === 'judgment'
+                      ? cited.has(s.marker)
+                        ? 'bg-amber-50 font-medium text-amber-900 ring-amber-200'
+                        : 'bg-white text-slate-500 ring-slate-200'
+                      : cited.has(s.marker)
+                        ? 'bg-indigo-50 font-medium text-indigo-900 ring-indigo-200'
+                        : 'bg-white text-slate-500 ring-slate-200'
                   }`}
                   data-testid="source-chip"
+                  data-kind={s.kind || 'statute'}
                   data-cited={cited.has(s.marker)}
                 >
-                  <span className="font-semibold">[{s.marker}]</span>{' '}
-                  {s.section ? `§${s.section}` : s.citation_path}
-                  {s.title ? ` ${s.title}` : ''}
+                  <span className="font-semibold">[{s.marker}]</span>
+                  {s.kind === 'judgment' ? (
+                    <>
+                      <ScalesMini />
+                      <span className="max-w-[18rem] truncate">{s.title}</span>
+                      <span className="opacity-70">({[s.court?.includes('Supreme') ? 'SC' : '', s.year].filter(Boolean).join(', ')})</span>
+                    </>
+                  ) : (
+                    <span>
+                      {s.section ? `§${s.section}` : s.citation_path}
+                      {s.title ? ` ${s.title}` : ''}
+                    </span>
+                  )}
                 </button>
               </li>
             ))}

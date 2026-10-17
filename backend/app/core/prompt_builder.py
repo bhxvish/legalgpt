@@ -23,7 +23,11 @@ example, dishonest intention). Do not refuse because the facts themselves are no
 4. Only if no source defines an offence or rule that could apply to the question, reply exactly: \
 "{NOT_COVERED_REPLY}" You may then say briefly what the sources do cover.
 5. Quote section numbers and punishments exactly as written in the sources.
-6. Be concise and precise. This is legal information, not legal advice."""
+6. Be concise and precise. This is legal information, not legal advice.
+7. Sources marked JUDGMENT are passages of real court decisions, not statute. Cite one only for what \
+that court said or decided, and name the case (e.g. "In X v. Y (SC, 2023), the court held ... [4]"). \
+Never present a judgment as the text of a section, never name a case that is not in SOURCES, and \
+do not use a judgment that is about a different offence."""
 
 GENERAL_SYSTEM_PROMPT = """You are LegalGPT in general mode. Answer helpfully and concisely. \
 You are not consulting any legal sources in this mode, so do not present statements as authoritative \
@@ -53,4 +57,9 @@ class PromptBuilder:
     @staticmethod
     def format_sources(sources: list[SourceEvidence]) -> str:
         """Sources are numbered by `marker`, in order — the same numbers the model must cite."""
-        return "\n\n".join(f"[{s.marker}] ({s.citation_path})\n{s.text}" for s in sources)
+        def head(s: SourceEvidence) -> str:
+            if s.kind == "judgment":
+                return f"[{s.marker}] (JUDGMENT: {s.citation_path}; {s.role} passage)"
+            return f"[{s.marker}] ({s.citation_path})"
+
+        return "\n\n".join(f"{head(s)}\n{s.text}" for s in sources)

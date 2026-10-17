@@ -75,3 +75,7 @@ class SourceEvidence(BaseModel):
     role: str
     section: str = ""
     title: str = ""
+    # "statute" (an IPC chunk) or "judgment" (a passage of a real court judgment; JudgmentSearch)
+    kind: str = "statute"
+    court: str = ""
+    year: int | None = None

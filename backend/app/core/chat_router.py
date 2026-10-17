@@ -15,6 +15,7 @@ Event stream (each `data:` line is JSON):
 import json
 import logging
 from collections.abc import Callable, Iterator
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any, Literal
 
 from fastapi import APIRouter
@@ -86,6 +87,7 @@ class ChatRouter:
         verifier: "VerificationService | None" = None,
         rewriter: "QueryRewriter | None" = None,
         offline: bool = False,
+        judgments: "Any | None" = None,
     ) -> None:
         """`llm` is the default model. `models` adds named alternatives a request can choose with
         `model` (the base-vs-tuned toggle); `model_notes` explains slow or unavailable ones."""
@@ -102,6 +104,7 @@ class ChatRouter:
         self.verifier = verifier
         self.rewriter = rewriter  # LLM query rewrite for everyday fact patterns (query_rewriter.py)
         self.offline = offline  # OFFLINE_MODE: local models rewrite for themselves; nothing goes to a hosted model
+        self.judgments = judgments  # JudgmentSearch: real judgments cited after the IPC sources
         self.router = APIRouter(prefix="/api", tags=["chat"])
         self.router.add_api_route("/chat", self.chat, methods=["POST"], response_class=StreamingResponse)
         self.router.add_api_route("/models", self.list_models, methods=["GET"], response_model=list[ModelInfo])
@@ -180,6 +183,9 @@ class ChatRouter:
             yield from self._attestation(question, [], SCOPE_REFUSAL, [], llm.model_id, True, result.used_context,
                                          self._used_rewrite(result))
             return
+        sources = sources + self._judgment_sources(question, result, len(sources))
+        if len(sources) > len(result.sources):
+            result = replace(result, sources=sources)
         yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": False})
         yield sse("sources", [s.model_dump() for s in sources])
         yield sse("retrieval", self._retrieval_info(question, result))
@@ -191,6 +197,22 @@ class ChatRouter:
         yield from self._explanation(question, result, "".join(answer), False, llm.model_id)
         yield from self._attestation(question, messages, "".join(answer), sources, llm.model_id, False,
                                      result.used_context, self._used_rewrite(result))
+
+    def _judgment_sources(self, question: str, result: RetrievalResult, n_statute: int) -> list:
+        """Passages of real judgments on the same offence, numbered after the IPC sources. Searched
+        with the statute-aware query (the rewrite names the offence and section); only when the IPC
+        retrieval found something, so out-of-scope questions never get case law. A failure here is
+        logged and the answer goes ahead with the IPC sources alone."""
+        if self.judgments is None or not n_statute:
+            return []
+        try:
+            if not self.judgments.available():
+                return []
+            hits = self.judgments.search(result.query or question)
+            return self.judgments.to_sources(hits, n_statute + 1)
+        except Exception:
+            logger.exception("judgment search failed")
+            return []
 
     def _retrieval_info(self, question: str, result: RetrievalResult) -> dict[str, Any]:
         """Why these sources: the floor in force (lowered by the scope check for everyday fact
@@ -213,7 +235,8 @@ class ChatRouter:
             "defined_sections": [s for s in defined_sections(question, getattr(self.retriever, "titles", None)) if s not in named],
             "sources": [{"marker": s.marker, "section": s.section, "similarity": s.similarity,
                          "weight": round(s.score / s.similarity, 2) if s.similarity else None,
-                         "named": s.section in named} for s in result.sources],
+                         "named": s.section in named, "kind": s.kind,
+                         **({"case": s.citation_path} if s.kind == "judgment" else {})} for s in result.sources],
         }
 
     @staticmethod

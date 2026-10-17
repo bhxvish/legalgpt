@@ -173,7 +173,8 @@ export function AnswerProof({ msg }) {
     try {
       const bundle = await zkApi.proveRetrieval(msg.question, att.record?.retrieval_rewrite)
       const check = await zkApi.verify(bundle)
-      const shown = (msg.sources || []).map((s) => s.chunk_id)
+      // the proof covers the IPC index; judgment passages come from a separate collection
+      const shown = (msg.sources || []).filter((s) => s.kind !== 'judgment').map((s) => s.chunk_id)
       setRetr({ bundle, check, same: JSON.stringify(shown) === JSON.stringify(bundle.sources) })
     } catch (e) {
       setError(e.message)
@@ -220,12 +221,15 @@ export function AnswerProof({ msg }) {
               Zero-knowledge proof of the similarity of your question to all {manifest?.corpus?.chunks ?? ''} IPC chunks, made in{' '}
               {retr.bundle.prove_seconds}s. Re-running the retrieval rules on the proven scores gives{' '}
               {retr.same ? (
-                <b className="text-emerald-700">exactly the sources shown above</b>
+                <b className="text-emerald-700">exactly the IPC sources shown above</b>
               ) : (
                 <b className="text-amber-700">different sources from those shown ({retr.bundle.sources.length} proven)</b>
               )}
               .
             </p>
+            {(msg.sources || []).some((s) => s.kind === 'judgment') && (
+              <p className="text-slate-500">The cited judgments come from a separate case library and are not covered by this proof.</p>
+            )}
             <Checks result={retr.check} />
           </div>
         )}

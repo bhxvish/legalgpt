@@ -14,6 +14,8 @@ and cleans the text of the Supreme Court Reports layout:
 Usage (from the repo root):
     python backend/scripts/fetch_sc_judgments.py --year 2023 --list-criminal 40
     python backend/scripts/fetch_sc_judgments.py --year 2023 --files 2023_8_152_182_EN.pdf 2023_11_484_506_EN.pdf
+    # judgment library for citations (kept apart from the annotation corpus):
+    python backend/scripts/fetch_sc_judgments.py --year 2023 --criminal 150 --library
 """
 
 import argparse
@@ -72,7 +74,11 @@ def main() -> int:
     ap.add_argument("--files", nargs="*", default=[], help="PDF names from the year's index to fetch")
     ap.add_argument("--list-criminal", type=int, default=0, metavar="N",
                     help="list likely criminal cases (State is a party) among the first N files of the tar")
-    ap.add_argument("--out", type=Path, default=REPO_ROOT / "data" / "inbox")
+    ap.add_argument("--criminal", type=int, default=0, metavar="N",
+                    help="fetch the first N likely-criminal judgments of the year (in tar order)")
+    ap.add_argument("--library", action="store_true",
+                    help="write to data/judgment_library/sc/ with a metadata file per judgment, keep only those citing the IPC")
+    ap.add_argument("--out", type=Path, default=None, help="default data/inbox (data/judgment_library/sc with --library)")
     args = ap.parse_args()
 
     import pyarrow.parquet as pq
@@ -91,19 +97,43 @@ def main() -> int:
 
     from pdfminer.high_level import extract_text
 
+    if args.criminal:
+        args.files = [name for name in order
+                      if (m := meta.get(name.replace("_EN.pdf", ""))) and _PARTY_STATE.search(m["title"])
+                      and not _NON_CRIMINAL.search(m["title"])][: args.criminal]
+    args.out = args.out or REPO_ROOT / "data" / ("judgment_library/sc" if args.library else "inbox")
     args.out.mkdir(parents=True, exist_ok=True)
+    kept = skipped = 0
     for name, (start, size) in tar_locations(tar_url, set(args.files)).items():
         m = meta[name.replace("_EN.pdf", "")]
-        text = clean_judgment_text(extract_text(io.BytesIO(fetch(tar_url, start, size))))
+        try:
+            text = clean_judgment_text(extract_text(io.BytesIO(fetch(tar_url, start, size))))
+        except Exception as e:  # one bad PDF must not stop a batch
+            print(f"SKIP   {name}: {type(e).__name__}: {e}")
+            skipped += 1
+            continue
         if looks_garbled(text):
             print(f"SKIP   {name}: PDF text layer is garbled (words run together)")
+            skipped += 1
+            continue
+        if args.library and not re.search(r"Indian Penal Code|\bI\.\s?P\.\s?C\b|\bIPC\b", text):
+            print(f"SKIP   {name}: does not cite the IPC")
+            skipped += 1
             continue
         slug = re.sub(r"[^a-z0-9]+", "-", m["title"].split(" versus ")[0].split("@")[0].lower()).strip("-")[:40]
-        out = args.out / f"sc-{args.year}-{slug}.txt"  # source: labofsahil/Indian-Supreme-Court-Judgments (CC-BY-4.0)
+        stem = f"sc-{args.year}-{slug}" + (f"-{name.replace('_EN.pdf', '').replace('_', '-')}" if args.library else "")
+        out = args.out / f"{stem}.txt"  # source: labofsahil/Indian-Supreme-Court-Judgments (CC-BY-4.0)
+        if args.library:
+            out.with_suffix(".json").write_text(json.dumps({
+                "title": m["title"], "court": "Supreme Court of India", "decision_date": str(m["decision_date"]),
+                "year": args.year, "source_pdf": name, "dataset": "labofsahil/Indian-Supreme-Court-Judgments",
+                "licence": "CC-BY-4.0"}, indent=1), encoding="utf-8")
+        kept += 1
         # judgment-style header only; provenance (dataset + PDF name) is the file's source_path
         header = f"Supreme Court of India\n{m['title']}\nDecided on {m['decision_date']}\n\n"
         out.write_text(header + text + "\n", encoding="utf-8")
-        print(f"WROTE  {out.name}: {len(text)} chars (PDF {size / 1e6:.2f} MB)")
+        print(f"WROTE  {out.name}: {len(text)} chars (PDF {size / 1e6:.2f} MB)", flush=True)
+    print(f"done: {kept} written, {skipped} skipped")
     return 0
 
 
