@@ -70,12 +70,13 @@ illustrative facts, not real cases.
 
 | Module | Implemented | Future work |
 |---|---|---|
-| 0 Retrieval & chat | IPC bare act, hierarchical chunks, ChromaDB + MiniLM, calibrated refusal floor, scope check, 41-rule lay-term lexicon, LLM query rewrite for everyday scenarios (gated by the scope check), definition-question lookup, SSE chat with `[n]` citations, Legal/General modes, several back-ends (Groq, Gemini, OpenAI, OpenRouter, local LoRA, local 7B via llama.cpp), `OFFLINE_MODE` | BNS/BNSS and IPC↔BNS mapping; judgments as a retrieval source; re-ranker |
+| 0 Retrieval & chat | IPC bare act, hierarchical chunks, ChromaDB + MiniLM, calibrated refusal floor, scope check, 41-rule lay-term lexicon, LLM query rewrite for everyday scenarios (gated by the scope check), definition-question lookup, SSE chat with `[n]` citations, Legal/General modes, several back-ends (Groq, Gemini, OpenAI, OpenRouter, local LoRA, local 7B via llama.cpp), `OFFLINE_MODE`, **citations of real judgments** (role-labelled passages from a judgment library) | BNS/BNSS and IPC↔BNS mapping; re-ranker; a larger judgment library (High Courts) |
 | 1 Dataset | Collector with screening, 5-role scheme + guideline, append-only store, kappa tooling, frozen versions with hashes | Double annotation to actually measure agreement |
-| 2 Assisted labelling | InLegalBERT classifier (CV macro-F1 0.745 ± 0.021), confidence + audit review queue, review UI, explanations (integrated gradients, occlusion, nearest examples) with faithfulness metrics | Larger corpus, active learning |
+| 2 Assisted labelling | InLegalBERT ensemble (fine-tuned + BiLSTM, public-corpus transfer; CV macro-F1 0.807, single model 0.739), confidence + audit review queue, review UI, explanations (integrated gradients, occlusion, nearest examples) with faithfulness metrics | Larger corpus, active learning |
 | 3 Fine-tuning | 4-bit LoRA (Qwen2.5-1.5B on the laptop; 3B and 7B on Colab), instruction builder with IPC Q&A, scenario answers, refusals and a distilled query rewrite; base-vs-tuned comparison; in-app switch | Human-written answer targets; fewer wrong-section answers on scenarios when retrieval misses |
 | 4 Explainability | Evidence-match band, citation checks, sentence attribution (legal claims vs other sentences), "how the sources were chosen" (floor, scope check, lexicon, rewrite, definition lookup), warnings on every legal answer | Detecting subtle legal errors, not just unsupported sentences |
 | 5 Verification | Prolog element checklists for 7 sections (279, 304A, 304B, 323, 337, 338, 379), quote-checked two-run fact extraction (Groq, falling back to the free Gemini models in `EXTRA_MODELS` and then the local model when Groq's free limit is reached), rule-computed what-ifs | More sections, exceptions and Chapter IV defences |
+| Case analysis | Upload a case file: quote-checked facts, possible IPC offences, element-by-element check (Prolog rules for the 7 encoded sections, model-assessed otherwise), similar past judgments with what the court held, a cited written analysis with explainability; local-only privacy mode. Never a verdict | Evaluation with lawyers on real files; more encoded sections |
 | ZKML | Zero-knowledge proofs (EZKL) of fact-check verdicts (facts hidden) and of retrieval over all chunks, including the disclosed query rewrite; commitments manifest; Ed25519-signed answers; offline verifier ([docs/zk](zk/README.md)) | Proving the LLMs themselves (including the rewrite): a 1.5B+ transformer is still orders of magnitude too slow to prove on this hardware, and it would prove which model ran, not that the answer is legally right |
 | Evaluation | IPC benchmark (1,056 items) with held-out sampling, baselines against three model families, paired significance tests, retrieval ablation, error analysis, counterfactual test of the rules ([benchmark](../benchmark/README.md), [reports](reports/)) | Legal review of the AI-written (silver) scenario and out-of-scope labels |
 
@@ -327,6 +328,42 @@ The API is `GET /api/review/cases/{case_id}/items/{sentence_id}/explain[?label=R
 faithfulness test (ERASER comprehensiveness and sufficiency; IG vs occlusion vs random) is in
 `backend/scripts/eval_explanations.py` and reported in
 [docs/reports/classifier_explanations.md](reports/classifier_explanations.md).
+
+## Judgment citations and case analysis
+
+**The judgment library.** Real judgments, split into passages and labelled by role (Facts, Law
+Applied, Precedent, Argument, Ruling). It holds the annotated collection plus Supreme Court
+judgments fetched from the CC-BY-4.0 dataset `labofsahil/Indian-Supreme-Court-Judgments`. The fetch
+keeps only judgments that cite the IPC and writes a metadata file next to each.
+
+```bash
+python backend/scripts/fetch_sc_judgments.py --year 2023 --criminal 170 --library   # -> data/judgment_library/sc/
+.venv-gpu\Scripts\python backend/scripts/build_judgment_index.py                    # labels roles, builds the index
+```
+
+The index is a separate Chroma collection (`judgments`), so the IPC index and its retrieval proof are
+unchanged. Roles come from human labels where they exist and from the sentence-role ensemble
+otherwise.
+
+**In the chat**, after the IPC sources, up to `JUDGMENT_K` (2) passages are added: Ruling, Law
+Applied or Precedent passages, one per judgment, above `JUDGMENT_MIN_SIMILARITY` (0.55). Rules:
+- The answer may cite a judgment only for what that court said, and must name the case (prompt rule 7).
+- Judgment chips show a scales icon and the case. The source window shows the court, the year and the passage's role.
+- The retrieval proof covers the IPC sources only, and says so.
+- Turn the feature off with `JUDGMENT_CITATIONS=false`.
+
+**Case analysis** (its own tab; `POST /api/case/analyze`). Upload a `.txt` / `.pdf` (or paste text). The report:
+1. The facts, each with a quote that is checked against the file. A fact whose quote is not found
+   is shown but not used.
+2. The IPC offences these facts may engage, with the section text. The section number must exist
+   and its title must match the named offence, so a Motor Vehicles Act number is dropped.
+3. An element-by-element check. The Prolog rule engine handles the 7 encoded sections; other
+   sections are assessed by the model and labelled so.
+4. Similar past judgments, and what the court held in each.
+5. A written analysis citing only the numbered sources, with the chat's "Why this answer?".
+
+It never says whether anyone is guilty. **Keep the file on this computer** runs every model step on
+a local model; nothing is sent to Groq or Gemini, and nothing is stored either way.
 
 ## Neuro-symbolic verification (Module 5)
 
