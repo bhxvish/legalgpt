@@ -24,11 +24,16 @@ class RRLExample:
 _PLACES = ("start", "early", "middle", "late", "end")
 
 
-def context_texts(examples: Sequence[RRLExample]) -> dict[str, str]:
+CONTEXT_MODES = ("full", "position", "neighbours")
+
+
+def context_texts(examples: Sequence[RRLExample], mode: str = "full") -> dict[str, str]:
     """sentence_id -> where the sentence sits in its judgment and the sentences around it; a role
     often depends on them ("The appeal is allowed" is a Ruling at the end, a Precedent inside a
     quoted case). Neighbours come from the same case among `examples` (by idx); examples without a
-    case or position get no entry."""
+    case or position get no entry. mode "position" / "neighbours" keeps only that part (ablation)."""
+    if mode not in CONTEXT_MODES:
+        raise ValueError(f"unknown context mode {mode!r}; one of {CONTEXT_MODES}")
     by_case: dict[str, list[RRLExample]] = {}
     for e in examples:
         if e.case_id and e.idx >= 0:
@@ -46,7 +51,12 @@ def context_texts(examples: Sequence[RRLExample]) -> dict[str, str]:
         place = _PLACES[min(len(_PLACES) - 1, j * len(_PLACES) // len(case))]
         before = case[j - 1].text if j > 0 else "(none)"
         after = case[j + 1].text if j + 1 < len(case) else "(none)"
-        out[e.sentence_id] = f"{place} of judgment. before: {before} after: {after}"
+        if mode == "position":
+            out[e.sentence_id] = f"{place} of judgment."
+        elif mode == "neighbours":
+            out[e.sentence_id] = f"before: {before} after: {after}"
+        else:
+            out[e.sentence_id] = f"{place} of judgment. before: {before} after: {after}"
     return out
 
 
@@ -61,7 +71,7 @@ class RRLDataset(Dataset):
 
     def __init__(
         self, examples: Sequence[RRLExample], tokenizer: Any, labels: Sequence[str], max_length: int = 128,
-        context: bool = False, context_pool: Sequence[RRLExample] | None = None,
+        context: bool | str = False, context_pool: Sequence[RRLExample] | None = None,
     ) -> None:
         self.examples = list(examples)
         self.labels = list(labels)
@@ -71,7 +81,8 @@ class RRLDataset(Dataset):
             raise ValueError(f"labels {unknown} are not in the classifier's label set {self.labels}")
         texts = [e.text for e in self.examples]
         if context:
-            ctx = context_texts(context_pool if context_pool is not None else self.examples)
+            mode = "full" if context is True else context  # True: position + neighbours
+            ctx = context_texts(context_pool if context_pool is not None else self.examples, mode)
             pairs = [ctx.get(e.sentence_id, "") for e in self.examples]
             enc = tokenizer(texts, pairs, truncation="longest_first", max_length=max_length)
         else:
@@ -107,7 +118,7 @@ class RRLDataset(Dataset):
     @classmethod
     def from_version(
         cls, store: AnnotationStore, version: str, split: str, tokenizer: Any, labels: Sequence[str], max_length: int = 128,
-        context: bool = False, human_only: bool = False,
+        context: bool | str = False, human_only: bool = False,
     ) -> "RRLDataset":
         """One split ("train" / "val" / "test") of a frozen, digest-verified corpus version.
         human_only drops labels no person checked (assisted-path sentences accepted unreviewed):

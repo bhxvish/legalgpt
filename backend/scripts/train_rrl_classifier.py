@@ -45,6 +45,11 @@ def main() -> int:
     ap.add_argument("--freeze-layers", type=int, default=8, help="bottom encoder layers to freeze (0 = none)")
     ap.add_argument("--max-length", type=int, default=128, help="tokens per input (sentence + context)")
     ap.add_argument("--context", action="store_true", help="read each sentence with its neighbours and position")
+    ap.add_argument("--context-mode", choices=("full", "position", "neighbours"), default="full",
+                    help="with --context: both (default), or only the position / only the neighbours (ablation)")
+    ap.add_argument("--save-predictions", action="store_true",
+                    help="with --cv: store every held-out sentence's predicted probabilities (for paired tests and ensembles)")
+    ap.add_argument("--tag", default="", help="with --cv: added to the output file name")
     ap.add_argument("--include-unreviewed", action="store_true", help="also train on assisted labels no one checked")
     ap.add_argument("--no-calibrate", action="store_true", help="skip temperature scaling of confidences")
     ap.add_argument("--bf16", action="store_true", help="bfloat16 autocast on CUDA (saves GPU memory)")
@@ -63,7 +68,9 @@ def main() -> int:
     calibrate = not args.no_calibrate
     cfg = TrainConfig(epochs=args.epochs, batch_size=args.batch_size, lr=args.lr, freeze_layers=args.freeze_layers,
                       max_steps=args.max_steps, seed=args.seed, bf16=args.bf16)
-    setup = {"context": args.context, "max_length": args.max_length, "human_only": human_only, "calibrate": calibrate}
+    context = (args.context_mode if args.context_mode != "full" else True) if args.context else False
+    setup = {"context": args.context, "context_mode": args.context_mode if args.context else None,
+             "max_length": args.max_length, "human_only": human_only, "calibrate": calibrate}
     corpus = {"version": args.version, "sha256": manifest.sha256, "cases": len(manifest.case_ids)}
     checked = sum(is_human_checked(x) for x in sentences)
     print(f"corpus {args.version} (sha256 {manifest.sha256[:12]}…): {len(manifest.case_ids)} cases, "
@@ -71,7 +78,7 @@ def main() -> int:
     print(f"config: {asdict(cfg)}\nsetup: {setup}")
 
     def new_classifier() -> RRLClassifier:
-        return RRLClassifier(labels, model_name=args.model, max_length=args.max_length, context=args.context)
+        return RRLClassifier(labels, model_name=args.model, max_length=args.max_length, context=context)
 
     if args.cv:
         pool = RRLDataset.examples_from(sentences)  # every sentence: neighbours for context
@@ -79,6 +86,7 @@ def main() -> int:
         confidences: list[float] = []
         correct: list[bool] = []
         temperatures: list[float] = []
+        saved: list[dict] = []
 
         def train_and_predict(train, test):  # fresh model per fold; test cases are never seen
             train_cases = sorted({e.case_id for e in train})
@@ -96,6 +104,9 @@ def main() -> int:
             out = [by_id[e.sentence_id] for e in test]
             confidences.extend(p.confidence for p in out)
             correct.extend(p.label == e.label for p, e in zip(out, test))
+            if args.save_predictions:
+                saved.extend({"sentence_id": e.sentence_id, "case_id": e.case_id, "idx": e.idx, "gold": e.label,
+                              "pred": p.label, "probabilities": p.probabilities} for p, e in zip(out, test))
             return [p.label for p in out]
 
         report = ClassifierEvaluator().cross_validate(gold, args.cv, args.seed, train_and_predict, labels)
@@ -105,12 +116,14 @@ def main() -> int:
         print(f"\nreview load, pooled over all {len(confidences)} held-out sentences"
               + (f" (temperatures {', '.join(f'{t:.2f}' for t in temperatures)})" if temperatures else ""))
         print(format_review_load(rows))
-        out = args.out or s.rrl_model_dir.parent / "rrl_cv" / f"{args.version}-cv{args.cv}-{datetime.now():%Y%m%d-%H%M%S}.json"
+        tag = f"-{args.tag}" if args.tag else ""
+        out = args.out or s.rrl_model_dir.parent / "rrl_cv" / f"{args.version}-cv{args.cv}{tag}-{datetime.now():%Y%m%d-%H%M%S}.json"
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps({"corpus": corpus, "config": asdict(cfg), "setup": setup, "k": args.cv,
                                    "folds": [m.to_dict() for m in report.folds], "fold_cases": report.fold_cases,
                                    "macro_f1_mean_sd": report.macro_f1, "accuracy_mean_sd": report.accuracy,
-                                   "temperatures": temperatures, "review_load": [asdict(r) for r in rows]}, indent=2),
+                                   "temperatures": temperatures, "review_load": [asdict(r) for r in rows],
+                                   **({"predictions": saved} if args.save_predictions else {})}, indent=2),
                        encoding="utf-8")
         print(f"\nwrote {out}")
         return 0

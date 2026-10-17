@@ -87,3 +87,12 @@ new adapter's fingerprint (circuits and keys are not rebuilt). Until then they c
   On the laptop the 3B runs in 4-bit and the 7B through llama.cpp (Q4_K_M), so answers can differ
   slightly. The paper should name the configuration it reports.
 - The free T4 tier ran out of GPU time partway through the 3B. The paid L4 session above fits both models.
+
+## Sentence-role classifier experiments (InLegalBERT)
+
+`LegalGPT_RRL_ablation_Colab.ipynb` runs the context ablation (sentence only / + position /
++ neighbours / + both, 5-fold CV grouped by judgment) and the BiLSTM sequence model with its
+ensemble, on the same folds and settings as the laptop. Build the upload with
+`python backend/scripts/colab/make_rrl_package.py` (data/colab/legalgpt_rrl.zip: code + the v0.3
+annotation snapshot), choose an L4 GPU, Run all, and bring back `rrl_results.zip` (unzip it into
+the repo root: it fills data/models/rrl_cv/). About 30–40 minutes on an L4.

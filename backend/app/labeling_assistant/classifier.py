@@ -76,12 +76,13 @@ class RRLClassifier:
         device: str | None = None,
         model: Any | None = None,
         tokenizer: Any | None = None,
-        context: bool = False,
+        context: bool | str = False,
         temperature: float = 1.0,
     ) -> None:
         """Loads `model_name` with a fresh classification head, unless `model`/`tokenizer` are
         given (load() and tests pass them). context: read each sentence with its neighbours and
-        position (see dataset.context_texts). temperature: logits are divided by it before the
+        position (True or "full"), or only one of them ("position" / "neighbours"; see
+        dataset.context_texts). temperature: logits are divided by it before the
         softmax; calibrate() fits it so confidences match accuracy."""
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
         from transformers.utils import logging as hf_logging
