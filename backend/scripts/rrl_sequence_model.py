@@ -32,7 +32,6 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from torch import nn
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -42,6 +41,8 @@ from app.config import get_settings  # noqa: E402
 from app.labeling_assistant.classifier import DEFAULT_MODEL  # noqa: E402
 from app.labeling_assistant.dataset import is_human_checked  # noqa: E402
 from app.labeling_assistant.evaluator import ClassifierEvaluator  # noqa: E402
+from app.labeling_assistant.sequence import (  # noqa: E402  (shared with the app's EnsembleClassifier)
+    doc_tensors, embed_texts, macro_f1, predict_docs, train_tagger as train_fold)
 
 LABELS = list(LabelScheme.LABELS)
 
@@ -56,107 +57,12 @@ def embed(sentences, model_name: str, cache: Path, device: str, max_length: int 
     from transformers import AutoModel, AutoTokenizer
 
     tok = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModel.from_pretrained(model_name).to(device).eval()
-    ids, vecs = [], []
-    order = sorted(sentences, key=lambda s: len(s.text))  # similar lengths per batch: less padding
-    with torch.no_grad():
-        for i in range(0, len(order), 64):
-            batch = order[i : i + 64]
-            enc = tok([s.text for s in batch], truncation=True, max_length=max_length, padding=True, return_tensors="pt").to(device)
-            out = model(**enc).last_hidden_state
-            mask = enc["attention_mask"].unsqueeze(-1).float()
-            pooled = (out * mask).sum(1) / mask.sum(1)
-            ids += [s.sentence_id for s in batch]
-            vecs.append(pooled.float().cpu().numpy())
-    vecs_arr = np.concatenate(vecs)
+    model = AutoModel.from_pretrained(model_name).to(device)
+    ids = [s.sentence_id for s in sentences]
+    vecs_arr = embed_texts([s.text for s in sentences], model, tok, device)
     cache.parent.mkdir(parents=True, exist_ok=True)
     np.savez(cache, ids=np.array(ids), vecs=vecs_arr)
     return dict(zip(ids, vecs_arr))
-
-
-class SeqTagger(nn.Module):
-    def __init__(self, dim_in: int, hidden: int = 128, n_labels: int = len(LABELS), dropout: float = 0.3) -> None:
-        super().__init__()
-        self.proj = nn.Sequential(nn.Dropout(dropout), nn.Linear(dim_in, 256), nn.GELU())
-        self.lstm = nn.LSTM(256, hidden, num_layers=2, bidirectional=True, batch_first=True, dropout=dropout)
-        self.out = nn.Sequential(nn.Dropout(dropout), nn.Linear(2 * hidden, n_labels))
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:  # x: (1, n_sentences, dim_in)
-        h, _ = self.lstm(self.proj(x))
-        return self.out(h)
-
-
-def target(s) -> int:
-    """Label id, or -100 (ignored by the loss): our sentences count only when a person checked them;
-    public sentences count when their role maps to one of ours."""
-    checked = is_human_checked(s) if hasattr(s, "source") else s.label is not None
-    return LABELS.index(s.label) if checked and s.label in LABELS else -100
-
-
-def doc_tensors(case, emb):
-    """One judgment: features (sentence vector + relative position) and label ids (-100 = not trained on)."""
-    n = len(case)
-    rel = np.arange(n, dtype=np.float32) / max(1, n - 1)
-    pos = np.stack([rel, np.sin(np.pi * rel), np.cos(np.pi * rel)], axis=1)
-    x = np.concatenate([np.stack([emb[s.sentence_id] for s in case]), pos], axis=1)
-    y = [target(s) for s in case]
-    return torch.tensor(x, dtype=torch.float32).unsqueeze(0), torch.tensor(y)
-
-
-def train_fold(docs_fit, docs_val, dim_in, seed, device, epochs=60, patience=10, init=None):
-    torch.manual_seed(seed)
-    random.seed(seed)
-    counts = np.bincount(torch.cat([y[y >= 0] for _, y in docs_fit]).numpy(), minlength=len(LABELS))
-    weights = torch.tensor((counts.sum() / (len(LABELS) * np.maximum(counts, 1))) ** 0.5, dtype=torch.float32, device=device)
-    model = SeqTagger(dim_in).to(device)
-    if init is not None:
-        model.load_state_dict(init)
-    opt = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-2)
-    loss_fn = nn.CrossEntropyLoss(weight=weights, ignore_index=-100)
-    best, best_state, bad = -1.0, None, 0
-    for _ in range(epochs):
-        model.train()
-        random.shuffle(docs_fit)
-        for x, y in docs_fit:
-            opt.zero_grad()
-            loss = loss_fn(model(x.to(device)).squeeze(0), y.to(device))
-            loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            opt.step()
-        f1 = macro_f1(*predict_docs(model, docs_val, device))
-        if f1 > best:
-            best, best_state, bad = f1, {k: v.detach().clone() for k, v in model.state_dict().items()}, 0
-        else:
-            bad += 1
-            if bad >= patience:
-                break
-    model.load_state_dict(best_state)
-    return model
-
-
-def predict_docs(model, docs, device):
-    model.eval()
-    gold, probs = [], []
-    with torch.no_grad():
-        for x, y in docs:
-            p = torch.softmax(model(x.to(device)).squeeze(0), -1).cpu().numpy()
-            keep = (y >= 0).numpy()
-            gold += y[keep].tolist()
-            probs.append(p[keep])
-    return gold, (np.concatenate(probs) if probs else np.zeros((0, len(LABELS))))
-
-
-def macro_f1(gold, probs):
-    if not len(gold):
-        return 0.0
-    pred = probs.argmax(1)
-    f1s = []
-    for c in range(len(LABELS)):
-        tp = int(((pred == c) & (np.array(gold) == c)).sum())
-        fp = int(((pred == c) & (np.array(gold) != c)).sum())
-        fn = int(((pred != c) & (np.array(gold) == c)).sum())
-        f1s.append(2 * tp / (2 * tp + fp + fn) if tp else 0.0)
-    return float(np.mean(f1s))
 
 
 def main() -> int:

@@ -209,6 +209,10 @@ class JudgmentIntake:
         if checkpoint is None:
             raise RuntimeError(f"no trained classifier in {self.model_dir}; run "
                                "backend/scripts/train_rrl_classifier.py first")
+        from app.labeling_assistant.sequence import EnsembleClassifier, is_ensemble
+
+        if is_ensemble(checkpoint):  # fine-tuned classifier + BiLSTM (train_rrl_final.py)
+            return EnsembleClassifier.load(checkpoint), checkpoint.name
         return RRLClassifier.load(checkpoint), checkpoint.name
 
     def _ensure_worker(self) -> None:

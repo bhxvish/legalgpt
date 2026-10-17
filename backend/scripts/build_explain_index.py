@@ -32,7 +32,10 @@ def main() -> int:
     checked = [x for x in sentences if is_human_checked(x)]
     examples = RRLDataset.examples_from(checked)
     ckpt = latest_checkpoint(s.rrl_model_dir)
-    clf = RRLClassifier.load(ckpt)
+    from app.labeling_assistant.sequence import is_ensemble
+
+    # an ensemble's explanations describe its fine-tuned member; the index still sits at the top
+    clf = RRLClassifier.load(ckpt / "classifier" if is_ensemble(ckpt) else ckpt)
     ctx = context_texts(examples) if clf.context else {}
     vecs = ClassifierExplainer(clf).pooled([e.text for e in examples], [ctx.get(e.sentence_id, "") for e in examples])
     out = ckpt / "neighbours.npz"
