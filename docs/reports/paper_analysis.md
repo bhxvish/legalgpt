@@ -390,7 +390,7 @@ Argument or Ruling (InLegalBERT, `law-ai/InLegalBERT`, fine-tuned).
 
 **Caveats:**
 - 36 judgments is a small corpus; the judgment-level intervals are the honest measure of uncertainty.
-- The deployed Review-tab model is still the fine-tuned one (0.739). Using the ensemble in the app means training the BiLSTM on all judgments and checking its confidence calibration for the review queue.
+- Deployment (§7b): the Review tab now runs the final ensemble, trained on all judgments (`train_rrl_final.py`).
 
 Figure: `docs/figures/fig5_rrl.png`.
 
@@ -456,3 +456,15 @@ noise.
 - More of our own labelled judgments (snapshot v0.4) is the next lever.
 
 Script: `backend/scripts/rrl_round2_report.py`. Figure: `docs/figures/fig5_rrl.png` (rounds 1 and 2).
+
+**Deployed (2026-10-17).** The final system was retrained on 32 of the 36 judgments (`train_rrl_final.py`, Colab L4).
+The snapshot's 4 validation judgments (754 sentences) were held out for epoch choice, early stopping
+and calibration. On them it scores macro-F1 0.875 (the fine-tuned member alone: 0.782). That set also
+tuned the model, so these numbers are optimistic; the cross-validated 0.807 above is the estimate to
+report.
+
+The Review tab runs this ensemble with a review threshold of 0.9. On the validation judgments, 66% of
+sentences are then accepted without review, and 97.0% of those are correct; 10% of them are still
+spot-checked. On a judgment it had never seen (Meera v. State of Tamil Nadu, 67 sentences), the
+upload took 7 s and 32 sentences were highlighted for checking.
+

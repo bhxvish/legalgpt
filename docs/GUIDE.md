@@ -174,6 +174,18 @@ guideline: `python backend/scripts/build_guideline.py`. A test fails if the two 
    python backend/scripts/train_rrl_classifier.py --version v0.1 --cv 5   # case-grouped cross-validation (~1 h on CPU)
    ```
 
+   **The model the Review tab uses now** is an ensemble (cross-validated macro-F1 0.807 vs 0.739 for
+   the single fine-tuned model; `docs/reports/paper_analysis.md` §7):
+   - the components:
+     - InLegalBERT first trained on the public *InRhetoricalRoles* corpus (Kalamkar et al., 2022), then on our judgments;
+     - a BiLSTM that reads the whole judgment in order;
+   - the two are averaged and calibrated;
+   - train it on a Colab L4 with `backend/scripts/colab/LegalGPT_RRL_final_Colab.ipynb` (uses `train_rrl_final.py`);
+   - put the resulting `v0.3-ensemble-…` folder in `data/models/rrl/`. The app loads the newest checkpoint, ensemble or not;
+   - set `REVIEW_TAU_CONF=0.9` in `.env` for it: about 2/3 of sentences are then accepted without review, ~97% correct on held-out judgments;
+   - then run `build_explain_index.py`.
+   The experiment notebooks are `LegalGPT_RRL_ablation_Colab.ipynb` and `LegalGPT_RRL_transfer_Colab.ipynb`.
+
 2. Get new judgments. For example, fetch Supreme Court judgments from the CC-BY-4.0 dataset
    `labofsahil/Indian-Supreme-Court-Judgments` (only the chosen PDFs are downloaded), then collect them:
 

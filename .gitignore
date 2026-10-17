@@ -34,3 +34,8 @@ data/colab/
 
 # public InRhetoricalRoles corpus (CC BY-SA 4.0): used for training only, never committed
 data/rrl_public/
+
+# downloaded model / result archives (the extracted copies live in data/models/)
+/v0.3-ensemble-*.zip
+benchmark/*.zip
+benchmark/metrics.json
