@@ -468,3 +468,19 @@ sentences are then accepted without review, and 97.0% of those are correct; 10% 
 spot-checked. On a judgment it had never seen (Meera v. State of Tamil Nadu, 67 sentences), the
 upload took 7 s and 32 sentences were highlighted for checking.
 
+
+**Label provenance (checked 2026-10-17).** Of the 4,823 "human-checked" sentences in snapshot v0.3,
+529 (11%) were labelled or review-confirmed by an AI assistant (annotator `claude`), not a person.
+They come from 4 Supreme Court judgments added through the review workflow (Rajo 225, Mukesh Singh
+167, Prakash Nishad 107, State of U.P. 30). The other 4,294 are the team's manual annotations
+(4,274) plus the author's own (20).
+
+Sensitivity check on the saved cross-validation predictions, scoring only the 32 judgments labelled
+by people (training still included the 4):
+- deployed model: 0.752;
+- final ensemble: **0.813**;
+- gain: +0.061, McNemar p = 2e-14 (on all 36 judgments: +0.068).
+
+The improvement does not depend on the AI-made labels. The paper should state the provenance. A
+clean re-run without the 4 judgments, or after a person re-checks their labels in the Review tab,
+would remove the caveat entirely.
