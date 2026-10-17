@@ -210,22 +210,32 @@ def fig_size(items, ipc) -> None:
 
 
 def fig_rrl() -> None:
-    src = REPO_ROOT / "data" / "models" / "rrl_cv" / "v0.3-ablation-report.json"
-    if not src.exists():
+    cv = REPO_ROOT / "data" / "models" / "rrl_cv"
+    r1, r2 = cv / "v0.3-ablation-report.json", cv / "v0.3-round2-report.json"
+    if not r1.exists():
         print("fig5_rrl: skipped (run rrl_ablation_report.py --json-out first)")
         return
-    rows = json.loads(src.read_text(encoding="utf-8"))["rows"]
-    fig, ax = plt.subplots(figsize=(8, 3.4))
-    style(ax, f"Sentence roles in judgments: macro-F1 on held-out judgments (5-fold CV, 36 judgments)")
+    rows = [(r["model"], r["macro_f1"]) for r in json.loads(r1.read_text(encoding="utf-8"))["rows"]]
+    rows = [(n.replace("Ensemble (+ both, + sequence)", "Ensemble, round 1"), f) for n, f in rows]
+    if r2.exists():
+        d = json.loads(r2.read_text(encoding="utf-8"))
+        single = {x["model"]: x["macro_f1"] for x in d["single"]}
+        final = next(x for x in d["ensembles"] if x["fine_tuned"] == "public transfer"
+                     and x["sequence"] == "BiLSTM pretrained on public + transferred vectors")
+        rows += [("+ public-corpus transfer", single["public transfer"]),
+                 ("BiLSTM, public pretraining + vectors", single["BiLSTM pretrained on public + transferred vectors"]),
+                 ("Final ensemble (round 2)", final["macro_f1"])]
+    fig, ax = plt.subplots(figsize=(8, 0.45 * len(rows) + 1.0))
+    style(ax, "Sentence roles in judgments: macro-F1 on held-out judgments (5-fold CV, 36 judgments)")
     ax.xaxis.grid(True, color=GRID, linewidth=0.8)
     ax.yaxis.grid(False)
-    labels, vals = [r["model"] for r in rows][::-1], [100 * r["macro_f1"] for r in rows][::-1]
-    colours = [SERIES[1] if lab.startswith("Ensemble") else SERIES[0] for lab in labels]
+    labels, vals = [r[0] for r in rows][::-1], [100 * r[1] for r in rows][::-1]
+    colours = [SERIES[1] if lab.startswith(("Ensemble", "Final")) else SERIES[0] for lab in labels]
     ax.barh(labels, vals, height=0.6, color=colours, edgecolor=SURFACE, linewidth=1)
     for y, v in enumerate(vals):
         ax.text(v + 0.6, y, f"{v:.1f}", va="center", fontsize=8, color=INK)
-    ax.set_xlim(50, 85)
-    ax.set_xlabel("macro-F1 x 100 (axis starts at 50)", color=INK2, fontsize=8)
+    ax.set_xlim(50, 88)
+    ax.set_xlabel("macro-F1 x 100 (axis starts at 50); orange = averaged ensembles", color=INK2, fontsize=8)
     save(fig, "fig5_rrl")
 
 

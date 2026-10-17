@@ -39,7 +39,8 @@ def load_rows(version: str) -> dict[str, dict[str, tuple[str, str, str]]]:
                       ("full", "+ position + neighbours")]:
         d = json.loads(latest(f"{version}-cv5-abl-{tag}-*.json").read_text(encoding="utf-8"))
         rows[name] = {p["sentence_id"]: (p["case_id"], p["gold"], p["pred"]) for p in d["predictions"]}
-    seq = json.loads(latest(f"{version}-cv5-sequence-*.json").read_text(encoding="utf-8"))
+    # round 1's sequence run (round-2 runs carry a tag after "sequence-")
+    seq = json.loads(latest(f"{version}-cv5-sequence-2026*.json").read_text(encoding="utf-8"))
     case_of = {sid: v[0] for sid, v in rows["Sentence only"].items()}
     argmax = lambda probs: max(probs, key=probs.get)  # noqa: E731
     rows["BiLSTM sequence model"] = {p["sentence_id"]: (case_of[p["sentence_id"]], p["gold"], argmax(p["probabilities"]))

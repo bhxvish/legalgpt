@@ -393,3 +393,66 @@ Argument or Ruling (InLegalBERT, `law-ai/InLegalBERT`, fine-tuned).
 - The deployed Review-tab model is still the fine-tuned one (0.739). Using the ensemble in the app means training the BiLSTM on all judgments and checking its confidence calibration for the review queue.
 
 Figure: `docs/figures/fig5_rrl.png`.
+
+### 7b. Round 2: longer training and transfer from a public corpus
+
+**Public corpus:** *InRhetoricalRoles* (Kalamkar et al., LREC 2022; CC BY-SA 4.0, used for
+training only and not redistributed).
+- 245 train and 30 dev judgments, 23,029 labelled sentences.
+- Its 13 roles were mapped onto our 5 (`build_rrl_public.py`). PREAMBLE, ISSUE and NONE are read as context only.
+- Public judgments that share sentences with ours are dropped first.
+- Stage A (`pretrain_rrl_public.py`, 2 epochs) reaches macro-F1 0.687 / accuracy 80.8% on the public dev set under the mapping.
+
+Our cross-validation uses the same 5 folds and the same 4,823 sentences as above (Colab L4).
+
+| Single model | Macro-F1 | Accuracy |
+|---|---|---|
+| deployed (InLegalBERT, context; row 4 above) | 0.739 | 77.1% |
+| longer training (10 epochs, 384 tokens, lr 2e-5) | 0.743 | 77.4% |
+| public transfer (stage A, then our judgments) | 0.757 | 78.6% |
+| public transfer + longer training | 0.745 | 77.5% |
+| BiLSTM (round 1) | 0.720 | 76.6% |
+| BiLSTM pretrained on the public judgments | 0.782 | 80.2% |
+| BiLSTM pretrained on the public judgments + stage-A sentence vectors | 0.793 | 81.4% |
+
+**Ensembles:** every fine-tuned model averaged 50/50 with every sequence model gives macro-F1 between
+0.780 and 0.815. All six that combine a public-pretrained BiLSTM are 0.804 or above.
+
+**Final system:** the public transfer averaged with the BiLSTM pretrained on the public judgments
+plus stage-A vectors, i.e. both improvements together. I chose this combination before computing the
+ensemble grid. Its cell (0.807) is not the grid's best (0.815): the cells differ by less than the
+noise.
+- **Overall:** macro-F1 **0.807**, accuracy 81.3%.
+- **Per class:** Facts 0.888, Law Applied **0.750**, Precedent **0.832**, Argument 0.812, Ruling 0.755.
+
+| Comparison | Macro-F1 change (95% CI, judgment bootstrap) | Fixed / broken | McNemar p |
+|---|---|---|---|
+| public transfer vs deployed (single models) | +0.018 (-0.004 to +0.040) | 343 / 269 | 0.003 |
+| upgraded BiLSTM vs round-1 BiLSTM | +0.072 (+0.023 to +0.127) | 528 / 294 | 3e-16 |
+| **final ensemble vs deployed** | **+0.068 (+0.041 to +0.096)** | **535 / 268** | **3e-21** |
+| final ensemble vs round-1 ensemble | +0.026 (-0.006 to +0.056) | 352 / 260 | 2e-4 |
+| final ensemble vs its best single member (upgraded BiLSTM) | +0.015 (+0.005 to +0.025) | 159 / 100 | 3e-4 |
+
+**What this shows:**
+- **The public corpus helps most through the sequence model.** Pretraining the BiLSTM on 245 public
+  judgments lifts it from 0.720 to 0.782, and stage-A vectors to 0.793. That is now the best single
+  model.
+- **Fine-tuning gains are smaller.** For the fine-tuned classifier, transfer gives +1.8 points (the
+  per-sentence test is significant; the judgment-level CI touches 0), and longer training gives
+  almost nothing (+0.4).
+- **Averaging still pays.** The two models still make different mistakes, so averaging them adds
+  +1.5 points over the best single model, significant at both levels.
+- **Overall:** the final system is +6.8 points over the deployed model and +14.0 points over the
+  sentence-only baseline (0.667 → 0.807). The weakest classes gain most: Law Applied 0.632 → 0.750
+  and Precedent 0.716 → 0.832.
+- **Confidence still works for review.** The final ensemble's averaged confidence (not
+  temperature-calibrated) still separates easy from hard sentences: ≥ 0.9 covers 40% of sentences
+  at 96.8% accuracy; ≥ 0.95 covers 12% at 98.8%.
+
+**Caveats:**
+- The public labels follow a different guideline. In particular, ANALYSIS sentences stating a
+  general principle would be Law Applied in ours.
+- 36 of our judgments is still small; the judgment-level intervals are the honest uncertainty.
+- More of our own labelled judgments (snapshot v0.4) is the next lever.
+
+Script: `backend/scripts/rrl_round2_report.py`. Figure: `docs/figures/fig5_rrl.png` (rounds 1 and 2).
