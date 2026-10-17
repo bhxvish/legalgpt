@@ -31,3 +31,6 @@ data/reports/
 # ZKML: proving keys (~1 GB), compiled circuits and the server signing key
 data/zk/
 data/colab/
+
+# public InRhetoricalRoles corpus (CC BY-SA 4.0): used for training only, never committed
+data/rrl_public/

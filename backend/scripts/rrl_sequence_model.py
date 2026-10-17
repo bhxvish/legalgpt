@@ -12,6 +12,10 @@ Evaluation uses exactly the case folds of a cross-validation file from train_rrl
 probabilities of that run's fine-tuned classifier are averaged with this model's (two
 independently trained models; no stage-2 training on stage-1 outputs, so no leakage).
 
+Options for the transfer experiment: --encoder takes the sentence vectors from another checkpoint
+(e.g. the one fine-tuned on the public corpus, pretrain_rrl_public.py), and --pretrain-public first
+trains the BiLSTM on the public judgments (data/rrl_public) and starts every fold from those weights.
+
 Usage (from the repo root):
     .venv-gpu\\Scripts\\python backend/scripts/rrl_sequence_model.py --version v0.3 \\
         --folds-from data/models/rrl_cv/v0.3-cv5-abl-full-*.json [--ensemble-with <same file>]
@@ -82,22 +86,31 @@ class SeqTagger(nn.Module):
         return self.out(h)
 
 
+def target(s) -> int:
+    """Label id, or -100 (ignored by the loss): our sentences count only when a person checked them;
+    public sentences count when their role maps to one of ours."""
+    checked = is_human_checked(s) if hasattr(s, "source") else s.label is not None
+    return LABELS.index(s.label) if checked and s.label in LABELS else -100
+
+
 def doc_tensors(case, emb):
-    """One judgment: features (sentence vector + relative position) and label ids (-100 = unchecked)."""
+    """One judgment: features (sentence vector + relative position) and label ids (-100 = not trained on)."""
     n = len(case)
     rel = np.arange(n, dtype=np.float32) / max(1, n - 1)
     pos = np.stack([rel, np.sin(np.pi * rel), np.cos(np.pi * rel)], axis=1)
     x = np.concatenate([np.stack([emb[s.sentence_id] for s in case]), pos], axis=1)
-    y = [LABELS.index(s.label) if is_human_checked(s) and s.label in LABELS else -100 for s in case]
+    y = [target(s) for s in case]
     return torch.tensor(x, dtype=torch.float32).unsqueeze(0), torch.tensor(y)
 
 
-def train_fold(docs_fit, docs_val, dim_in, seed, device, epochs=60, patience=10):
+def train_fold(docs_fit, docs_val, dim_in, seed, device, epochs=60, patience=10, init=None):
     torch.manual_seed(seed)
     random.seed(seed)
     counts = np.bincount(torch.cat([y[y >= 0] for _, y in docs_fit]).numpy(), minlength=len(LABELS))
     weights = torch.tensor((counts.sum() / (len(LABELS) * np.maximum(counts, 1))) ** 0.5, dtype=torch.float32, device=device)
     model = SeqTagger(dim_in).to(device)
+    if init is not None:
+        model.load_state_dict(init)
     opt = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-2)
     loss_fn = nn.CrossEntropyLoss(weight=weights, ignore_index=-100)
     best, best_state, bad = -1.0, None, 0
@@ -153,7 +166,10 @@ def main() -> int:
     ap.add_argument("--ensemble-with", default=None, help="a CV JSON saved with --save-predictions (glob ok)")
     ap.add_argument("--seeds", type=int, default=3, help="independent runs per fold; probabilities are averaged")
     ap.add_argument("--val-cases", type=int, default=3)
-    ap.add_argument("--model", default=DEFAULT_MODEL)
+    ap.add_argument("--model", default=DEFAULT_MODEL, help="encoder for the sentence vectors")
+    ap.add_argument("--encoder", default=None, help="alias of --model (a fine-tuned checkpoint directory works too)")
+    ap.add_argument("--pretrain-public", type=Path, default=None, help="data/rrl_public: pretrain the BiLSTM on the public judgments")
+    ap.add_argument("--tag", default="")
     args = ap.parse_args()
 
     s = get_settings()
@@ -164,8 +180,28 @@ def main() -> int:
         cases.setdefault(x.case_id, []).append(x)
     for c in cases.values():
         c.sort(key=lambda x: x.idx)
-    emb = embed(sentences, args.model, s.rrl_model_dir.parent / "rrl_seq" / f"emb-{args.version}.npz", device)
+    encoder = args.encoder or args.model
+    enc_tag = "" if encoder == DEFAULT_MODEL else "-" + Path(encoder).name
+    public = {}
+    if args.pretrain_public:
+        from app.labeling_assistant.dataset import RRLExample
+
+        for split in ("train", "dev"):
+            rows = [json.loads(x) for x in (args.pretrain_public / f"{split}.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
+            for r in rows:
+                public.setdefault(split, {}).setdefault(r["case_id"], []).append(
+                    RRLExample(r["sentence_id"], r["case_id"], r["idx"], r["text"], r["label"]))
+    all_sentences = list(sentences) + [e for split in public.values() for doc in split.values() for e in doc]
+    emb = embed(all_sentences, encoder, s.rrl_model_dir.parent / "rrl_seq" / f"emb-{args.version}{enc_tag}{'-pub' if public else ''}.npz", device)
     dim_in = next(iter(emb.values())).shape[0] + 3
+
+    init = None
+    if public:
+        pub_fit = [doc_tensors(sorted(d, key=lambda e: e.idx), emb) for d in public["train"].values()]
+        pub_val = [doc_tensors(sorted(d, key=lambda e: e.idx), emb) for d in public["dev"].values()]
+        pre = train_fold(pub_fit, pub_val, dim_in, 7, device, epochs=30, patience=5)
+        init = {k: v.detach().clone() for k, v in pre.state_dict().items()}
+        print(f"BiLSTM pretrained on {len(pub_fit)} public judgments (dev macro-F1 {macro_f1(*predict_docs(pre, pub_val, device)):.3f})")
 
     folds_file = sorted(glob.glob(args.folds_from))[-1]
     fold_cases = json.load(open(folds_file, encoding="utf-8"))["fold_cases"]
@@ -185,7 +221,7 @@ def main() -> int:
         test_docs = [doc_tensors(cases[c], emb) for c in test_cases]
         probs_sum = None
         for seed in range(args.seeds):
-            model = train_fold(list(fit_docs), val_docs, dim_in, 1000 * k + seed, device)
+            model = train_fold(list(fit_docs), val_docs, dim_in, 1000 * k + seed, device, init=init)
             gold, probs = predict_docs(model, test_docs, device)
             probs_sum = probs if probs_sum is None else probs_sum + probs
         probs = probs_sum / args.seeds
@@ -213,7 +249,8 @@ def main() -> int:
         summary[name] = {"macro_f1_mean": st.mean(f1), "macro_f1_sd": st.stdev(f1), "accuracy_mean": st.mean(acc),
                          "folds": [m.to_dict() for m in ms]}
         print(f"{name}: macro-F1 {st.mean(f1):.3f} ± {st.stdev(f1):.3f}, accuracy {st.mean(acc):.3f}")
-    out = s.rrl_model_dir.parent / "rrl_cv" / f"{args.version}-cv{len(fold_cases)}-sequence-{datetime.now():%Y%m%d-%H%M%S}.json"
+    tag = f"-{args.tag}" if args.tag else ""
+    out = s.rrl_model_dir.parent / "rrl_cv" / f"{args.version}-cv{len(fold_cases)}-sequence{tag}-{datetime.now():%Y%m%d-%H%M%S}.json"
     out.write_text(json.dumps({"version": args.version, "folds_from": folds_file, "ensemble_with": args.ensemble_with and ens_file,
                                "seeds": args.seeds, "fold_cases": fold_cases, "summary": summary, "predictions": saved}, indent=1),
                    encoding="utf-8")
