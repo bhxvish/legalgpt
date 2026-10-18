@@ -134,6 +134,10 @@ In the app this is the **Label** tab: upload judgments there, check InLegalBERT'
 label blind where the tab asks (blind samples, judgments sent back, second labellings). The steps
 below are the command-line route for a batch of files.
 
+**The model's accuracy on blind samples** (labels it could not influence): once some blind samples
+are labelled, `python backend/scripts/eval_blind_samples.py` compares them with the model's
+predictions (accuracy, macro-F1, per role, confident vs flagged sentences).
+
 1. Put criminal judgments as plain `.txt` files in `data/inbox/` (git-ignored), then collect them:
 
    ```bash
