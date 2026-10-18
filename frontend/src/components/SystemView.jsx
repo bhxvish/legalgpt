@@ -178,7 +178,13 @@ export default function SystemView() {
             analysis uses both. M0-M5 are the modules in the paper; numbers marked live come from this server, the
             others from the evaluations (hover a result for its source).
           </p>
-          {error && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">Live counts unavailable ({error}); the diagram still applies.</p>}
+          {error && (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">
+              {error.includes('404')
+                ? 'Live counts need a newer backend: restart it to load GET /api/system. The diagram still applies.'
+                : `Live counts unavailable (${error}); the diagram still applies.`}
+            </p>
+          )}
         </div>
 
         <div className="space-y-3">
