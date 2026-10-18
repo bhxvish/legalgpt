@@ -37,7 +37,9 @@ const done = (p) => p && p.sentences > 0 && p.labelled === p.sentences
 function stateOf(c) {
   const q = c.queue
   // not through InLegalBERT's queue: the original labelled collection (or not labelled at all)
-  if (!q) return c.labelled_by?.length
+  // an older backend sends no labelled_by: say nothing rather than "Not labelled"
+  if (!q && c.labelled_by === undefined) return { key: 'hand', text: 'In the label store', mode: 'blind', tone: 'bg-slate-50 text-slate-600 ring-slate-200' }
+  if (!q) return c.labelled_by.length
     ? { key: 'hand', text: 'Labelled', mode: 'blind', tone: 'bg-emerald-50 text-emerald-700 ring-emerald-200' }
     : { key: 'unlabelled', text: 'Not labelled', mode: 'blind', tone: 'bg-amber-50 text-amber-800 ring-amber-200' }
   if (q.status === 'escalated') return { key: 'sent', text: 'Sent back · label by hand', mode: 'blind', tone: 'bg-amber-50 text-amber-800 ring-amber-200' }
