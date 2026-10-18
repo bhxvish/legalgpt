@@ -99,10 +99,34 @@ def judge(goal: str, report: dict) -> bool:
     return False
 
 
+def run(analyzer, text: str, llm) -> dict:
+    report = {"offences": [], "analysis": "", "guard": []}
+    try:
+        for event, data in analyzer.analyze(text, llm):
+            if event == "facts":
+                report["summary"], report["offences"] = data["summary"], data["offences"]
+            elif event == "token":
+                report["analysis"] += data["text"]
+            elif event == "analysis_replace":
+                report["analysis"] = data["text"]  # what the user sees after the output guard
+            elif event == "elements":
+                report["elements"] = data["checks"]
+            elif event == "guard":
+                report["guard"].append(data)
+            elif event == "error":
+                report["error"] = data["message"]
+    except Exception as e:
+        report["error"] = f"{type(e).__name__}: {e}"
+    report["model"] = getattr(llm, "model_id", "")
+    return report
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--no-harden", action="store_true", help="the analyzer's earlier prompts, without the defences")
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--fixed", action="store_true", help="no fallback to other models: wait out rate limits instead")
+    ap.add_argument("--rerun-errors", action="store_true", help="keep finished rows of an earlier run; redo those that failed")
     ap.add_argument("--model", default="", help="chat model id, e.g. gemini:gemini-3.8-flash (default: the app default)")
     args = ap.parse_args()
 
@@ -113,32 +137,37 @@ def main() -> int:
     s = get_settings()
     chat = build_chat_router(s)
     first = chat.models[args.model or chat.default_model]
-    backups = [m for k, m in chat.models.items() if m is not first and not getattr(m, "is_local", False)
+    backups = [] if args.fixed else [m for k, m in chat.models.items() if m is not first and not getattr(m, "is_local", False)
                and (k == "groq" or str(getattr(m, "model_id", "")).startswith("gemini:"))]
     analyzer = CaseAnalyzer(chat.retriever, None, None, chat.judgments, valid_sections=ipc_sections(),
                             harden=not args.no_harden)
     tag = ("baseline" if args.no_harden else "hardened") + (f"-{args.model.split(':')[-1]}" if args.model else "")
     OUT.mkdir(parents=True, exist_ok=True)
     rows, t0 = [], time.time()
+    earlier = {}
+    if args.rerun_errors and (OUT / f"{tag}.jsonl").exists():
+        earlier = {r["id"]: r for r in map(json.loads, (OUT / f"{tag}.jsonl").read_text(encoding="utf-8").splitlines())
+                   if not r["report"].get("error")}
     for f in attack_files(args.limit):
+        if f["id"] in earlier:
+            rows.append({**earlier[f["id"]], "success": judge(f["goal"], earlier[f["id"]]["report"])})
+            continue
         llm = StickyFallback([first] + backups)
-        report = {"offences": [], "analysis": "", "guard": []}
-        try:
-            for event, data in analyzer.analyze(f["text"], llm):
-                if event == "facts":
-                    report["summary"], report["offences"] = data["summary"], data["offences"]
-                elif event == "token":
-                    report["analysis"] += data["text"]
-                elif event == "elements":
-                    report["elements"] = data["checks"]
-                elif event == "guard":
-                    report["guard"].append(data)
-                elif event == "error":
-                    report["error"] = data["message"]
-        except Exception as e:
-            report["error"] = f"{type(e).__name__}: {e}"
+        report = run(analyzer, f["text"], llm)
+        from app.benchmark.quota import QuotaWaiter
+
+        waiter = QuotaWaiter(True, 3.0)
+        for _ in range(6):  # a rate limit mid-analysis: wait and run the file again
+            err = report.get("error", "")
+            if not any(w in err.lower() for w in ("ratelimit", "too many requests", "usage limit", "rate limit", "could not read facts")):
+                break
+            if "daily" in err.lower():
+                waiter.wait(RuntimeError(err))
+            else:
+                time.sleep(60)
+            report = run(analyzer, f["text"], StickyFallback([first] + backups))
         hit = judge(f["goal"], report)
-        rows.append({**f, "model": llm.model_id, "success": hit, "report": report})
+        rows.append({**f, "model": report["model"], "success": hit, "report": report})
         print(f"  {f['id']:34} {f['goal']:9} {'ATTACK WORKED' if hit else 'resisted'}"
               f"{'  [guard: ' + ', '.join(g['kind'] for g in report['guard']) + ']' if report['guard'] else ''}"
               f"{'  ERROR ' + report['error'][:60] if report.get('error') else ''}", flush=True)
@@ -147,11 +176,13 @@ def main() -> int:
     summary = {g: {"attacks": sum(r["goal"] == g for r in rows), "succeeded": sum(r["goal"] == g and r["success"] for r in rows)}
                for g in goals}
     total = sum(r["success"] for r in rows)
+    failed = sum(bool(r["report"].get("error")) for r in rows)
     print(f"\n{tag}: {total}/{len(rows)} attacks reached their goal ({time.time() - t0:.0f}s)")
     for g, v in summary.items():
         print(f"  {g:9} {v['succeeded']}/{v['attacks']}")
     (OUT / f"{tag}-summary.json").write_text(json.dumps({"total": total, "n": len(rows), "by_goal": summary,
-                                                         "models": sorted({r['model'] for r in rows})}, indent=1), encoding="utf-8")
+                                                         "models": sorted({r['model'] for r in rows}),
+                                                         "runs_with_errors": failed}, indent=1), encoding="utf-8")
     return 0
 
 

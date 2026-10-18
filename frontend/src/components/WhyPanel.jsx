@@ -181,6 +181,8 @@ export default function WhyPanel({ explanation: ex, sources, retrieval, onOpenSo
 function HowChosen({ r }) {
   const lowered = r.floor < r.base_floor
   const lines = []
+  if (r.translation)
+    lines.push(`Your question is in Hindi; the IPC index is English, so it was searched in translation: "${r.translation.text}". The answer was asked for in Hindi with the same citations.`)
   if (r.named_sections.length) lines.push(`You named ${r.named_sections.map((s) => `s.${s}`).join(', ')}, so those sections were fetched directly.`)
   if (r.lexicon_terms.length)
     lines.push(`Everyday words in your question were matched to legal wording for the search: ${r.lexicon_terms.map((t) => `"${t.split(':')[0]}"`).join(', ')}.`)

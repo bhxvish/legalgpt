@@ -88,6 +88,7 @@ class ChatRouter:
         rewriter: "QueryRewriter | None" = None,
         offline: bool = False,
         judgments: "Any | None" = None,
+        translator: "Any | None" = None,
     ) -> None:
         """`llm` is the default model. `models` adds named alternatives a request can choose with
         `model` (the base-vs-tuned toggle); `model_notes` explains slow or unavailable ones."""
@@ -105,6 +106,11 @@ class ChatRouter:
         self.rewriter = rewriter  # LLM query rewrite for everyday fact patterns (query_rewriter.py)
         self.offline = offline  # OFFLINE_MODE: local models rewrite for themselves; nothing goes to a hosted model
         self.judgments = judgments  # JudgmentSearch: real judgments cited after the IPC sources
+        if translator is None:
+            from app.core.language import Translator
+
+            translator = Translator()
+        self.translator = translator  # Hindi questions -> English for retrieval (language.py)
         self.router = APIRouter(prefix="/api", tags=["chat"])
         self.router.add_api_route("/chat", self.chat, methods=["POST"], response_class=StreamingResponse)
         self.router.add_api_route("/models", self.list_models, methods=["GET"], response_model=list[ModelInfo])
@@ -171,16 +177,32 @@ class ChatRouter:
         sources = self.retriever.retrieve(question, context=context)  # minimal retrievers (tests)
         return RetrievalResult(sources, max((s.similarity for s in sources), default=0.0), 0.0, len(sources))
 
+    def _translate(self, text: str | None, llm: LLMClient) -> tuple[str | None, str | None]:
+        """(text to search with, its English translation if `text` is Hindi)."""
+        from app.core.language import detect
+
+        if not text or detect(text) != "hi" or self.translator is None:
+            return text, None
+        english = self.translator.to_english(text, self._rewrite_llm(llm))
+        return english or text, english
+
     def _legal(self, question: str, history: list[Message], llm: LLMClient) -> Iterator[str]:
+        from app.core.language import HINDI_RULE, SCOPE_REFUSAL_HI, detect
+
+        hindi = detect(question) == "hi"
         previous = next((m.content for m in reversed(history) if m.role == "user"), None)
-        result = self._retrieve(question, previous, llm)
+        # the IPC text and the embedding model are English: a Hindi question is searched in translation
+        search, english = self._translate(question, llm)
+        previous, _ = self._translate(previous, llm)
+        result = self._retrieve(search, previous, llm)
         sources = result.sources
         if not sources:
+            refusal = SCOPE_REFUSAL_HI if hindi else SCOPE_REFUSAL
             yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": True})
-            yield sse("retrieval", self._retrieval_info(question, result))
-            yield sse("token", {"text": SCOPE_REFUSAL})
-            yield from self._explanation(question, result, SCOPE_REFUSAL, True, llm.model_id)
-            yield from self._attestation(question, [], SCOPE_REFUSAL, [], llm.model_id, True, result.used_context,
+            yield sse("retrieval", self._retrieval_info(search, result, english))
+            yield sse("token", {"text": refusal})
+            yield from self._explanation(search, result, refusal, True, llm.model_id)
+            yield from self._attestation(question, [], refusal, [], llm.model_id, True, result.used_context,
                                          self._used_rewrite(result))
             return
         from app.core.bns import annotate
@@ -190,13 +212,16 @@ class ChatRouter:
             result = replace(result, sources=sources)
         yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": False})
         yield sse("sources", [s.model_dump() for s in sources])
-        yield sse("retrieval", self._retrieval_info(question, result))
-        messages = self.prompt_builder.build(question, sources, "legal", history)
+        yield sse("retrieval", self._retrieval_info(search, result, english))
+        asked = f"{question}\n(English translation: {english})" if english else question
+        messages = self.prompt_builder.build(asked, sources, "legal", history)
+        if hindi:
+            messages[0] = Message("system", messages[0].content + "\n" + HINDI_RULE)
         answer: list[str] = []
         for text in normalize_stream(llm.stream(messages)):
             answer.append(text)
             yield sse("token", {"text": text})
-        yield from self._explanation(question, result, "".join(answer), False, llm.model_id)
+        yield from self._explanation(search, result, "".join(answer), False, llm.model_id)
         yield from self._attestation(question, messages, "".join(answer), sources, llm.model_id, False,
                                      result.used_context, self._used_rewrite(result))
 
@@ -216,7 +241,7 @@ class ChatRouter:
             logger.exception("judgment search failed")
             return []
 
-    def _retrieval_info(self, question: str, result: RetrievalResult) -> dict[str, Any]:
+    def _retrieval_info(self, question: str, result: RetrievalResult, english: str | None = None) -> dict[str, Any]:
         """Why these sources: the floor in force (lowered by the scope check for everyday fact
         patterns), the statutory wording the lexicon added, follow-up context, and per source its
         similarity and the weight applied by the reranker."""
@@ -225,6 +250,8 @@ class ChatRouter:
 
         named = QueryExpander.section_refs(question)
         return {
+            # a Hindi question: the English text that was searched (and that a retrieval proof covers)
+            **({"translation": {"from": "hi", "text": english}} if english else {}),
             "floor": round(result.min_similarity, 3),
             "base_floor": getattr(self.retriever, "min_similarity", result.min_similarity),
             "best_similarity": round(result.best_similarity, 3),

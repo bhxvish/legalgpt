@@ -171,7 +171,7 @@ export function AnswerProof({ msg }) {
     setBusy('retr')
     setError('')
     try {
-      const bundle = await zkApi.proveRetrieval(msg.question, att.record?.retrieval_rewrite)
+      const bundle = await zkApi.proveRetrieval(msg.retrieval?.translation?.text || msg.question, att.record?.retrieval_rewrite)
       const check = await zkApi.verify(bundle)
       // the proof covers the IPC index; judgment passages come from a separate collection
       const shown = (msg.sources || []).filter((s) => s.kind !== 'judgment').map((s) => s.chunk_id)

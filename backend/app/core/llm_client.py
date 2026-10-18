@@ -5,6 +5,7 @@ open model locally, optionally with a LoRA adapter. Callers depend on LLMClient 
 """
 
 import json
+import logging
 import os
 import re
 import threading
@@ -15,6 +16,7 @@ from typing import Any
 
 from app.core.models import Message
 
+logger = logging.getLogger(__name__)
 
 class LLMClientError(RuntimeError):
     """Raised when the backing model cannot be reached or is misconfigured."""
@@ -84,7 +86,9 @@ class GroqClient(LLMClient):
         client: Any | None = None,
         max_retries: int = 5,  # 429s on the free tier (8k tokens/min) clear in seconds; the SDK honours retry-after
     ) -> None:
-        self.api_key = api_key
+        # GROQ_API_KEY may list several keys, comma-separated: on a rate limit the next one is used
+        self.api_keys = [k.strip() for k in (api_key or "").split(",") if k.strip()]
+        self.api_key = self.api_keys[0] if self.api_keys else ""
         self.model_id = model
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -105,16 +109,30 @@ class GroqClient(LLMClient):
         return [{"role": m.role, "content": m.content} for m in messages]
 
     def _create(self, messages: list[Message], **kwargs: Any) -> Any:
-        try:
-            return self.client.chat.completions.create(
-                model=self.model_id,
-                messages=self._payload(messages),
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                **kwargs,
-            )
-        except Exception as exc:
-            raise groq_error(exc) from exc
+        tried = 0
+        while True:
+            try:
+                return self.client.chat.completions.create(
+                    model=self.model_id,
+                    messages=self._payload(messages),
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                    **kwargs,
+                )
+            except Exception as exc:
+                err = groq_error(exc)
+                tried += 1
+                if isinstance(err, LLMRateLimitError) and tried < len(self.api_keys):
+                    self._next_key()
+                    continue
+                raise err from exc
+
+    def _next_key(self) -> None:
+        i = self.api_keys.index(self.api_key) if self.api_key in self.api_keys else -1
+        self.api_key = self.api_keys[(i + 1) % len(self.api_keys)]
+        self._client = None
+        logger.warning("Groq rate limit: switched to API key %d of %d", self.api_keys.index(self.api_key) + 1,
+                       len(self.api_keys))
 
     def generate(self, messages: list[Message]) -> str:
         return self._create(messages).choices[0].message.content or ""

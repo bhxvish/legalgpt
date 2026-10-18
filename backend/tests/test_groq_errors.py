@@ -90,3 +90,31 @@ def test_chat_suggests_the_local_model_only_when_it_exists() -> None:
     with_adapter = _error_message({"groq": RateLimitedLLM(), "adapter": StubLLM()})
     assert with_adapter.startswith("The hosted model's daily usage limit") and "Local (LoRA)" in with_adapter
     assert "Local (LoRA)" not in _error_message({"groq": RateLimitedLLM()})
+
+
+def test_a_rate_limited_key_hands_over_to_the_next(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    import app.core.llm_client as lc
+
+    monkeypatch.setattr(lc, "groq_error", lambda exc: lc.LLMRateLimitError(str(exc)))
+    used = []
+
+    class Keys(lc.GroqClient):
+        @property
+        def client(self):
+            def create(**kw):
+                used.append(self.api_key)
+                if self.api_key == "k1":
+                    raise RuntimeError("429")
+                return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))])
+
+            return SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+
+    assert Keys(api_key="k1, k2").generate([]) == "ok" and used == ["k1", "k2"]
+    used.clear()
+    try:
+        Keys(api_key="k1").generate([])
+    except lc.LLMRateLimitError:
+        pass
+    assert used == ["k1"]  # a single key: the error is raised as before
