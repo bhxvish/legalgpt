@@ -38,7 +38,7 @@ export default function SourceModal({ source, onClose }) {
             {source.kind === 'judgment' && (
               <p className="mt-1 text-xs text-slate-500">
                 {source.court || 'Court not recorded'} · passage labelled <b>{source.role}</b> by the sentence-role model (InLegalBERT ensemble){' '}
-                <a href="#review" onClick={onClose} className="whitespace-nowrap font-medium text-indigo-600 hover:underline">
+                <a href="#label" onClick={onClose} className="whitespace-nowrap font-medium text-indigo-600 hover:underline">
                   <span className="font-mono text-[10px]">M2</span> how roles are labelled →
                 </a>
               </p>

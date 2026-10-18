@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { API_BASE_URL } from './api.js'
-import AnnotateView from './components/AnnotateView.jsx'
 import CaseAnalysisView from './components/CaseAnalysisView.jsx'
 import ChatWindow from './components/ChatWindow.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
-import ReviewView from './components/ReviewView.jsx'
+import LabelView from './components/LabelView.jsx'
 import SystemView from './components/SystemView.jsx'
 import VerifyPanel from './components/VerifyPanel.jsx'
 import { LogoMark, TabIcons } from './components/LawArt.jsx'
@@ -70,8 +69,7 @@ function HealthBadge() {
 // using it (every question). `module`: the module number in the paper.
 const VIEWS = [
   { id: 'system', label: 'Overview', short: 'Home', group: 'overview' },
-  { id: 'annotate', label: 'Annotate', group: 'build', module: 'M1' },
-  { id: 'review', label: 'Review', group: 'build', module: 'M2' },
+  { id: 'label', label: 'Label', group: 'build', module: 'M1·M2' },
   { id: 'chat', label: 'Chat', group: 'use', module: 'M0' },
   { id: 'case', label: 'Case analysis', short: 'Case', group: 'use' },
   { id: 'verify', label: 'Verify', group: 'use', module: 'M5' },
@@ -121,7 +119,8 @@ function Nav({ view, className }) {
 
 function viewFromHash() {
   const id = window.location.hash.replace('#', '').split('?')[0]
-  return VIEWS.some((v) => v.id === id) ? id : 'system'
+  const alias = { annotate: 'label', review: 'label' }[id] // the former tabs, merged into Label
+  return alias || (VIEWS.some((v) => v.id === id) ? id : 'system')
 }
 
 export default function App() {
@@ -178,13 +177,11 @@ export default function App() {
             <SystemView />
           </ErrorBoundary>
         </div>
-      ) : view === 'annotate' ? (
-        <div key="annotate" className="flex min-h-0 flex-1 animate-rise flex-col">
-          <AnnotateView />
-        </div>
-      ) : view === 'review' ? (
-        <div key="review" className="flex min-h-0 flex-1 animate-rise flex-col">
-          <ReviewView />
+      ) : view === 'label' ? (
+        <div key="label" className="flex min-h-0 flex-1 animate-rise flex-col">
+          <ErrorBoundary>
+            <LabelView />
+          </ErrorBoundary>
         </div>
       ) : view === 'case' ? (
         <div key="case" className="flex min-h-0 flex-1 animate-rise flex-col">

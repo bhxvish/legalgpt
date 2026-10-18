@@ -2,14 +2,9 @@
 // (the System overview shows the whole picture).
 
 const PARTS = {
-  annotate: {
-    module: 'M1',
-    text: 'Labels made here train the sentence-role classifier, which gives every passage of the judgment library its role.',
-    links: [['review', 'Review (M2)'], ['system', 'Overview']],
-  },
-  review: {
-    module: 'M2',
-    text: 'The InLegalBERT ensemble labels new judgments and you check the unsure sentences. These roles decide what the chat cites (rulings, law applied, precedents) and what Case analysis compares (facts).',
+  label: {
+    module: 'M1 · M2',
+    text: 'Checked labels train InLegalBERT, which gives every passage of the judgment library its role: the chat cites rulings, law applied and precedents, and Case analysis compares facts.',
     links: [['chat', 'Chat'], ['case', 'Case analysis'], ['system', 'Overview']],
   },
   verify: {

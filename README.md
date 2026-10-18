@@ -59,7 +59,7 @@ also builds its search index from the IPC text in this repo (about a minute; the
 
 **What works out of the box:** Chat (Legal and General modes), citations, the Why panel, fact
 checking and the Verify tab. The annotation data and trained models are not in this repository,
-so the **Review** and **Annotate** tabs start empty, uploading judgments in the Review tab needs a
+so the **Label** tab starts empty, uploading judgments in the Label tab needs a
 trained sentence-role classifier, and the **Local (LoRA)** model is disabled until you train one (see
 the [full guide](docs/GUIDE.md)).
 
@@ -73,9 +73,10 @@ Try asking:
 
 | Tab | Who it's for | What you do there |
 |---|---|---|
+| **Overview** | Everyone | How the parts fit together: the offline lane that builds the knowledge and the online lane every question runs through, with module numbers, live counts and headline results. |
 | **Chat** | Everyone | Ask questions. *Legal* mode answers only from the IPC with citations; *General* mode is an ordinary chatbot answer. Past conversations are kept in a history sidebar (saved in your browser) where you can start a new chat or delete old ones. |
-| **Review** | Annotators | Upload judgments (.txt or .pdf) and the computer suggests a role for every sentence. You check only the uncertain sentences and a random sample of confident ones: Enter to accept or 1–5 to change, then *Sign off*. |
-| **Annotate** | Annotators | Label a judgment fully by hand: cases the Review step sent back, and a small "gold" sample used to keep measuring the model. |
+| **Label** | Annotators | Upload judgments (.txt or .pdf); InLegalBERT suggests a role for every sentence. You check only the uncertain sentences and a random sample of confident ones (Enter to accept, 1–5 to change, then *Sign off*). Some judgments are labelled blind, with the suggestions hidden: about 1 in 10 uploads (a stable hash of the case id; `REVIEW_BLIND_RATE`), judgments sent back because too many spot checks were wrong, and second labellings for agreement between people. |
+| **Case analysis** | Everyone | Upload a case file; facts with quotes, IPC offences, element checks, similar judgments and a cited analysis (never a verdict). |
 | **Verify** | Everyone | Paste case facts and check them against one of 7 encoded sections (279, 304A, 304B, 323, 337, 338, 379). |
 
 ## Results

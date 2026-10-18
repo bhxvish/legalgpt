@@ -193,7 +193,7 @@ def build_review_router(settings: Settings) -> ReviewRouter:
     # Uploaded judgments are labelled by the newest InLegalBERT checkpoint (loaded on first upload).
     intake = JudgmentIntake(collector, store, queue, settings.rrl_model_dir,
                             tau_conf=settings.review_tau_conf, audit_rate=settings.review_audit_rate)
-    return ReviewRouter(queue, collector, intake)
+    return ReviewRouter(queue, collector, intake, blind_rate=settings.review_blind_rate)
 
 
 def create_app(chat_router: ChatRouter | None = None, annotation_router: AnnotationRouter | None = None) -> FastAPI:

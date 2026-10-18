@@ -1,5 +1,6 @@
 """ReviewRouter: JSON API behind the Review tab (/api/review/...)."""
 
+import hashlib
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -11,6 +12,13 @@ from app.labeling_assistant.review_queue import HumanReviewQueue, QueueCase, Rev
 from app.labeling_assistant.titles import detect_title
 
 
+def is_blind_sample(case_id: str, rate: float) -> bool:
+    """About `rate` of all judgments, chosen by a stable hash of the case id (never by the model or
+    a person), are labelled blind first - suggestions hidden - so the model's accuracy can be measured
+    on labels it did not influence."""
+    return int(hashlib.sha1(case_id.encode()).hexdigest()[:8], 16) / 0xFFFFFFFF < rate
+
+
 class ReviewerBody(BaseModel):
     reviewer: str = Field(min_length=1, max_length=40)
 
@@ -20,8 +28,10 @@ class CorrectionBody(ReviewerBody):
 
 
 class ReviewRouter:
-    def __init__(self, queue: HumanReviewQueue, collector: JudgmentCollector, intake: JudgmentIntake | None = None) -> None:
+    def __init__(self, queue: HumanReviewQueue, collector: JudgmentCollector, intake: JudgmentIntake | None = None,
+                 blind_rate: float = 0.1) -> None:
         self.queue = queue
+        self.blind_rate = blind_rate
         self.collector = collector
         self.intake = intake
         self.router = APIRouter(prefix="/api/review", tags=["review"])
@@ -60,6 +70,7 @@ class ReviewRouter:
             "max_audit_error": self.queue.max_audit_error,
             "tau_conf": case.tau_conf,
             "decision_note": case.decision_note,
+            "blind_sample": is_blind_sample(case.case_id, self.blind_rate),
         }
 
     def list_cases(self) -> list[dict[str, Any]]:

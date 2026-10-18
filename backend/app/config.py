@@ -64,6 +64,8 @@ class Settings(BaseSettings):
     rrl_model_dir: Path = Field(default=REPO_ROOT / "data" / "models" / "rrl", alias="RRL_MODEL_DIR")
     review_tau_conf: float = Field(default=0.7, alias="REVIEW_TAU_CONF")
     review_audit_rate: float = Field(default=0.1, alias="REVIEW_AUDIT_RATE")
+    # share of uploaded judgments labelled blind first (suggestions hidden), to measure the model
+    review_blind_rate: float = Field(default=0.1, alias="REVIEW_BLIND_RATE")
     review_max_audit_error: float = Field(default=0.2, alias="REVIEW_MAX_AUDIT_ERROR")
 
     # Module 3 — LoRA fine-tuning

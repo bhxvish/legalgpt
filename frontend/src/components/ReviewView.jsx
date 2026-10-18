@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import WhereItFits from './WhereItFits.jsx'
 import { annotationApi, reviewApi } from '../api.js'
-import { HeaderArt, GavelArt } from './LawArt.jsx'
-import { stagger } from './motion.jsx'
 import RoleExplanation from './RoleExplanation.jsx'
 
 const PALETTE = [
@@ -18,38 +15,22 @@ const KIND = {
   audit: { text: 'Spot check', hint: 'The model was sure. We check a few of these to catch confident mistakes.', cls: 'bg-amber-50 text-amber-800 ring-amber-200' },
 }
 
-const STATUS = {
+export const STATUS = {
   open: { text: 'To review', cls: 'bg-indigo-50 text-indigo-700 ring-indigo-200' },
   promoted: { text: 'Done — added to corpus', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
   escalated: { text: 'Sent to full annotation', cls: 'bg-amber-50 text-amber-800 ring-amber-200' },
-}
-
-function readStored(key) {
-  try {
-    return localStorage.getItem(key) || ''
-  } catch {
-    return ''
-  }
-}
-
-function writeStored(key, value) {
-  try {
-    localStorage.setItem(key, value)
-  } catch {
-    /* storage unavailable */
-  }
 }
 
 const pct = (x) => `${Math.round(x * 100)}%`
 
 const stroke = { viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }
 
-function Pill({ label, colour }) {
+export function Pill({ label, colour }) {
   return <span className={`inline-block rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ${colour}`}>{label}</span>
 }
 
 /** A bar that grows to `value` (0..1) after mounting. */
-function Meter({ value, tone = 'bg-indigo-500', className = 'w-24' }) {
+export function Meter({ value, tone = 'bg-indigo-500', className = 'w-24' }) {
   const [shown, setShown] = useState(0)
   useEffect(() => {
     const t = requestAnimationFrame(() => setShown(value))
@@ -77,7 +58,7 @@ const UPLOAD = {
 
 /** Upload judgments (.txt / .pdf): the server screens each one, InLegalBERT suggests a role for every
  * sentence, and the case joins the list below with the uncertain sentences highlighted. */
-function UploadPanel({ uploader, onFinished, onOpen }) {
+export function UploadPanel({ uploader, onFinished, onOpen }) {
   const [jobs, setJobs] = useState([])
   const [local, setLocal] = useState([]) // uploads the server refused outright (wrong type, too big)
   const [dragging, setDragging] = useState(false)
@@ -204,7 +185,7 @@ function UploadPanel({ uploader, onFinished, onOpen }) {
   )
 }
 
-function CaseReview({ caseId, reviewer, scheme, onBack }) {
+export function CaseReview({ caseId, reviewer, scheme, onBack }) {
   const [detail, setDetail] = useState(null)
   const [showAll, setShowAll] = useState(false)
   const [cursor, setCursor] = useState(null) // sentence_id
@@ -544,190 +525,6 @@ function CaseReview({ caseId, reviewer, scheme, onBack }) {
             </span>
           </p>
         </div>
-      </div>
-    </div>
-  )
-}
-
-export default function ReviewView() {
-  const [reviewer, setReviewer] = useState(() => readStored('legalgpt.annotator'))
-  const [draft, setDraft] = useState(reviewer)
-  const [scheme, setScheme] = useState([])
-  const [cases, setCases] = useState(null)
-  const [open, setOpen] = useState(null)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    annotationApi.scheme().then(setScheme).catch((e) => setError(e.message))
-  }, [])
-
-  const loadCases = useCallback(() => {
-    reviewApi.cases().then(setCases).catch((e) => setError(e.message))
-  }, [])
-
-  useEffect(() => {
-    if (!open) loadCases()
-  }, [open, loadCases])
-
-  if (!reviewer) {
-    return (
-      <div className="relative isolate flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-4 pt-16">
-        <div aria-hidden="true" className="bg-dots pointer-events-none absolute inset-0 -z-10" />
-        <form
-          className="w-full max-w-sm animate-rise rounded-2xl bg-white p-6 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_16px_40px_-20px_rgb(15_23_42/0.3)] ring-1 ring-slate-200"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (!draft.trim()) return
-            writeStored('legalgpt.annotator', draft.trim())
-            setReviewer(draft.trim())
-          }}
-        >
-          <span className="grid size-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200">
-            <svg {...stroke} className="size-5">
-              <path d="m4.5 10.5 3.5 3.5 7.5-8" />
-            </svg>
-          </span>
-          <h2 className="mt-4 text-lg font-semibold tracking-tight text-slate-900">Who is reviewing?</h2>
-          <p className="mt-1 text-sm text-slate-500">Your name is saved with every check you make.</p>
-          <input
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            maxLength={40}
-            aria-label="Reviewer name"
-            placeholder="e.g. priya"
-            className="mt-5 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-sm text-slate-900 transition-[border-color,box-shadow,background-color] focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-100"
-          />
-          <button
-            type="submit"
-            disabled={!draft.trim()}
-            className="mt-3 w-full rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-on-accent shadow-sm transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-accent-hover disabled:translate-y-0 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
-          >
-            Start reviewing
-          </button>
-        </form>
-      </div>
-    )
-  }
-
-  if (open && scheme.length) {
-    return <CaseReview caseId={open} reviewer={reviewer} scheme={scheme} onBack={() => setOpen(null)} />
-  }
-
-  const counts = (cases || []).reduce((t, c) => ({ ...t, [c.status]: (t[c.status] || 0) + 1 }), {})
-
-  return (
-    <div className="relative isolate min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:py-10">
-      <div aria-hidden="true" className="bg-dots pointer-events-none absolute inset-0 -z-10" />
-      <div className="mx-auto max-w-4xl space-y-5">
-        <header className="relative flex flex-wrap items-end justify-between gap-4">
-          <div aria-hidden="true" className="pointer-events-none absolute -left-24 -top-24 -z-10 h-64 w-[30rem] max-w-[120%] animate-float rounded-full bg-[radial-gradient(closest-side,var(--color-indigo-200),transparent)] opacity-50 blur-2xl" />
-          <HeaderArt>
-            <GavelArt />
-          </HeaderArt>
-          <div>
-            <p className="mb-3 inline-flex animate-rise items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200 backdrop-blur">
-              <span aria-hidden="true" className="size-1.5 rounded-full bg-indigo-500" />
-              Human-in-the-loop · InLegalBERT suggestions
-            </p>
-            <h2 className="animate-rise text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl" style={stagger(1)}>
-              Judgments to review
-            </h2>
-            <p className="mt-1.5 max-w-xl animate-rise text-sm text-slate-500" style={stagger(2)}>
-              The computer suggested roles for these judgments. You only need to check the sentences it highlights.
-            </p>
-          </div>
-          <div className="flex animate-rise items-center gap-2 rounded-xl bg-white/80 py-1.5 pl-1.5 pr-3 ring-1 ring-slate-200 backdrop-blur" style={stagger(2)}>
-            <span className="grid size-7 place-items-center rounded-lg bg-accent text-xs font-bold uppercase text-on-accent">{reviewer.slice(0, 1)}</span>
-            <span className="text-sm">
-              <span className="block text-[11px] leading-tight text-slate-500">Reviewing as</span>
-              <span className="block font-medium leading-tight text-slate-900">{reviewer}</span>
-            </span>
-            <button
-              className="ml-2 rounded-md px-1.5 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
-              onClick={() => {
-                writeStored('legalgpt.annotator', '')
-                setDraft('')
-                setReviewer('')
-              }}
-            >
-              Change
-            </button>
-          </div>
-          <WhereItFits part="review" className="mt-4 animate-rise" />
-        </header>
-
-        {cases && cases.length > 0 && (
-          <div className="grid animate-rise gap-3 sm:grid-cols-3" style={stagger(3)}>
-            {[
-              ['To review', counts.open || 0, 'waiting for a check', 'bg-indigo-500'],
-              ['Added to corpus', counts.promoted || 0, 'signed off', 'bg-emerald-500'],
-              ['Sent to annotation', counts.escalated || 0, 'too many spot-check corrections', 'bg-amber-500'],
-            ].map(([label, value, hint, dot]) => (
-              <div key={label} className="rounded-2xl bg-white px-4 py-3 ring-1 ring-slate-200">
-                <p className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <span aria-hidden="true" className={`size-1.5 rounded-full ${dot}`} />
-                  {label}
-                </p>
-                <p className="mt-0.5 text-xl font-semibold tabular-nums tracking-tight text-slate-900">{value}</p>
-                <p className="text-xs text-slate-400">{hint}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="animate-rise" style={stagger(4)}>
-          <UploadPanel uploader={reviewer} onFinished={loadCases} onOpen={setOpen} />
-        </div>
-        {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{error}</p>}
-        {cases === null ? (
-          <div className="space-y-2">
-            {Array.from({ length: 4 }, (_, i) => (
-              <span key={i} className="block h-16 animate-pulse rounded-2xl bg-slate-100" />
-            ))}
-          </div>
-        ) : cases.length === 0 ? (
-          <div className="rounded-2xl bg-white px-5 py-8 text-center text-sm text-slate-600 ring-1 ring-slate-200">
-            <p className="font-medium text-slate-800">Nothing to review yet</p>
-            <p className="mt-1">Upload a judgment above to get started.</p>
-          </div>
-        ) : (
-          <section className="space-y-3">
-            <h3 className="text-sm font-semibold text-slate-800">
-              All judgments <span className="font-normal text-slate-400">({cases.length})</span>
-            </h3>
-            <ul className="space-y-2" data-testid="review-case-list">
-              {cases.map((c, i) => {
-                const frac = c.flagged ? c.reviewed / c.flagged : 1
-                return (
-                  <li key={c.case_id} className="animate-rise" style={stagger(Math.min(i, 12), 40, 220)}>
-                    <button
-                      onClick={() => setOpen(c.case_id)}
-                      className="group flex w-full flex-wrap items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3.5 text-left ring-1 ring-slate-200 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_-14px_rgb(15_23_42/0.35)] hover:ring-indigo-300"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-slate-100 font-serif text-sm font-bold text-slate-500 transition-colors group-hover:bg-indigo-50 group-hover:text-indigo-600">§</span>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-slate-900">{c.title || c.case_id}</p>
-                          <p className="mt-0.5 text-xs text-slate-500">
-                            {c.reviewed} of {c.flagged} highlighted sentences checked · {c.sentences} sentences in total
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Meter value={frac} tone={c.status === 'escalated' ? 'bg-amber-500' : frac === 1 ? 'bg-emerald-500' : 'bg-indigo-500'} className="hidden w-20 sm:block" />
-                        <Pill label={STATUS[c.status].text} colour={STATUS[c.status].cls} />
-                        <svg {...stroke} className="size-4 text-slate-300 transition-[transform,color] duration-200 group-hover:translate-x-0.5 group-hover:text-indigo-500">
-                          <path d="m7.5 5 5 5-5 5" />
-                        </svg>
-                      </div>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          </section>
-        )}
       </div>
     </div>
   )

@@ -82,6 +82,8 @@ export const TabIcons = {
   ),
 }
 
+TabIcons.label = TabIcons.annotate // the Label tab (annotation and review, merged)
+
 /* ---------- large faint header illustrations ---------- */
 
 const art = { ...line, strokeWidth: 1.1 }

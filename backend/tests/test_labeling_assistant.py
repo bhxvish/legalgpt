@@ -362,3 +362,13 @@ def test_calibration_changes_confidence_not_labels_and_round_trips(tiny_classifi
     again = RRLClassifier.load(clf.save(tmp_path / "cal"), device="cpu")
     assert again.temperature == pytest.approx(t) and again.context is False
     clf.temperature = 1.0
+
+
+def test_blind_samples_are_stable_and_about_the_rate() -> None:
+    from app.labeling_assistant.router import is_blind_sample
+
+    ids = [f"sc-{i}" for i in range(3000)]
+    share = sum(is_blind_sample(i, 0.1) for i in ids) / len(ids)
+    assert 0.08 < share < 0.12
+    assert [is_blind_sample(i, 0.1) for i in ids[:50]] == [is_blind_sample(i, 0.1) for i in ids[:50]]
+    assert not any(is_blind_sample(i, 0.0) for i in ids)

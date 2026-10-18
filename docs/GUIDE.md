@@ -21,7 +21,8 @@ docker compose up --build
 - Frontend: <http://localhost:5173>:
   - **Chat:** Legal / General mode, a model switch (see "Model options in the chat" below), and
     "also verify facts against" a section;
-  - **Verify**, **Annotate** and **Review** tabs.
+  - **Overview** (how the parts connect), **Label** (InLegalBERT suggestions checked by people, plus
+    blind labelling), **Case analysis** and **Verify** tabs.
 - Backend: <http://localhost:8000/docs>.
 
 On the first start the backend downloads the embedding model and embeds the committed IPC chunks
@@ -41,7 +42,7 @@ cache live in named Docker volumes (`docker compose down -v` deletes them).
 
 Annotations, judgments and trained models are not in git. If you were given the team data zip,
 unzip it into the repo root (it adds `data/annotation_store`, `data/raw_judgments` and
-`data/models/...`), then start with the data overlay so the Annotate and Review tabs use it:
+`data/models/...`), then start with the data overlay so the Label tab uses it:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.data.yml up --build
@@ -129,6 +130,10 @@ python backend/scripts/calibrate_retrieval.py
 
 ## Annotate judgments (Module 1)
 
+In the app this is the **Label** tab: upload judgments there, check InLegalBERT's suggestions, and
+label blind where the tab asks (blind samples, judgments sent back, second labellings). The steps
+below are the command-line route for a batch of files.
+
 1. Put criminal judgments as plain `.txt` files in `data/inbox/` (git-ignored), then collect them:
 
    ```bash
@@ -175,7 +180,7 @@ guideline: `python backend/scripts/build_guideline.py`. A test fails if the two 
    python backend/scripts/train_rrl_classifier.py --version v0.1 --cv 5   # case-grouped cross-validation (~1 h on CPU)
    ```
 
-   **The model the Review tab uses now** is an ensemble (cross-validated macro-F1 0.807 vs 0.739 for
+   **The model the Label tab uses now** is an ensemble (cross-validated macro-F1 0.807 vs 0.739 for
    the single fine-tuned model; `docs/reports/paper_analysis.md` §7):
    - the components:
      - InLegalBERT first trained on the public *InRhetoricalRoles* corpus (Kalamkar et al., 2022), then on our judgments;
@@ -203,7 +208,7 @@ guideline: `python backend/scripts/build_guideline.py`. A test fails if the two 
    python backend/scripts/run_assisted_labeling.py
    ```
 
-   **Or skip steps 2–3 and upload from the app:** in the Review tab, drop `.txt` or text-based `.pdf`
+   **Or skip steps 2–3 and upload from the app:** in the Label tab, drop `.txt` or text-based `.pdf`
    judgments on **Add judgments**. Each file is screened like `collect_judgments.py` does (duplicates,
    non-English and non-criminal texts are refused with the reason), segmented, labelled by the newest
    checkpoint in `data/models/rrl/` and queued; the panel shows progress and an **Open** link (about a
@@ -311,7 +316,7 @@ is LegalGPT with Gemini as the LLM, `closed+gemini:gemini-3.5-flash-lite` is Gem
 `--smoke` first: it answers 4 questions per system, so a wrong key or model name shows up before a
 full run.
 
-### Explanations in the Review tab
+### Explanations in the Label tab
 
 Press **w** (or click *Why this suggestion?*) on a sentence to see:
 - **Word highlights:** Integrated Gradients over the input embeddings, 128 steps, [PAD]
