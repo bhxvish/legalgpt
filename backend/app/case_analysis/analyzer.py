@@ -213,6 +213,10 @@ class CaseAnalyzer:
             yield "error", {"message": "The model could not read facts from this file. Try a hosted model or a shorter, clearer text."}
             return
 
+        if not facts.offences:  # bail, procedure, a special Act...: say so instead of analysing unrelated IPC text
+            yield from self._out_of_scope(facts, llm, local_only)
+            return
+
         yield "step", {"id": "law", "status": "running"}
         rewrite = Rewrite(True, facts.offences) if facts.offences else None
         result = self.retriever.retrieve_with_diagnostics(facts.summary or text[:2000], rewrite=rewrite)
@@ -277,6 +281,28 @@ class CaseAnalyzer:
                 pass
         yield "done", {"disclaimer": DISCLAIMER, "model": llm.model_id, "local_only": local_only,
                        "model_note": getattr(llm, "note", "")}
+
+    def _out_of_scope(self, facts: "CaseFacts", llm: Any, local_only: bool) -> Iterator[tuple[str, Any]]:
+        """No IPC offence in the file: no IPC text is retrieved or analysed (it would be unrelated);
+        the facts and similar judgments are still shown, with a plain explanation."""
+        yield "law", {"sources": [], "bns": {}}
+        yield "elements", {"checks": []}
+        yield "step", {"id": "similar", "status": "running"}
+        similar = self._similar_cases(facts)
+        yield "similar", {"cases": similar}
+        yield "step", {"id": "analysis", "status": "running"}
+        named = [f"{d['name']} (s.{d['section']}, {d['reason']})" for d in facts.dropped]
+        text = (
+            "No IPC offence was found in this file, so there is nothing for LegalGPT to analyse against the "
+            "Indian Penal Code. LegalGPT covers offences under the IPC, 1860; bail, criminal procedure (CrPC) and "
+            "special laws such as the UAPA or the NDPS Act are outside its sources."
+            + (f"\n\nProvisions the model named but could not use: {'; '.join(named)}." if named else "")
+            + ("\n\nThe facts read from the file and the most similar past judgments are shown above; they may "
+               "still help, but they are not an analysis." if similar else "")
+        )
+        yield "token", {"text": text}
+        yield "done", {"disclaimer": DISCLAIMER, "model": llm.model_id, "local_only": local_only,
+                       "model_note": getattr(llm, "note", ""), "out_of_scope": True}
 
     def guard_output(self, text: str, sources: list) -> tuple[str, list[dict]]:
         """Remove sentences that state a verdict, cite a section that is not an IPC section, name a
