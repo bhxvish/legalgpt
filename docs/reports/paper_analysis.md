@@ -553,7 +553,11 @@ Cohen's κ 0.72 (3-way), 0.86 (supported vs not). Statute-citation control (19):
 3/19 sentences name a different case than the one cited. Small sample; human check of the 5
 non-unanimous items is future work.
 
-**Case analysis on real SC judgments** (`eval_case_analysis.py`, n = 92 of 120; rest pending quota):
-at least one correct offence 68%; P/R/F1 0.48/0.37/0.38; similar-judgment top-1 shares a gold
-offence 70%, P@3 0.67. The IPC validation filter removed 12 proposals, 3 of them correct: it is a
-safety filter, not an accuracy gain.
+**Case analysis on real SC judgments** (`eval_case_analysis.py`, 120 judgments; facts with every
+section number masked; gold = offences cited in the judgment's Facts and Ruling; 110 analysed by
+gpt-oss-120b, 10 by gemini-3.5-flash-lite after a quota fallback). Model's proposal: at least one
+correct offence **65%** (95% CI 57-73%); precision / recall / F1 0.45 / 0.35 / 0.36; exactly the gold
+set 9%. Similar judgments: the top one shares a gold offence in **68%** (58-76%), precision@3 0.68.
+The IPC validation filter removed 15 proposals, 5 of them correct (F1 0.36 -> 0.35): it is a safety
+filter against non-IPC numbers, not an accuracy gain. 793 of 1,141 extracted facts were verified
+against the text by quote.

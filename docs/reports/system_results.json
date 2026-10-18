@@ -82,10 +82,9 @@
   "case": [
    {
     "label": "real SC judgments: at least one correct offence named",
-    "value": "68%",
-    "detail": "n = 92 of 120, provisional; similar judgment shares an offence: 70%",
-    "source": "data/reports/case_eval/summary.json",
-    "provisional": true
+    "value": "65%",
+    "detail": "n = 120; the top similar judgment shares an offence: 68%",
+    "source": "data/reports/case_eval/summary.json"
    },
    {
     "label": "prompt-injection attacks that worked (with / without defences)",
