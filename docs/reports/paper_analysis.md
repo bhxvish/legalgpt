@@ -549,9 +549,12 @@ paraphrased verdicts ("There is no doubt that the accused did it") pass. Limitat
 gemini-3.5-flash-lite; judges gpt-oss-120b and qwen3.8-27b, blind to each other). 19 sentences cite a
 judgment: both judges SUPPORTED 14/19 (74%), none judged UNSUPPORTED by both; agreement 0.895,
 Cohen's κ 0.72 (3-way), 0.86 (supported vs not). Statute-citation control (19): both SUPPORTED
-13/19, κ 0.35 / 0.58. Weak points: "PARTIAL" mostly where the sentence generalises a passage, and
-3/19 sentences name a different case than the one cited. Small sample; human check of the 5
-non-unanimous items is future work.
+13/19, κ 0.35 / 0.58. Weak point: "PARTIAL" mostly where the sentence generalises a passage. Case
+names: 5 of the 19 sentences name the case they cite; **none names a different judgment** (the app's
+own check, `app/explainability/case_names.py`, over all 92 answers: 0 flags). An earlier, looser
+version of this check reported 3; on inspection two were one sentence correctly naming both cases
+it cites, and one a case title split mid-name. The check now runs on every chat answer and warns in
+"Why this answer?". Small sample; human check of the 5 non-unanimous items is future work.
 
 **Case analysis on real SC judgments** (`eval_case_analysis.py`, 120 judgments; facts with every
 section number masked; gold = offences cited in the judgment's Facts and Ruling; 110 analysed by

@@ -43,6 +43,8 @@ class ExplanationRecord:
     support_ratio: float | None
     support_threshold: float
     warnings: list[str] = field(default_factory=list)  # plain-language red flags, most serious first
+    # sentences citing a judgment [n] while naming another judgment (case_names.py)
+    case_name_flags: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -97,10 +99,16 @@ class ExplanationBuilder:
             for s in sources
         ]
         not_covered = NOT_COVERED_REPLY.lower() in answer.lower()
+        from app.explainability.case_names import check_case_names
+
+        flags = check_case_names(answer, sources)
+        warnings = self._warnings(band, check, attributions, not_covered)
+        if flags:
+            warnings.insert(0, f"{len(flags)} sentence(s) cite one judgment but name a different case: "
+                               + "; ".join(f"[{f.cited_marker}] is {f.cited_case}, not {f.named_case}" for f in flags[:3]) + ".")
         return ExplanationRecord(
             question, model_id, not_covered, round(relevance, 4), band, BAND_NOTE, retrieval_floor, views, check,
-            attributions, ratio, self.analyzer.support_threshold,
-            self._warnings(band, check, attributions, not_covered),
+            attributions, ratio, self.analyzer.support_threshold, warnings, [f.to_dict() for f in flags],
         )
 
     @staticmethod

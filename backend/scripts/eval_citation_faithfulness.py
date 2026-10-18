@@ -44,21 +44,6 @@ Judge only the content attributed to the cited source; ignore claims the sentenc
 [numbers]. Do not use outside knowledge about whether the claim is true in law.
 Reply with JSON only: {"label": "SUPPORTED" | "PARTIAL" | "UNSUPPORTED", "reason": "<one short sentence>"}"""
 
-SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z*\[\"'])|\n+")
-# a full stop after these is not a sentence end ("Mohd. Rafiq v. State of M.P.")
-ABBREVIATION = re.compile(r"(?:\b(?:v|vs|No|s|ss|Mohd|Md|Smt|Shri|Sri|Dr|Mr|Mrs|Ms|Ltd|Co|Ors|Anr|Pvt|Govt|Art|Cr|Crl|cl|para|etc)|\b[A-Z])\.$")
-
-
-def sentences(text: str) -> list[str]:
-    out: list[str] = []
-    for piece in SENTENCE_END.split(text):
-        if out and ABBREVIATION.search(out[-1]):
-            out[-1] += " " + piece
-        else:
-            out.append(piece)
-    return out
-
-
 def safe(spec: str) -> str:
     return re.sub(r"[^\w.-]+", "_", spec)
 
@@ -144,19 +129,17 @@ def get_answers(items, model: str, cached_only: bool = False) -> list[dict]:
     return [done[q["id"]] for q in items if q["id"] in done and not done[q["id"]].get("error")]
 
 
-def party_words(title: str) -> list[str]:
-    """Distinctive words of each party in "A v. B" (not "State", "Union", "of", ...)."""
-    common = {"state", "of", "the", "union", "india", "and", "anr", "ors", "others", "another", "through", "thr",
-              "mr", "smt", "shri", "sri", "m/s", "etc", "v", "vs", "versus", "uttar", "pradesh", "madhya", "andhra",
-              "himachal", "arunachal", "tamil", "nadu", "west", "bengal", "nct", "delhi", "govt", "government"}
-    return [w for w in re.findall(r"[a-z]{3,}", title.lower()) if w not in common]
-
-
 def claims(answers: list[dict]) -> list[dict]:
     out = []
+    from types import SimpleNamespace
+
+    from app.explainability.case_names import check_case_names, party_words, sentences
+
     for a in answers:
         by_marker = {s["marker"]: s for s in a["sources"]}
+        flagged = check_case_names(a["answer"], [SimpleNamespace(**s) for s in a["sources"]])
         for sent in sentences(a["answer"]):
+            wrong = {f.cited_marker for f in flagged if f.sentence == sent[:400]}
             sent = sent.strip(" -*")
             for n in dict.fromkeys(int(m) for m in re.findall(r"\[(\d+)\]", sent)):
                 src = by_marker.get(n)
@@ -166,10 +149,8 @@ def claims(answers: list[dict]) -> list[dict]:
                      "source": src["text"][:2500], "title": src.get("title", ""), "citation": src.get("citation_path", "")}
                 if c["kind"] == "judgment":
                     words = party_words(src.get("title", ""))
-                    c["names_its_case"] = any(w in sent.lower() for w in words) if words else None
-                    others = [s for s in a["sources"] if s.get("kind") == "judgment" and s["marker"] != n]
-                    c["names_another_case"] = any(any(w in sent.lower() for w in party_words(o.get("title", ""))
-                                                      if w not in words) for o in others)
+                    c["names_its_case"] = any(re.search(rf"\b{w}\b", sent.lower()) for w in words) if words else None
+                    c["names_another_case"] = n in wrong  # the app's own check (case_names.py)
                 out.append(c)
     return out
 
