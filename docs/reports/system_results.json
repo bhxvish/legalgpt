@@ -3,40 +3,129 @@
  "updated": "2026-10-18",
  "stages": {
   "annotate": [
-   {"label": "annotated judgments, five sentence roles", "value": "37", "source": "paper_analysis.md §7"}
+   {
+    "label": "annotated judgments, five sentence roles",
+    "value": "37",
+    "source": "paper_analysis.md §7"
+   }
   ],
   "classifier": [
-   {"label": "sentence-role macro-F1 (5-fold CV by judgment)", "value": "0.807", "detail": "sentence-only baseline 0.667; McNemar p = 3e-21", "source": "paper_analysis.md §7b"},
-   {"label": "gain on human-labelled judgments only", "value": "0.752 → 0.813", "source": "paper_analysis.md §7b (label provenance)"}
+   {
+    "label": "sentence-role macro-F1 (5-fold CV by judgment)",
+    "value": "0.807",
+    "detail": "sentence-only baseline 0.667; McNemar p = 3e-21",
+    "source": "paper_analysis.md §7b"
+   },
+   {
+    "label": "gain on human-labelled judgments only",
+    "value": "0.752 → 0.813",
+    "source": "paper_analysis.md §7b (label provenance)"
+   }
   ],
   "library": [
-   {"label": "Supreme Court criminal judgments, 2020-2023, plus the annotated set", "value": "349", "source": "paper_analysis.md §8"}
+   {
+    "label": "Supreme Court criminal judgments, 2020-2023, plus the annotated set",
+    "value": "349",
+    "source": "paper_analysis.md §8"
+   }
   ],
   "retrieval": [
-   {"label": "right section on statute questions (LegalGPT vs model alone)", "value": "98-100% vs 41-81%", "detail": "three models, p ≤ 0.002", "source": "paper_analysis.md §0"},
-   {"label": "civil questions answered as an offence", "value": "0% vs 47-90%", "source": "paper_analysis.md §0"}
+   {
+    "label": "right section on statute questions (LegalGPT vs model alone)",
+    "value": "98-100% vs 41-81%",
+    "detail": "three models, p ≤ 0.002",
+    "source": "paper_analysis.md §0"
+   },
+   {
+    "label": "civil questions answered as an offence",
+    "value": "0% vs 47-90%",
+    "source": "paper_analysis.md §0"
+   }
   ],
   "hindi": [
-   {"label": "Hindi scenarios: right section retrieved (English: 53/60)", "value": "52/60", "detail": "searched as written: 0/60", "source": "data/reports/hindi/summary.json"}
+   {
+    "label": "Hindi scenarios: right section retrieved (English: 53/60)",
+    "value": "52/60",
+    "detail": "searched as written: 0/60",
+    "source": "data/reports/hindi/summary.json"
+   }
   ],
   "answer": [
-   {"label": "wrong punishments stated", "value": "0%", "detail": "model alone: 15-54%", "source": "paper_analysis.md §0"}
+   {
+    "label": "wrong punishments stated",
+    "value": "0%",
+    "detail": "model alone: 15-54%",
+    "source": "paper_analysis.md §0"
+   }
   ],
   "explain": [
-   {"label": "every sentence matched to the source it rests on", "value": "per answer", "source": "Why this answer? panel"}
+   {
+    "label": "every sentence matched to the source it rests on",
+    "value": "per answer",
+    "source": "Why this answer? panel"
+   }
   ],
   "verify": [
-   {"label": "IPC sections encoded as Prolog rules", "value": "live", "source": "backend/app/verification/rules"}
+   {
+    "label": "IPC sections encoded as Prolog rules",
+    "value": "live",
+    "source": "backend/app/verification/rules"
+   }
   ],
   "zk": [
-   {"label": "answers signed; retrieval provable in zero knowledge", "value": "Ed25519 + EZKL", "source": "GUIDE.md: Verifiable results"}
+   {
+    "label": "answers signed; retrieval provable in zero knowledge",
+    "value": "Ed25519 + EZKL",
+    "source": "GUIDE.md: Verifiable results"
+   }
   ],
   "case": [
-   {"label": "real SC judgments: at least one correct offence named", "value": "68%", "detail": "n = 92 of 120, provisional; similar judgment shares an offence: 70%", "source": "data/reports/case_eval/summary.json", "provisional": true},
-   {"label": "prompt-injection attacks that worked (with / without defences)", "value": "0/24 vs 1/24", "detail": "worst case, a model obeying every attack: the output guard removed 312 of 432 inserted sentences, no others", "source": "data/reports/injection/"}
+   {
+    "label": "real SC judgments: at least one correct offence named",
+    "value": "68%",
+    "detail": "n = 92 of 120, provisional; similar judgment shares an offence: 70%",
+    "source": "data/reports/case_eval/summary.json",
+    "provisional": true
+   },
+   {
+    "label": "prompt-injection attacks that worked (with / without defences)",
+    "value": "0/24 vs 1/24",
+    "detail": "worst case, a model obeying every attack: the output guard removed 312 of 432 inserted sentences, no others",
+    "source": "data/reports/injection/"
+   }
   ],
   "bns": [
-   {"label": "IPC sections mapped to the BNS (official BPRD table)", "value": "527", "source": "backend/app/core/bns_map.json"}
+   {
+    "label": "IPC sections mapped to the BNS (official BPRD table)",
+    "value": "527",
+    "source": "backend/app/core/bns_map.json"
+   }
   ]
- }
+ },
+ "headline": [
+  {
+   "value": "98-100%",
+   "label": "right IPC section",
+   "detail": "statute questions; the same models alone: 41-81% (p ≤ 0.002)",
+   "source": "paper_analysis.md §0"
+  },
+  {
+   "value": "0%",
+   "label": "wrong punishments",
+   "detail": "the same models alone: 15-54%",
+   "source": "paper_analysis.md §0"
+  },
+  {
+   "value": "0 / 30",
+   "label": "civil questions treated as crimes",
+   "detail": "the same models alone: 14-27 of 30",
+   "source": "paper_analysis.md §0"
+  },
+  {
+   "value": "0.81",
+   "label": "sentence-role macro-F1",
+   "detail": "InLegalBERT ensemble, 5-fold CV by judgment; baseline 0.67",
+   "source": "paper_analysis.md §7b"
+  }
+ ]
 }
