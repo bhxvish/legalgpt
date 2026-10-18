@@ -382,8 +382,16 @@ offences). The map `backend/app/core/bns_map.json` comes from the official BPRD 
 python backend/scripts/build_bns_map.py --pdf data/bns/comparison_summary_BNS_to_IPC.pdf
 ```
 
-Only the displayed numbers come from the table; answers still cite the IPC. Check the Sanhita's text
-where it matters.
+**Answering under the BNS.** The chat's **Law** switch: *Auto* (the BNS when you name it or the events
+are on or after 1 July 2024, else the IPC), *IPC* or *BNS*. The BNS text is indexed from the official
+India Code PDF (save it as `data/bns/a2023-45.pdf`):
+
+```bash
+python backend/scripts/ingest_corpus.py data/bns/a2023-45.pdf --doc-id BNS --dry-run --dump data/corpus/bns_chunks.jsonl
+python backend/scripts/ingest_corpus.py data/corpus/bns_chunks.jsonl --collection bns_bare_act --reset
+```
+
+Each BNS source shows the IPC section(s) it replaced. The retrieval proof covers the IPC index only.
 
 ## Neuro-symbolic verification (Module 5)
 

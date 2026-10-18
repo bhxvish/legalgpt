@@ -95,9 +95,10 @@
   ],
   "bns": [
    {
-    "label": "IPC sections mapped to the BNS (official BPRD table)",
-    "value": "527",
-    "source": "backend/app/core/bns_map.json"
+    "label": "BNS: right section retrieved (IPC: 53/60)",
+    "value": "53/60",
+    "detail": "358 BNS sections indexed; IPC numbers from the rewrite converted by the official table",
+    "source": "data/reports/bns_eval.json"
    }
   ]
  },

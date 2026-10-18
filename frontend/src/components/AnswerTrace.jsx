@@ -59,7 +59,9 @@ export default function AnswerTrace({ msg, containerRef, onCite }) {
   const supported = claims.filter((a) => a.supported).length
   const why = () => open(containerRef.current, 'why-panel')
   // the first cited IPC section the rule engine encodes: its facts can be checked there
-  const checkable = statutes.find((s) => cited.has(s.marker) && rules.includes(s.section))
+  const ruleSection = (s) => (s.doc_id === 'BNS' ? s.ipc?.find((x) => rules.includes(x)) : rules.includes(s.section) ? s.section : null)
+  const checkable = statutes.find((s) => cited.has(s.marker) && ruleSection(s))
+  const checkSection = checkable && ruleSection(checkable)
   const steps = []
 
   if (r.translation?.failed)
@@ -77,14 +79,20 @@ export default function AnswerTrace({ msg, containerRef, onCite }) {
         Hindi → English
       </Step>,
     )
+  if (r.law)
+    steps.push(
+      <Step key="law" title={`Why this code: ${r.law_reason}`}>
+        {r.law === 'bns' ? 'BNS' : 'IPC'}
+      </Step>,
+    )
   steps.push(
     msg.refused ? (
       <Step key="ret" module="M0" tone="warn" onClick={why} title="No IPC section matched closely enough, so the question was declined">
-        no IPC match · declined
+        no {r.law === 'bns' ? 'BNS' : 'IPC'} match · declined
       </Step>
     ) : (
       <Step key="ret" module="M0" onClick={why} title="How the sources were chosen">
-        {statutes.length} IPC section{statutes.length === 1 ? '' : 's'}
+        {statutes.length} {r.law === 'bns' ? 'BNS' : 'IPC'} section{statutes.length === 1 ? '' : 's'}
         {r.rewrite?.used ? ' · read as ' + r.rewrite.offences.map((o) => `s.${o.section}`).join(', ') : ''}
       </Step>
     ),
@@ -128,11 +136,11 @@ export default function AnswerTrace({ msg, containerRef, onCite }) {
       {checkable && (
         <button
           type="button"
-          onClick={() => sendTo('verify', { text: msg.question, section: checkable.section })}
+          onClick={() => sendTo('verify', { text: msg.question, section: checkSection })}
           className="ml-auto inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-medium text-indigo-700 ring-1 ring-indigo-200 transition hover:bg-indigo-100"
-          title={`Open the Verify tab with your question and s.${checkable.section}: the facts are tested against its elements, written as Prolog rules`}
+          title={`Open the Verify tab with your question and IPC s.${checkSection}: the facts are tested against its elements, written as Prolog rules`}
         >
-          <span className="font-mono text-[9.5px] font-semibold">M5</span> Check the facts against s.{checkable.section} →
+          <span className="font-mono text-[9.5px] font-semibold">M5</span> Check the facts against s.{checkSection}{checkable.doc_id === 'BNS' ? ' IPC' : ''} →
         </button>
       )}
     </div>

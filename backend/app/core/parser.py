@@ -24,6 +24,7 @@ _ALL_CAPS = re.compile(r"^[A-Z][A-Z ,'&()-]+$")
 # Italic sub-headings inside a chapter, e.g. "Of offences affecting life", "Of theft".
 _SUBHEADING = re.compile(r"^Of [A-Za-z ,'()-]{2,120}$")
 _STATE_AMENDMENTS = re.compile(r"^STATE AMENDMENTS?\b", re.IGNORECASE)
+_WATERMARK = re.compile(r"[ \t]*\b(?:I?n{1,2}d?i?aCode|IndiaCode)\b[ \t]*")
 _PAGE_FOOTER = re.compile(r"This Bare Act is a government source", re.IGNORECASE)
 # First line of an amendment footnote: "1. Subs. by Act 26 of 1955, s. 117 ...", "3. Ins. by ...".
 _FOOTNOTE = re.compile(
@@ -130,7 +131,14 @@ class LegalDocumentParser:
             )
             out.extend(text for _, _, _, text in lines[:cut])
             out.append("")  # page break
-        return "\n".join(out)
+        text = "\n".join(out)
+        # India Code PDFs: a diagonal "IndiaCode" watermark leaks into lines as fragments
+        # ("intention ndaCode be"), and a heading can open with a dash ("255.—Public servant ...").
+        text = _WATERMARK.sub(" ", text)
+        # (not "467.—Whoever ...": the end of a wrapped heading followed by the section's text)
+        text = re.sub(r"(?m)^(\d{1,3}[A-Z]{0,2})\.[—–]\s*(?=[A-Z])(?!(?:Whoever|If|When|Where|Any|Nothing|Every|Provided|The|In)\b)",
+                      r"\1. ", text)
+        return re.sub(r"[ \t]{2,}", " ", text)
 
     def parse_file(self, path: str | Path, doc_id: str | None = None) -> list[Node]:
         path = Path(path)

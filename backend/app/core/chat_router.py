@@ -60,6 +60,8 @@ class ChatRequest(BaseModel):
     model: str | None = Field(default=None, max_length=40)  # an id from /api/models; None = server default
     # Legal mode: also check the facts stated in the question against this IPC section (Module 5).
     verify_section: str | None = Field(default=None, max_length=10)
+    # which code to answer under: the IPC, the BNS (in force from 1 July 2024), or chosen from the question
+    law: Literal["auto", "ipc", "bns"] = "auto"
 
 
 class ModelInfo(BaseModel):
@@ -89,6 +91,7 @@ class ChatRouter:
         offline: bool = False,
         judgments: "Any | None" = None,
         translator: "Any | None" = None,
+        bns_retriever: "Retriever | None" = None,
     ) -> None:
         """`llm` is the default model. `models` adds named alternatives a request can choose with
         `model` (the base-vs-tuned toggle); `model_notes` explains slow or unavailable ones."""
@@ -111,6 +114,7 @@ class ChatRouter:
 
             translator = Translator()
         self.translator = translator  # Hindi questions -> English for retrieval (language.py)
+        self.bns_retriever = bns_retriever  # the Bharatiya Nyaya Sanhita's own index (None: IPC only)
         self.router = APIRouter(prefix="/api", tags=["chat"])
         self.router.add_api_route("/chat", self.chat, methods=["POST"], response_class=StreamingResponse)
         self.router.add_api_route("/models", self.list_models, methods=["GET"], response_model=list[ModelInfo])
@@ -138,7 +142,7 @@ class ChatRouter:
             if req.mode == "general":
                 yield from self._general(req.question, history, llm)
             else:
-                yield from self._legal(req.question, history, llm)
+                yield from self._legal(req.question, history, llm, req.law)
                 if req.verify_section:
                     yield from self._verification(req.question, req.verify_section)
         except LLMRateLimitError as exc:  # expected on the free tier: no traceback, say what to do
@@ -166,16 +170,29 @@ class ChatRouter:
             return llm
         return next((m for m in self.models.values() if not getattr(m, "is_local", False)), llm)
 
-    def _retrieve(self, question: str, context: str | None, llm: LLMClient | None = None) -> RetrievalResult:
-        if hasattr(self.retriever, "retrieve_with_diagnostics"):
+    def _retrieve(self, question: str, context: str | None, llm: LLMClient | None = None, law: str = "ipc") -> RetrievalResult:
+        retriever = self.bns_retriever if law == "bns" and self.bns_retriever is not None else self.retriever
+        if hasattr(retriever, "retrieve_with_diagnostics"):
             rewrite = None
             # a question that names its section, or continues the previous one, needs no rewrite
-            follow_up = bool(context) and self.retriever.expander.is_follow_up(question)
-            if self.rewriter is not None and llm is not None and not follow_up                     and not self.retriever.expander.section_refs(question):
+            follow_up = bool(context) and retriever.expander.is_follow_up(question)
+            if self.rewriter is not None and llm is not None and not follow_up                     and not retriever.expander.section_refs(question):
                 rewrite = self.rewriter.rewrite(question, self._rewrite_llm(llm))
-            return self.retriever.retrieve_with_diagnostics(question, context=context, rewrite=rewrite)
-        sources = self.retriever.retrieve(question, context=context)  # minimal retrievers (tests)
+                if rewrite is not None and law == "bns":
+                    rewrite = self._to_bns(rewrite)
+            return retriever.retrieve_with_diagnostics(question, context=context, rewrite=rewrite)
+        sources = retriever.retrieve(question, context=context)  # minimal retrievers (tests)
         return RetrievalResult(sources, max((s.similarity for s in sources), default=0.0), 0.0, len(sources))
+
+    @staticmethod
+    def _to_bns(rewrite):
+        """The rewrite names IPC sections; for the BNS index, the corresponding BNS sections
+        (official BPRD table). An offence with no BNS equivalent is dropped from the rewrite."""
+        from app.core.bns import base, bns_for
+        from app.core.query_rewriter import Rewrite
+
+        offences = [(name, base(bns_for(sec)[0])) for name, sec in rewrite.offences if bns_for(sec)]
+        return Rewrite(rewrite.criminal, list(dict.fromkeys(offences)), rewrite.model_id)
 
     def _translate(self, text: str | None, llm: LLMClient) -> tuple[str | None, str | None]:
         """(text to search with, its English translation if `text` is Hindi)."""
@@ -194,7 +211,7 @@ class ChatRouter:
                 return english, english
         return text, None
 
-    def _legal(self, question: str, history: list[Message], llm: LLMClient) -> Iterator[str]:
+    def _legal(self, question: str, history: list[Message], llm: LLMClient, law_requested: str = "auto") -> Iterator[str]:
         from app.core.language import HINDI_RULE, SCOPE_REFUSAL_HI, TRANSLATION_FAILED, detect
 
         hindi = detect(question) == "hi"
@@ -207,27 +224,37 @@ class ChatRouter:
             yield sse("token", {"text": TRANSLATION_FAILED})
             return
         previous, _ = self._translate(previous, llm)
-        result = self._retrieve(search, previous, llm)
+        from app.core.bns import choose_law
+
+        law, law_why = choose_law(f"{question}\n{english or ''}", law_requested)
+        if law == "bns" and self.bns_retriever is None:
+            law, law_why = "ipc", "the BNS index is not built (backend/scripts/ingest_corpus.py ... --collection bns_bare_act)"
+        law_info = {"law": law, "law_reason": law_why}
+        result = self._retrieve(search, previous, llm, law)
         sources = result.sources
         if not sources:
             refusal = SCOPE_REFUSAL_HI if hindi else SCOPE_REFUSAL
+            if law == "bns":
+                refusal = refusal.replace("the Indian Penal Code, 1860", "the Bharatiya Nyaya Sanhita, 2023").replace(
+                    "भारतीय दंड संहिता, 1860", "भारतीय न्याय संहिता, 2023")
             yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": True})
-            yield sse("retrieval", self._retrieval_info(search, result, english))
+            yield sse("retrieval", {**self._retrieval_info(search, result, english), **law_info})
             yield sse("token", {"text": refusal})
             yield from self._explanation(search, result, refusal, True, llm.model_id)
             yield from self._attestation(question, [], refusal, [], llm.model_id, True, result.used_context,
                                          self._used_rewrite(result))
             return
-        from app.core.bns import annotate
+        from app.core.bns import annotate, annotate_bns
 
-        sources = annotate(list(sources)) + self._judgment_sources(question, result, len(sources))
+        statute = annotate_bns(list(sources)) if law == "bns" else annotate(list(sources))
+        sources = statute + self._judgment_sources(question, result, len(sources))
         if len(sources) > len(result.sources):
             result = replace(result, sources=sources)
         yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": False})
         yield sse("sources", [s.model_dump() for s in sources])
-        yield sse("retrieval", self._retrieval_info(search, result, english))
+        yield sse("retrieval", {**self._retrieval_info(search, result, english), **law_info})
         asked = f"{question}\n(English translation: {english})" if english else question
-        messages = self.prompt_builder.build(asked, sources, "legal", history)
+        messages = self.prompt_builder.build(asked, sources, "legal", history, law=law)
         if hindi:
             messages[0] = Message("system", messages[0].content + "\n" + HINDI_RULE)
         answer: list[str] = []

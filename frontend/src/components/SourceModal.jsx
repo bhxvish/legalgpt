@@ -46,6 +46,16 @@ export default function SourceModal({ source, onClose }) {
             <p className="mt-1 break-words font-mono text-xs text-slate-600" data-testid="source-citation-path">
               {source.citation_path}
             </p>
+            {source.doc_id === 'BNS' && source.ipc?.length > 0 && (
+              <p className="mt-2 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs text-indigo-900 ring-1 ring-indigo-200">
+                {source.ipc[0] === 'new' ? (
+                  <>A provision <b>new in the Bharatiya Nyaya Sanhita, 2023</b>: no IPC section corresponds to it.</>
+                ) : (
+                  <>Replaced <b>IPC Section {source.ipc.join(', ')}</b> from 1 July 2024.</>
+                )}{' '}
+                <span className="text-indigo-700/80">From the BPRD correspondence table.</span>
+              </p>
+            )}
             {source.kind !== 'judgment' && source.bns?.length > 0 && (
               <p className="mt-2 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs text-indigo-900 ring-1 ring-indigo-200">
                 {source.bns[0] === 'none' ? (

@@ -267,8 +267,19 @@ rebuilds its rows from the PDF's text positions and keeps only section numbers a
   and next to each offence in Case analysis. The model's answers are not changed: the numbers come
   from the table, never from the model, so the benchmark is unaffected.
 
-Remaining future work: index the BNS text itself and answer under the BNS when the offence date is
-on or after 1 July 2024.
+**Update: answering under the BNS.** The BNS text itself (India Code, Act 45 of 2023, as on
+6 October 2025) is now indexed in its own collection: all 358 sections, 479 chunks
+(`data/corpus/bns_chunks.jsonl`). The chat answers under the BNS when the user chooses it, names it, or
+dates the events on or after 1 July 2024 (`app/core/bns.py: choose_law`); otherwise under the IPC.
+The query rewrite still names IPC sections, which are converted to BNS sections by the official
+table before retrieval. Each BNS source shows the IPC section(s) it replaced. On the 60 held-out
+scenarios, with acceptable IPC sections converted to BNS ones (`eval_bns.py`, cached rewrites):
+right section retrieved **53/60 under the BNS, the same as under the IPC (53/60)**; 32/60 without the
+rewrite; out-of-scope questions answered 0/30 in every condition. One acceptable IPC section (446)
+has no BNS equivalent. The retrieval proof (ZK) covers the IPC index only; BNS answers are signed
+but not proved. Remaining: the benchmark's statute questions name IPC sections and were not
+converted; the Prolog rules encode IPC sections (a BNS answer is checked via the IPC section it
+replaced).
 
 ## Caveats
 

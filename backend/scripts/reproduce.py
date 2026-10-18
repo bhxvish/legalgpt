@@ -61,6 +61,8 @@ STEPS = [
     ("bns", "§4", "IPC -> BNS map from the BPRD table",
      [PY, "backend/scripts/build_bns_map.py", "--pdf", "data/bns/comparison_summary_BNS_to_IPC.pdf"],
      ["data/bns/comparison_summary_BNS_to_IPC.pdf"]),
+    ("bns-answering", "§4", "Answering under the BNS: retrieval from the BNS index",
+     [PY, "backend/scripts/eval_bns.py"], ["data/reports/bench/rewrites"]),
     ("blind-samples", "Label", "InLegalBERT on blind samples",
      [PY, "backend/scripts/eval_blind_samples.py"], []),
 ]

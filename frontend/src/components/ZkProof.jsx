@@ -154,7 +154,8 @@ export function AnswerProof({ msg }) {
   const att = msg.attestation
   if (!att) return null
   const followUp = att.record?.follow_up_context
-  const canProve = manifest?.available?.retrieval_prove && !msg.refused && msg.question && !followUp
+  // the retrieval proof covers the IPC index; a BNS answer is signed but not proved
+  const canProve = manifest?.available?.retrieval_prove && !msg.refused && msg.question && !followUp && msg.retrieval?.law !== 'bns'
 
   const checkSignature = async () => {
     setBusy('sig')

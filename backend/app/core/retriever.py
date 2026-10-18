@@ -170,8 +170,9 @@ class RetrievalResult:
     query: str = ""  # the text actually searched: the question, plus a rewrite's offences if used
 
 
-def build_retriever(settings, embedder: Embedder | None = None, scope: bool = True) -> "Retriever":
-    """The app's retriever: index, floors and (if trained for this embedding model) the scope check."""
+def build_retriever(settings, embedder: Embedder | None = None, scope: bool = True, law: str = "ipc") -> "Retriever":
+    """The app's retriever: index, floors and (if trained for this embedding model) the scope check.
+    `law`: "ipc" (the default index) or "bns" (the Bharatiya Nyaya Sanhita's own collection)."""
     import logging
 
     from app.core.embeddings import EmbeddingService
@@ -185,19 +186,19 @@ def build_retriever(settings, embedder: Embedder | None = None, scope: bool = Tr
         check = None
     return Retriever(
         embedder=embedder or EmbeddingService(settings.embedding_model),
-        store=VectorStore(settings.chroma_persist_dir, settings.chroma_collection),
+        store=VectorStore(settings.chroma_persist_dir, settings.bns_collection if law == "bns" else settings.chroma_collection),
         min_similarity=settings.retrieval_min_similarity,
         scope=check,
         scope_floor=settings.retrieval_scope_floor,
         rewrite_gate=getattr(settings, "rewrite_gate", None),
-        titles=_titles(settings),
+        titles=_titles(settings, law),
     )
 
 
-def _titles(settings) -> dict[str, list[str]] | None:
+def _titles(settings, law: str = "ipc") -> dict[str, list[str]] | None:
     from app.core.corpus import load_chunks
 
-    path = getattr(settings, "corpus_chunks_path", None)
+    path = getattr(settings, "bns_chunks_path" if law == "bns" else "corpus_chunks_path", None)
     return title_index(load_chunks(path)) if path and Path(path).exists() else None
 
 

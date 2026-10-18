@@ -147,6 +147,12 @@ def build_verification_service(settings: Settings) -> "VerificationService | Non
 def build_chat_router(settings: Settings, verifier: "VerificationService | None" = None) -> ChatRouter:
     embedder = EmbeddingService(settings.embedding_model)
     retriever = build_retriever(settings, embedder)
+    bns_retriever = None
+    try:  # the BNS index (ingest_corpus.py data/corpus/bns_chunks.jsonl --collection bns_bare_act); IPC only without it
+        if VectorStore(settings.chroma_persist_dir, settings.bns_collection).count() > 0:
+            bns_retriever = build_retriever(settings, embedder, law="bns")
+    except Exception:
+        logger.exception("BNS index unavailable: answering under the IPC only")
     explainer = ExplanationBuilder(
         AttributionAnalyzer(embedder, settings.explain_support_threshold),
         ConfidenceScorer(high=settings.explain_band_high, medium=settings.explain_band_medium),
@@ -163,7 +169,7 @@ def build_chat_router(settings: Settings, verifier: "VerificationService | None"
     return ChatRouter(retriever, models[default], explainer=explainer, models=models, default_model=default,
                       model_notes=notes, verifier=verifier,
                       rewriter=QueryRewriter() if settings.query_rewrite else None, offline=settings.offline_mode,
-                      judgments=judgments)
+                      judgments=judgments, bns_retriever=bns_retriever)
 
 
 def build_zk_service(settings: Settings, chat_router: ChatRouter) -> "ZkService | None":

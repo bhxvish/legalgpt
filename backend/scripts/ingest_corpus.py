@@ -28,6 +28,7 @@ def main() -> int:
     ap.add_argument("--max-chunk-chars", type=int, default=1400)
     ap.add_argument("--overlap", type=int, default=150)
     ap.add_argument("--reset", action="store_true", help="drop the collection before ingesting")
+    ap.add_argument("--collection", default=None, help="Chroma collection (default CHROMA_COLLECTION; the BNS: bns_bare_act)")
     ap.add_argument("--dry-run", action="store_true", help="parse and chunk only; no embedding/upsert")
     ap.add_argument("--show", default="", help="comma-separated section numbers whose chunks to print")
     ap.add_argument("--dump", type=Path, help="write all chunks to this JSONL file for inspection")
@@ -37,7 +38,7 @@ def main() -> int:
     if args.path.suffix.lower() == ".jsonl":  # already parsed and chunked (data/corpus/ipc_chunks.jsonl)
         chunks = load_chunks(args.path)
         print(f"loaded {len(chunks)} chunks from {args.path}")
-        return 0 if args.dry_run else _index(chunks, args.reset)
+        return 0 if args.dry_run else _index(chunks, args.reset, args.collection)
 
     parser = LegalDocumentParser(doc_id=args.doc_id)
     t0 = time.perf_counter()
@@ -73,12 +74,13 @@ def main() -> int:
 
     if args.dry_run:
         return 0
-    return _index(chunks, args.reset)
+    return _index(chunks, args.reset, args.collection)
 
 
-def _index(chunks: list, reset: bool) -> int:
+def _index(chunks: list, reset: bool, collection: str | None = None) -> int:
     settings = get_settings()
-    store = VectorStore(settings.chroma_persist_dir, settings.chroma_collection)
+    collection = collection or settings.chroma_collection
+    store = VectorStore(settings.chroma_persist_dir, collection)
     if reset:
         store.reset()
     t0 = time.perf_counter()
@@ -86,7 +88,7 @@ def _index(chunks: list, reset: bool) -> int:
     store.upsert(chunks, embeddings)
     print(
         f"embedded + upserted {len(chunks)} chunks in {time.perf_counter() - t0:.1f}s; "
-        f"collection '{settings.chroma_collection}' now has {store.count()} chunks at {settings.chroma_persist_dir}"
+        f"collection '{collection}' now has {store.count()} chunks at {settings.chroma_persist_dir}"
     )
     return 0
 

@@ -178,6 +178,37 @@ function ModeToggle({ mode, setMode, disabled }) {
   )
 }
 
+/** Which code to answer under. Auto: the BNS when the question names it or dates the events on or
+ * after 1 July 2024, otherwise the IPC (backend app/core/bns.py: choose_law). */
+function LawToggle({ law, setLaw, disabled }) {
+  const options = [
+    { value: 'auto', label: 'Auto', hint: 'IPC, or the BNS when the events are on or after 1 July 2024 or you name the BNS' },
+    { value: 'ipc', label: 'IPC', hint: 'Indian Penal Code, 1860: offences before 1 July 2024' },
+    { value: 'bns', label: 'BNS', hint: 'Bharatiya Nyaya Sanhita, 2023: offences from 1 July 2024' },
+  ]
+  const ref = useRef(null)
+  return (
+    <div ref={ref} role="radiogroup" aria-label="Law" className="relative inline-flex rounded-lg bg-slate-100 p-0.5" data-testid="law-toggle">
+      <SlidingPill containerRef={ref} selector='[aria-checked="true"]' deps={[law]} className="rounded-md bg-white shadow-sm ring-1 ring-slate-900/5" />
+      {options.map((o) => (
+        <button
+          key={o.value}
+          role="radio"
+          aria-checked={law === o.value}
+          title={o.hint}
+          disabled={disabled}
+          onClick={() => setLaw(o.value)}
+          className={`relative rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${
+            law === o.value ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 const ScalesMini = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="size-3.5 shrink-0">
     <path d="M12 3.5v16M8 20.5h8M4.5 6.5h15M4.5 6.5 2 13M4.5 6.5 7 13M1.8 13a2.7 2.7 0 0 0 5.4 0ZM19.5 6.5 17 13M19.5 6.5 22 13M16.8 13a2.7 2.7 0 0 0 5.4 0Z" />
@@ -198,6 +229,11 @@ function AssistantMessage({ msg, onCite, live = false }) {
         <LogoMark className="size-6 rounded-md" />
         <span className="font-medium text-slate-700">{msg.mode === 'general' ? 'General answer' : 'Legal answer'}</span>
         {msg.model && <span className="max-w-full truncate rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px]" data-testid="answer-model">{msg.model}</span>}
+        {msg.retrieval?.law && (
+          <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 font-medium text-indigo-700 ring-1 ring-indigo-200" title={`Answered under the ${msg.retrieval.law === 'bns' ? 'Bharatiya Nyaya Sanhita, 2023' : 'Indian Penal Code, 1860'}: ${msg.retrieval.law_reason}`}>
+            {msg.retrieval.law.toUpperCase()}
+          </span>
+        )}
         {msg.refused && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">Out of scope</span>}
       </div>
       {msg.content ? (
@@ -220,6 +256,18 @@ function AssistantMessage({ msg, onCite, live = false }) {
         // IPC sections cited in the answer, with their BNS equivalent (BPRD correspondence table)
         const cited = new Set([...(msg.content || '').matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])))
         const seen = new Set()
+        const bnsRows = (msg.sources || []).filter((s) => s.doc_id === 'BNS' && s.ipc?.length && cited.has(s.marker) && !seen.has(s.section) && seen.add(s.section))
+        if (bnsRows.length > 0 && !msg.refused)
+          return (
+            <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200" data-testid="ipc-line">
+              <span className="font-medium text-slate-700">Answered under the BNS; before 1 July 2024:</span>
+              {bnsRows.map((s) => (
+                <span key={s.section} className="whitespace-nowrap">
+                  s.{s.section} BNS ← {s.ipc[0] === 'new' ? <i>new provision</i> : <b className="font-semibold text-slate-800">s.{s.ipc.slice(0, 4).join(', ')} IPC</b>}
+                </span>
+              ))}
+            </p>
+          )
         const rows = (msg.sources || []).filter((s) => s.kind !== 'judgment' && s.section && s.bns?.length && cited.has(s.marker) && !seen.has(s.section) && seen.add(s.section))
         return rows.length > 0 && !msg.refused ? (
           <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200" data-testid="bns-line">
@@ -266,8 +314,14 @@ function AssistantMessage({ msg, onCite, live = false }) {
                     </>
                   ) : (
                     <span>
+                      {s.doc_id === 'BNS' && <span className="mr-1 font-semibold">BNS</span>}
                       {s.section ? `§${s.section}` : s.citation_path}
                       {s.title ? ` ${s.title}` : ''}
+                      {s.ipc?.length > 0 && (
+                        <span className="ml-1.5 rounded bg-white/70 px-1 py-px font-mono text-[10px] font-medium text-slate-500 ring-1 ring-slate-200" title="The IPC section this BNS section replaced">
+                          {s.ipc[0] === 'new' ? 'new in BNS' : `IPC ${s.ipc.slice(0, 4).join(', ')}`}
+                        </span>
+                      )}
                       {s.bns?.length > 0 && (
                         <span className="ml-1.5 rounded bg-white/70 px-1 py-px font-mono text-[10px] font-medium text-slate-500 ring-1 ring-slate-200" title="Bharatiya Nyaya Sanhita, 2023 equivalent">
                           {s.bns[0] === 'none' ? 'no BNS' : `BNS ${s.bns.join(', ')}`}
@@ -446,6 +500,7 @@ export default function ChatWindow() {
   const [sidebarOpen, setSidebarOpen] = useState(readSidebar) // side panel on wide screens
   const [input, setInput] = useState('')
   const [mode, setMode] = useState('legal')
+  const [law, setLaw] = useState('auto')
   const [models, setModels] = useState([])
   const [model, setModel] = useState(null)
   const [sections, setSections] = useState([])
@@ -527,7 +582,7 @@ export default function ChatWindow() {
       abortRef.current = controller
       try {
         await streamChat(
-          { question, mode, history, model, verify_section: verify },
+          { question, mode, history, model, verify_section: verify, law },
           (event, data) => {
             if (event === 'meta') upd((m) => ({ ...m, refused: data.refused, model: data.model }))
             else if (event === 'sources') upd((m) => ({ ...m, sources: data }))
@@ -791,6 +846,7 @@ export default function ChatWindow() {
               />
               <div className="flex flex-wrap items-center gap-2 px-2.5 pb-2.5 pt-1">
                 <ModeToggle mode={mode} setMode={setMode} disabled={streaming} />
+                {mode === 'legal' && <LawToggle law={law} setLaw={setLaw} disabled={streaming} />}
               {models.length > 1 && (
                 <div ref={modelRef} role="radiogroup" aria-label="Answer model" className="relative inline-flex max-w-full overflow-x-auto rounded-lg bg-slate-100 p-0.5" data-testid="model-toggle">
                   <SlidingPill containerRef={modelRef} selector='[aria-checked="true"]' deps={[model, models.length]} className="rounded-md bg-white shadow-sm ring-1 ring-slate-900/5" />

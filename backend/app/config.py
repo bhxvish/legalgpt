@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     groq_model: str = Field(default="openai/gpt-oss-120b", alias="GROQ_MODEL")
     embedding_model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2", alias="EMBEDDING_MODEL")
     chroma_collection: str = Field(default="ipc_bare_act", alias="CHROMA_COLLECTION")
+    # the Bharatiya Nyaya Sanhita, 2023 (in force from 1 July 2024), indexed apart from the IPC
+    bns_collection: str = Field(default="bns_bare_act", alias="BNS_COLLECTION")
+    bns_chunks_path: Path = Field(default=REPO_ROOT / "data" / "corpus" / "bns_chunks.jsonl", alias="BNS_CHUNKS_PATH")
     # Parsed IPC chunks (committed); embedded into an empty index at startup.
     corpus_chunks_path: Path = Field(default=REPO_ROOT / "data" / "corpus" / "ipc_chunks.jsonl", alias="CORPUS_CHUNKS_PATH")
     # Cosine-similarity floor below which retrieved chunks are discarded (all discarded -> refusal).

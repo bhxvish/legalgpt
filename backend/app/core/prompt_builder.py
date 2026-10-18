@@ -34,6 +34,17 @@ You are not consulting any legal sources in this mode, so do not present stateme
 statements of law, and do not invent section numbers or case citations."""
 
 
+BNS_NAME = ("the Bharatiya Nyaya Sanhita, 2023 (BNS), which replaced the Indian Penal Code from 1 July 2024; "
+            "give BNS section numbers")
+
+
+def legal_system_prompt(law: str = "ipc") -> str:
+    """The legal-mode system prompt for the IPC (default) or the BNS."""
+    if law != "bns":
+        return LEGAL_SYSTEM_PROMPT
+    return LEGAL_SYSTEM_PROMPT.replace("the Indian Penal Code, 1860", BNS_NAME, 1)
+
+
 class PromptBuilder:
     def __init__(self, history_turns: int = 6) -> None:
         self.history_turns = history_turns
@@ -44,12 +55,13 @@ class PromptBuilder:
         sources: list[SourceEvidence],
         mode: Mode,
         history: list[Message] | None = None,
+        law: str = "ipc",
     ) -> list[Message]:
         recent = (history or [])[-self.history_turns :] if self.history_turns else []
         if mode == "general":
             return [Message("system", GENERAL_SYSTEM_PROMPT), *recent, Message("user", question)]
         return [
-            Message("system", LEGAL_SYSTEM_PROMPT),
+            Message("system", legal_system_prompt(law)),
             *recent,
             Message("user", f"SOURCES:\n{self.format_sources(sources)}\n\nQUESTION: {question}"),
         ]
