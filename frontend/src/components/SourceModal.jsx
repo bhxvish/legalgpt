@@ -43,6 +43,16 @@ export default function SourceModal({ source, onClose }) {
             <p className="mt-1 break-words font-mono text-xs text-slate-600" data-testid="source-citation-path">
               {source.citation_path}
             </p>
+            {source.kind !== 'judgment' && source.bns?.length > 0 && (
+              <p className="mt-2 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs text-indigo-900 ring-1 ring-indigo-200">
+                {source.bns[0] === 'none' ? (
+                  <>No direct equivalent in the <b>Bharatiya Nyaya Sanhita, 2023</b> (in force from 1 July 2024): omitted or folded into another provision.</>
+                ) : (
+                  <>Now <b>Section {source.bns.join(', ')}</b> of the <b>Bharatiya Nyaya Sanhita, 2023</b> (in force from 1 July 2024).</>
+                )}{' '}
+                <span className="text-indigo-700/80">From the BPRD correspondence table; check the Sanhita's text where it matters.</span>
+              </p>
+            )}
           </div>
           <button
             ref={closeRef}

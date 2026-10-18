@@ -183,7 +183,9 @@ class ChatRouter:
             yield from self._attestation(question, [], SCOPE_REFUSAL, [], llm.model_id, True, result.used_context,
                                          self._used_rewrite(result))
             return
-        sources = sources + self._judgment_sources(question, result, len(sources))
+        from app.core.bns import annotate
+
+        sources = annotate(list(sources)) + self._judgment_sources(question, result, len(sources))
         if len(sources) > len(result.sources):
             result = replace(result, sources=sources)
         yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": False})

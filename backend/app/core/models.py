@@ -79,3 +79,4 @@ class SourceEvidence(BaseModel):
     kind: str = "statute"
     court: str = ""
     year: int | None = None
+    bns: list[str] = []  # statute: the Bharatiya Nyaya Sanhita equivalent(s) (app/core/bns.py); ["none"] if repealed

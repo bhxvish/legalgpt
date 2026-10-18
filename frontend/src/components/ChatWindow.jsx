@@ -213,6 +213,22 @@ function AssistantMessage({ msg, onCite, live = false }) {
         )
       )}
       {msg.error && <p className="mt-1 text-red-700">Error: {msg.error}</p>}
+      {(() => {
+        // IPC sections cited in the answer, with their BNS equivalent (BPRD correspondence table)
+        const cited = new Set([...(msg.content || '').matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])))
+        const seen = new Set()
+        const rows = (msg.sources || []).filter((s) => s.kind !== 'judgment' && s.section && s.bns?.length && cited.has(s.marker) && !seen.has(s.section) && seen.add(s.section))
+        return rows.length > 0 && !msg.refused ? (
+          <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200" data-testid="bns-line">
+            <span className="font-medium text-slate-700">Under the BNS (since 1 July 2024):</span>
+            {rows.map((s) => (
+              <span key={s.section} className="whitespace-nowrap">
+                s.{s.section} IPC → {s.bns[0] === 'none' ? <i>no direct equivalent</i> : <b className="font-semibold text-slate-800">s.{s.bns.join(', ')} BNS</b>}
+              </span>
+            ))}
+          </p>
+        ) : null
+      })()}
       {msg.sources?.length > 0 && (
         <div className="mt-3 border-t border-slate-100 pt-2">
           <p className="mb-1 text-xs font-medium text-slate-500">
@@ -249,6 +265,11 @@ function AssistantMessage({ msg, onCite, live = false }) {
                     <span>
                       {s.section ? `§${s.section}` : s.citation_path}
                       {s.title ? ` ${s.title}` : ''}
+                      {s.bns?.length > 0 && (
+                        <span className="ml-1.5 rounded bg-white/70 px-1 py-px font-mono text-[10px] font-medium text-slate-500 ring-1 ring-slate-200" title="Bharatiya Nyaya Sanhita, 2023 equivalent">
+                          {s.bns[0] === 'none' ? 'no BNS' : `BNS ${s.bns.join(', ')}`}
+                        </span>
+                      )}
                     </span>
                   )}
                 </button>

@@ -87,7 +87,14 @@ function SourceChip({ s, onOpen }) {
       }`}
     >
       <span className="font-semibold">[{s.marker}]</span>
-      {judgment ? <span className="max-w-[16rem] truncate">{s.title}</span> : <span>§{s.section} {s.title}</span>}
+      {judgment ? (
+        <span className="max-w-[16rem] truncate">{s.title}</span>
+      ) : (
+        <span>
+          §{s.section} {s.title}
+          {s.bns?.length > 0 && <span className="ml-1 font-mono text-[10px] opacity-70">{s.bns[0] === 'none' ? '· no BNS' : `· BNS ${s.bns.join(', ')}`}</span>}
+        </span>
+      )}
     </button>
   )
 }
@@ -188,6 +195,8 @@ export default function CaseAnalysisView() {
           } else if (event === 'token') update((p) => ({ ...p, answer: p.answer + data.text }))
           else if (event === 'done') update((p) => ({ ...p, done: data, steps: Object.fromEntries(STEPS.map((s) => [s.id, 'done'])) }))
           else if (event === 'error') update((p) => ({ ...p, error: String(data?.message || data) }))
+          else if (event === 'analysis_replace') update((p) => ({ ...p, answer: data.text, removed: data.removed }))
+          else if (event === 'guard') update((p) => ({ ...p, guards: [...(p.guards || []), data] }))
           else update((p) => ({ ...p, [event]: data }))
         },
         controller.signal,
@@ -349,6 +358,16 @@ export default function CaseAnalysisView() {
             <p className="animate-rise rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{run.error}</p>
           )}
 
+          {run?.guards?.length > 0 && (
+            <div className="animate-rise space-y-1.5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200" role="status">
+              <p className="flex items-center gap-2 font-semibold">
+                <svg {...stroke} className="size-4"><path d="M10 2.75 3.75 5v4.5c0 3.6 2.6 6.4 6.25 7.75 3.65-1.35 6.25-4.15 6.25-7.75V5Z" /></svg>
+                Safety checks acted on this file
+              </p>
+              {run.guards.map((g, i) => <p key={i} className="text-xs">{g.message}</p>)}
+            </div>
+          )}
+
           {run?.facts && (
             <Section n={1} title="What the file says" hint={`Facts read by the model; each quote was checked against your file${run.facts.truncated ? ` (only the first ${run.facts.chars_read.toLocaleString()} characters were read)` : ''}.`}>
               {run.facts.summary && <p className="mb-4 rounded-xl bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700 ring-1 ring-slate-200">{run.facts.summary}</p>}
@@ -360,7 +379,11 @@ export default function CaseAnalysisView() {
                       <p className="text-slate-800">{f.fact}</p>
                       <p className="mt-0.5 text-xs italic text-slate-500">
                         “{f.quote}”{' '}
-                        {!f.verified && <span className="not-italic font-medium text-red-600">· quote not found in the file, not used</span>}
+                        {f.injection ? (
+                          <span className="not-italic font-medium text-red-600">· reads like an instruction to an AI (possible prompt injection), ignored</span>
+                        ) : (
+                          !f.verified && <span className="not-italic font-medium text-red-600">· quote not found in the file, not used</span>
+                        )}
                       </p>
                     </div>
                   </li>
@@ -374,7 +397,14 @@ export default function CaseAnalysisView() {
               {run.facts?.offences?.length ? (
                 <p className="mb-3 flex flex-wrap gap-1.5">
                   {run.facts.offences.map((o) => (
-                    <span key={o.section} className="rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-slate-50">s.{o.section} · {o.name}</span>
+                    <span key={o.section} className="rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-slate-50">
+                      s.{o.section} · {o.name}
+                      {run.law.bns?.[o.section] && (
+                        <span className="ml-1.5 font-normal opacity-75">
+                          → {run.law.bns[o.section].length ? `BNS ${run.law.bns[o.section].join(', ')}` : 'no BNS equivalent'}
+                        </span>
+                      )}
+                    </span>
                   ))}
                 </p>
               ) : (

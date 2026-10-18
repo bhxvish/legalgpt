@@ -42,3 +42,6 @@ benchmark/metrics.json
 
 # judgment library for citations (fetched texts; CC-BY-4.0 source, kept out of the repo for size)
 data/judgment_library/
+
+# official BPRD IPC-BNS comparison PDF and its text (the extracted mapping is backend/app/core/bns_map.json)
+data/bns/
