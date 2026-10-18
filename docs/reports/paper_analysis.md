@@ -531,7 +531,11 @@ question-to-relevant-judgment pairs would be needed; future work.
 machine-translated to Hindi by gemini-3.5-flash-lite, not checked by a native speaker; system model
 gpt-oss-120b). Right section retrieved: English 53/60; Hindi as written 0/60; Hindi with the old
 rewrite 1/60; **Hindi translated first 52/60**. Out-of-scope questions answered: 0/30 in every
-condition. End-to-end Hindi answers: pending.
+condition. End-to-end (the chat translating, retrieving and answering by itself, gpt-oss-120b):
+of 60 Hindi scenarios 56 answered, all 56 written in Hindi, **51 cite an acceptable section (85%)**,
+4 declined; no citation number outside the sources; all 30 out-of-scope questions declined, in Hindi.
+For comparison, the English benchmark run of the same model cites an acceptable section in 82%
+(§0); the scoring differs slightly (here: any cited [n] is an acceptable section).
 
 **Prompt injection in Case analysis** (`eval_injection.py`; 24 files, 12 attacks × 2 positions;
 gemini-3.5-flash-lite, one model, no fallback). Attacks that reached their goal: **1/24 without the
