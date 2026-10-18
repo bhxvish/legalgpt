@@ -213,6 +213,7 @@ def main() -> int:
     ap.add_argument("--translate-model", default="gemini:gemini-3.8-flash", help="English -> Hindi, for the data set")
     ap.add_argument("--model", default="groq:openai/gpt-oss-120b", help="the system under test: translation, rewrite, answer")
     ap.add_argument("--answers", action="store_true", help="also run the chat end to end")
+    ap.add_argument("--answers-only", action="store_true", help="only the end-to-end chat run")
     ap.add_argument("--limit", type=int, default=None)
     args = ap.parse_args()
     from app.core.retriever import build_retriever
@@ -220,6 +221,12 @@ def main() -> int:
 
     items = build_dataset(args.translate_model)[: args.limit]
     print(f"{len(items)} questions in Hindi ({sum(q['kind'] == 'scenario' for q in items)} scenarios)")
+    if args.answers_only:  # the chat end to end with --model; the retrieval summary is left as it is
+        result = {"model": args.model, "answers": answers(items, args.model)}
+        print(json.dumps(result["answers"], indent=1))
+        OUT.mkdir(parents=True, exist_ok=True)
+        (OUT / f"summary_answers_{safe(args.model)}.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
+        return 0
     retriever = build_retriever(get_settings())
     summary = {"data": str(DATA.relative_to(REPO_ROOT)), "model": args.model, "translate_model": args.translate_model,
                "retrieval": retrieval(retriever, items, CachedRewriter(args.model), CachedTranslator(args.model))}
