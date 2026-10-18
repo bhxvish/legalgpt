@@ -95,6 +95,22 @@ lawyers. The reports say exactly what was measured.
 | **Blind answer rating** | 20 questions, each answer rated 1–5 for relevance, groundedness and completeness without knowing which model wrote it: hosted model **4.75**, tuned LoRA **4.53**. [Report](docs/reports/blind_eval_v0.3.md) |
 | **Dataset** | Corpus v0.3: 36 judgments, 5,602 labelled sentences. Labelling agreement with an independent second annotation **κ = 0.91** (5 cases). [Report](docs/reports/annotation_agreement_v0.3.md) |
 
+## Reproduce the results
+
+One command rebuilds every table of the paper analysis (`docs/reports/paper_analysis.md`) from the
+saved results, with no model calls (API keys are replaced by an invalid placeholder for the run, so an
+incomplete cache fails instead of calling a model or spending money):
+
+```bash
+python backend/scripts/reproduce.py
+```
+
+It writes [docs/reports/reproduced.md](docs/reports/reproduced.md): each step's command, status and
+output. The cached inputs live in `data/reports/` (7 MB) and `data/models/rrl_cv/` (16 MB), which are
+not in git; a step whose inputs are missing is skipped and listed. Re-running an evaluation from
+scratch (new model outputs) uses the individual scripts in `backend/scripts/eval_*.py`, which need
+API keys and free-tier quota.
+
 ## Run without Docker
 
 You need Python 3.11, Node.js 20+ and [SWI-Prolog](https://www.swi-prolog.org/download/stable)
