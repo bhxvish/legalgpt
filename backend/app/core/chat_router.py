@@ -185,7 +185,9 @@ class ChatRouter:
             return text, None
         # the rewrite's model first, then the other hosted models (a used-up quota is common on free tiers)
         first = self._rewrite_llm(llm)
-        others = [] if self.offline else [m for m in self.models.values() if m is not first and not getattr(m, "is_local", False)]
+        # only free providers as fallbacks: a used-up quota must never move spending to a paid model
+        free = lambda m: not getattr(m, "is_local", False) and not str(getattr(m, "model_id", "")).startswith(("openai:", "openrouter:"))  # noqa: E731
+        others = [] if self.offline else [m for m in self.models.values() if m is not first and free(m)]
         for model in [first, *others]:
             english = self.translator.to_english(text, model)
             if english:

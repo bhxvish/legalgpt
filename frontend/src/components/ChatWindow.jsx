@@ -21,6 +21,7 @@ function modelLabel(id) {
   if (id === 'local-heavy') return 'Local heavy (7B)'
   if (id === 'groq') return 'Base (Groq)'
   const [provider, model = ''] = id.split(/:(.*)/s)
+  if (provider === 'openai') return model.replace(/^gpt/, 'GPT').replace(/-(mini|nano|pro)$/, ' $1') // "GPT-5.4 mini"
   const name = model.split('/').pop().replace(/^gemini-/, '').replace(/-/g, ' ')
   return `${PROVIDER_NAMES[provider] || provider} ${name}`.trim()
 }

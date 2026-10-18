@@ -110,3 +110,20 @@ def test_an_unmatched_hindi_question_is_refused_in_hindi(retriever) -> None:  # 
 
     ev = _events(retriever, Civil(), "मेरे मकान मालिक ने मेरी जमा राशि वापस नहीं की।")
     assert ev["meta"]["refused"] and "लीगल मोड" in ev["answer"]
+
+
+def test_translation_never_falls_back_to_a_paid_model(retriever) -> None:  # noqa: F811
+    class Fails(_Model):
+        model_id = "first"
+
+        def generate(self, messages):
+            raise RuntimeError("quota")
+
+    paid = _Model(reply=ANSWER)
+    paid.model_id = "openai:gpt-5.5"
+    first = Fails(reply=ANSWER)
+    app = FastAPI()
+    app.include_router(ChatRouter(retriever, first, models={"a": first, "openai:gpt-5.5": paid}, default_model="a",
+                                  rewriter=QueryRewriter()).router)
+    body = TestClient(app).post("/api/chat", json={"question": HINDI}).text
+    assert "could not be translated" in body and not paid.calls
