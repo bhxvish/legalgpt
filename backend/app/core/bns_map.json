@@ -1692,6 +1692,12 @@
     "subject": "Fouling water of public spring or reservoir."
    }
   ],
+  "278": [
+   {
+    "bns": "280",
+    "subject": "Making atmosphere noxious to health."
+   }
+  ],
   "279": [
    {
     "bns": "281",
@@ -1888,6 +1894,12 @@
    {
     "bns": "109",
     "subject": "Attempt to murder."
+   }
+  ],
+  "308": [
+   {
+    "bns": "110",
+    "subject": "Attempt to commit culpable homicide."
    }
   ],
   "312": [
@@ -2220,6 +2232,12 @@
     "subject": "Kidnapping from India."
    }
   ],
+  "361": [
+   {
+    "bns": "137",
+    "subject": "Kidnapping from lawful guardianship."
+   }
+  ],
   "362": [
    {
     "bns": "138",
@@ -2476,6 +2494,12 @@
     "subject": "Robbery- Punishment for robbery."
    }
   ],
+  "393": [
+   {
+    "bns": "309",
+    "subject": "Robbery- Attempt to commit robbery."
+   }
+  ],
   "394": [
    {
     "bns": "309",
@@ -2578,10 +2602,22 @@
     "subject": "Stolen property."
    }
   ],
+  "411": [
+   {
+    "bns": "317",
+    "subject": "Dishonestly receiving stolen property."
+   }
+  ],
   "412": [
    {
     "bns": "317",
     "subject": "Dishonestly receiving property stolen in the commission of a dacoity."
+   }
+  ],
+  "413": [
+   {
+    "bns": "317",
+    "subject": "Habitually dealing in stolen property."
    }
   ],
   "414": [
@@ -2612,6 +2648,12 @@
    {
     "bns": "318",
     "subject": "Cheating with knowledge that wrongful loss may ensue to person whose interest offender is bound to protect."
+   }
+  ],
+  "419": [
+   {
+    "bns": "319",
+    "subject": "Cheating by personation punishment."
    }
   ],
   "420": [
@@ -2738,6 +2780,18 @@
    {
     "bns": "324",
     "subject": "made for causing death or hurt."
+   }
+  ],
+  "441": [
+   {
+    "bns": "329",
+    "subject": "Criminal trespass and house- trespass."
+   }
+  ],
+  "442": [
+   {
+    "bns": "329",
+    "subject": "Criminal trespass and house- trespass."
    }
   ],
   "443": [
@@ -2870,6 +2924,12 @@
    {
     "bns": "337",
     "subject": "Forgery of record of Court or of public register, etc."
+   }
+  ],
+  "467": [
+   {
+    "bns": "338",
+    "subject": "Forgery of valuable security, will, etc."
    }
   ],
   "468": [
@@ -3191,10 +3251,6 @@
    "subject": "Causing death by negligence."
   },
   {
-   "bns": "110",
-   "subject": "Attempt to commit culpable homicide.  308"
-  },
-  {
    "bns": "111",
    "subject": "Organized crime."
   },
@@ -3215,10 +3271,6 @@
    "subject": "Voluntarily causing grievous hurt."
   },
   {
-   "bns": "137",
-   "subject": "Kidnapping from lawful guardianship.  361"
-  },
-  {
    "bns": "152",
    "subject": "Act endangering sovereignty, unity and integrity of India."
   },
@@ -3231,28 +3283,8 @@
    "subject": "Attempt to commit suicide to compel or restrain from applying or restrain of lawful power."
   },
   {
-   "bns": "280",
-   "subject": "Making atmosphere noxious to health.  278"
-  },
-  {
    "bns": "304",
    "subject": "Snatching."
-  },
-  {
-   "bns": "309",
-   "subject": "Robbery- Attempt to commit robbery.  393"
-  },
-  {
-   "bns": "317",
-   "subject": "Dishonestly receiving stolen property.  411"
-  },
-  {
-   "bns": "317",
-   "subject": "Habitually dealing in stolen property.  413"
-  },
-  {
-   "bns": "319",
-   "subject": "Cheating by personation punishment.  419"
   },
   {
    "bns": "324",
@@ -3261,18 +3293,6 @@
   {
    "bns": "324",
    "subject": "amount of one lakh rupees onwards."
-  },
-  {
-   "bns": "329",
-   "subject": "Criminal trespass and house- trespass.  441"
-  },
-  {
-   "bns": "329",
-   "subject": "Criminal trespass and house- trespass.  442"
-  },
-  {
-   "bns": "338",
-   "subject": "Forgery of valuable security, will, etc.  467"
   },
   {
    "bns": "341",

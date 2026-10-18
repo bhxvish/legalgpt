@@ -255,9 +255,20 @@ sample, not on these.
 > (`benchmark/ipc_bns_map.json`) was compiled without verification against the BNS text, so it
 > serves only as a diagnostic.
 
-Suggested future-work line: index the BNS alongside the IPC, verify the concordance against the
-official correspondence table, and answer with both section numbers when the offence date is not
-given.
+**Update (2026-10-18): official concordance added.** The IPC→BNS correspondence is now taken from
+the official table, *Correspondence Table and Comparison Summary of the BNS to the IPC* (Bureau of
+Police Research and Development, Ministry of Home Affairs). `backend/scripts/build_bns_map.py`
+rebuilds its rows from the PDF's text positions and keeps only section numbers and subject titles:
+- 527 IPC sections are mapped; 23 BNS provisions have no IPC source (e.g. organised crime s.111,
+  snatching s.304). Sedition (124A), s.377 and adultery (497) have no entry.
+- All 47 entries of the benchmark's unverified concordance agree with the official table, so the
+  "BNS confusion" diagnostic above stands.
+- The app shows the BNS number next to every IPC source, under answers ("s.302 IPC → s.103 BNS"),
+  and next to each offence in Case analysis. The model's answers are not changed: the numbers come
+  from the table, never from the model, so the benchmark is unaffected.
+
+Remaining future work: index the BNS text itself and answer under the BNS when the offence date is
+on or after 1 July 2024.
 
 ## Caveats
 

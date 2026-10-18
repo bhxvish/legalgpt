@@ -365,6 +365,17 @@ Applied or Precedent passages, one per judgment, above `JUDGMENT_MIN_SIMILARITY`
 It never says whether anyone is guilty. **Keep the file on this computer** runs every model step on
 a local model; nothing is sent to Groq or Gemini, and nothing is stored either way.
 
+**BNS numbers.** Since 1 July 2024 the Bharatiya Nyaya Sanhita, 2023 replaces the IPC. Every IPC
+source shows its BNS section (chips, the source window, a line under each answer, Case analysis
+offences). The map `backend/app/core/bns_map.json` comes from the official BPRD correspondence table:
+
+```bash
+python backend/scripts/build_bns_map.py --pdf data/bns/comparison_summary_BNS_to_IPC.pdf
+```
+
+Only the displayed numbers come from the table; answers still cite the IPC. Check the Sanhita's text
+where it matters.
+
 ## Neuro-symbolic verification (Module 5)
 
 Needs [SWI-Prolog](https://www.swi-prolog.org/download/stable) on `PATH` (the backend still starts

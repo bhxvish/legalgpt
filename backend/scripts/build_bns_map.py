@@ -61,6 +61,10 @@ def main() -> int:
     ipc_to_bns: dict[str, list[dict]] = defaultdict(list)
     new_in_bns = []
     for r in rows:
+        # a few IPC numbers sit so far left that they join the subject line: "Robbery- ...  393"
+        tail = re.search(r"\s{2,}(\d{1,3}[A-Z]{0,2}(?:\s*(?:,|and|&)\s*\d{1,3}[A-Z]{0,2})*)\s*$", r["subject"])
+        if tail:
+            r["subject"], r["ipc"] = r["subject"][:tail.start()].strip(), f"{tail.group(1)} {r['ipc']}"
         nums = ipc_numbers(r["ipc"])
         if re.match(r"\s*new\b", r["ipc"], re.I) or not nums:
             new_in_bns.append({"bns": r["bns"], "subject": r["subject"][:120]})
