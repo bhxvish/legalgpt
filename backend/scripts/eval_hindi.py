@@ -180,9 +180,17 @@ def answers(items, spec: str) -> dict:
                     ev["answer"] += data["text"]
                 else:
                     ev[kind] = data
+            if ev.get("retrieval", {}).get("translation", {}).get("failed"):  # every model's quota used up
+                ev["error"] = {"message": "translation failed (usage limits)"}
             if "error" not in ev:
                 break
-            time.sleep(30)
+            msg = ev["error"]["message"].lower()
+            if "daily" in msg or "translation failed" in msg:
+                from app.benchmark.quota import QuotaWaiter
+
+                QuotaWaiter(True, 1.0).wait(RuntimeError(ev["error"]["message"]))
+            else:
+                time.sleep(30)
         markers = {s["marker"]: s["section"] for s in ev.get("sources", []) if s.get("kind") != "judgment"}
         cited = {int(n) for n in re.findall(r"\[(\d+)\]", ev["answer"])}
         all_markers = {s["marker"] for s in ev.get("sources", [])}
