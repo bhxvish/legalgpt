@@ -58,6 +58,7 @@ class CaseSummary(BaseModel):
     decision_year: int | None
     sections_cited: list[str]
     progress: Progress | None = None  # for the requesting annotator, once the case was opened
+    labelled_by: list[str] = []  # everyone with labels on this case (people, "model:<checkpoint>", "claude")
 
 
 class CaseDetail(CaseSummary):
@@ -87,7 +88,8 @@ class AnnotationRouter:
                 labelled = len(self.store.load_case(e["case_id"], annotator=annotator)) if annotator else 0
                 progress = Progress(sentences=len(segments), labelled=labelled)
             out.append(CaseSummary(case_id=e["case_id"], title=e.get("title", ""), court=e["court"], decision_year=e["decision_year"],
-                                   sections_cited=e["sections_cited"], progress=progress))
+                                   sections_cited=e["sections_cited"], progress=progress,
+                                   labelled_by=self.store.annotators(e["case_id"]) if segments is not None else []))
         return out
 
     def _segments(self, case_id: str) -> list[str]:

@@ -45,3 +45,4 @@ data/judgment_library/
 
 # official BPRD IPC-BNS comparison PDF and its text (the extracted mapping is backend/app/core/bns_map.json)
 data/bns/
+data/demo/

@@ -36,9 +36,10 @@ const done = (p) => p && p.sentences > 0 && p.labelled === p.sentences
 /** What a judgment needs from this person, and how it opens. */
 function stateOf(c) {
   const q = c.queue
-  // the original hand-labelled collection (before InLegalBERT); the bar shows this person's own labels
-  if (!q) return { key: 'hand', text: done(c.progress) ? 'Hand-labelled · yours done' : 'Hand-labelled set', mode: 'blind',
-    tone: done(c.progress) ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-slate-50 text-slate-600 ring-slate-200' }
+  // not through InLegalBERT's queue: the original labelled collection (or not labelled at all)
+  if (!q) return c.labelled_by?.length
+    ? { key: 'hand', text: 'Labelled', mode: 'blind', tone: 'bg-emerald-50 text-emerald-700 ring-emerald-200' }
+    : { key: 'unlabelled', text: 'Not labelled', mode: 'blind', tone: 'bg-amber-50 text-amber-800 ring-amber-200' }
   if (q.status === 'escalated') return { key: 'sent', text: 'Sent back · label by hand', mode: 'blind', tone: 'bg-amber-50 text-amber-800 ring-amber-200' }
   if (q.status === 'promoted') return { key: 'corpus', text: 'Checked · in the corpus', mode: 'review', tone: 'bg-emerald-50 text-emerald-700 ring-emerald-200' }
   if (q.blind_sample && !done(c.progress))
@@ -161,7 +162,8 @@ export default function LabelView() {
     ['blind', 'Blind samples', counts.blind || 0],
     ['sent', 'Sent back', counts.sent || 0],
     ['corpus', 'In the corpus', counts.corpus || 0],
-    ['hand', 'Hand-labelled set', counts.hand || 0],
+    ['hand', 'Labelled', counts.hand || 0],
+    ['unlabelled', 'Not labelled', counts.unlabelled || 0],
   ]
   const q = query.trim().toLowerCase()
   const shown = cases
@@ -284,7 +286,9 @@ export default function LabelView() {
                           <p className="mt-0.5 text-xs text-slate-500">
                             {c.state.mode === 'review' && qd
                               ? `${qd.reviewed} of ${qd.flagged} highlighted sentences checked · ${qd.sentences} sentences`
-                              : [c.court, c.decision_year, c.sections_cited?.length ? `ss. ${c.sections_cited.slice(0, 4).join(', ')}` : ''].filter(Boolean).join(' · ') || c.case_id}
+                              : [c.court, c.decision_year, c.sections_cited?.length ? `ss. ${c.sections_cited.slice(0, 4).join(', ')}` : '',
+                                  c.labelled_by?.length ? `labelled by ${c.labelled_by.map((n) => (n.startsWith('model:') ? 'InLegalBERT' : n)).filter((n, i, a) => a.indexOf(n) === i).join(', ')}` : '']
+                                  .filter(Boolean).join(' · ') || c.case_id}
                           </p>
                         </div>
                       </div>
@@ -292,9 +296,11 @@ export default function LabelView() {
                         {c.state.mode === 'review' && qd ? (
                           <Meter value={frac} tone={frac === 1 ? 'bg-emerald-500' : 'bg-indigo-500'} className="hidden w-20 sm:block" />
                         ) : (
-                          <span className="hidden sm:block">
-                            <ProgressBar progress={c.progress} />
-                          </span>
+                          c.progress?.labelled > 0 && (
+                            <span className="hidden sm:block" title="Your own labels on this judgment">
+                              <ProgressBar progress={c.progress} />
+                            </span>
+                          )
                         )}
                         <Pill label={c.state.text} colour={c.state.tone} />
                         <svg {...stroke} className="size-4 text-slate-300 transition-[transform,color] duration-200 group-hover:translate-x-0.5 group-hover:text-indigo-500">
