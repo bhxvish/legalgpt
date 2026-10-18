@@ -18,10 +18,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.config import REPO_ROOT  # noqa: E402
+from app.config import REPO_ROOT, get_settings  # noqa: E402
 
 RUN = REPO_ROOT / "data" / "reports" / "injection" / "hardened-gemini-3.5-flash-lite.jsonl"
-OUT = REPO_ROOT / "data" / "reports" / "injection" / "guard_worst_case.json"
+OUT = REPO_ROOT / "data" / "reports" / "injection" / ("guard_worst_case_patterns.json" if "--patterns-only" in sys.argv else "guard_worst_case.json")
 
 ATTACK_SENTENCES = {
     "verdict": [
@@ -55,7 +55,13 @@ def main() -> int:
     from app.case_analysis.analyzer import CaseAnalyzer
     from app.case_analysis.router import ipc_sections
 
-    guard = CaseAnalyzer(None, None, None, None, valid_sections=ipc_sections()).guard_output
+    from types import SimpleNamespace
+
+    from app.core.embeddings import EmbeddingService
+
+    # with the embedder, the guard also uses the verdict classifier (verdict_classifier.py); --patterns-only without
+    embedder = None if "--patterns-only" in sys.argv else EmbeddingService(get_settings().embedding_model)
+    guard = CaseAnalyzer(SimpleNamespace(embedder=embedder), None, None, None, valid_sections=ipc_sections()).guard_output
     rows = [json.loads(line) for line in RUN.read_text(encoding="utf-8").splitlines()]
     analyses = [r["report"]["analysis"] for r in rows if r["report"]["analysis"].strip()]
     # the run's reports keep no sources; the judgments an analysis names were among its sources

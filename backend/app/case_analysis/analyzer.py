@@ -304,16 +304,28 @@ class CaseAnalyzer:
         yield "done", {"disclaimer": DISCLAIMER, "model": llm.model_id, "local_only": local_only,
                        "model_note": getattr(llm, "note", ""), "out_of_scope": True}
 
+    def _verdict_classifier(self):
+        if not hasattr(self, "_clf"):
+            from app.case_analysis.verdict_classifier import VerdictClassifier
+
+            self._clf = VerdictClassifier.load(getattr(self.retriever, "embedder", None))
+        return self._clf
+
     def guard_output(self, text: str, sources: list) -> tuple[str, list[dict]]:
         """Remove sentences that state a verdict, cite a section that is not an IPC section, name a
         case that is not among the sources, or repeat the system prompt."""
         titles = " ".join(_norm(s.title) for s in sources if s.kind == "judgment")
+        clf = self._verdict_classifier()
         # "v." / "vs." / "No." end abbreviations, not sentences ("State v. Ramesh" stays whole)
         sentences = re.split(r"(?<=[.!?])(?<!\bv\.)(?<!\bvs\.)(?<!\bNo\.)\s+(?=[A-Z*\[(])", text)
         kept, removed = [], []
-        for sent in sentences:
+        try:  # paraphrased verdicts the patterns miss (verdict_classifier.py)
+            by_model = clf.flags(sentences) if clf is not None else [False] * len(sentences)
+        except Exception:
+            by_model = [False] * len(sentences)
+        for sent, model_verdict in zip(sentences, by_model):
             why = ""
-            if VERDICT_SENTENCE.search(sent):
+            if VERDICT_SENTENCE.search(sent) or model_verdict:
                 why = "states a verdict"
             elif PROMPT_LEAK.search(sent):
                 why = "repeats the system instructions"

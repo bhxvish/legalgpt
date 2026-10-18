@@ -168,3 +168,20 @@ def test_a_file_with_no_ipc_offence_is_not_analysed_against_unrelated_ipc_text()
     assert ev["law"]["sources"] == [] and ev["elements"]["checks"] == []
     assert answer.startswith("No IPC offence was found") and "I don't know" not in answer
     assert ev["done"]["out_of_scope"] is True and llm.calls == 1  # no analysis call to the model
+
+
+def test_the_verdict_classifier_backs_up_the_patterns(tmp_path):
+    import numpy as np
+
+    from app.case_analysis.verdict_classifier import VerdictClassifier
+
+    class Emb:  # "doubt" sentences point one way, the rest the other
+        def embed(self, texts):
+            return np.array([[1.0, 0.0] if "no doubt" in t else [0.0, 1.0] for t in texts])
+
+    a = CaseAnalyzer(SimpleNamespace(embedder=Emb()), valid_sections=TITLES)
+    a._clf = VerdictClassifier(Emb(), [8.0, -8.0], 0.0, 0.5)
+    text = "The facts may engage section 304A. There is no doubt that the accused did it. Rashness must be proved."
+    cleaned, removed = a.guard_output(text, [])
+    assert [r["why"] for r in removed] == ["states a verdict"] and "no doubt" not in cleaned
+    assert VerdictClassifier.load(None) is None  # no embedder: patterns alone

@@ -545,6 +545,18 @@ in that run, so the model itself resisted most attacks; n is small. Worst case
 120/192 verdict, 120/144 fake-law and 72/96 prompt-leak insertions and no genuine sentence;
 paraphrased verdicts ("There is no doubt that the accused did it") pass. Limitation, not tuned away.
 
+**Verdict classifier** (`eval_verdict_guard.py`; logistic regression on the MiniLM sentence
+embeddings, `app/case_analysis/verdict_classifier.py`). Trained on sentences written by gpt-oss-120b
+(106 verdicts, 420 non-verdicts incl. 300 sentences of real analyses); threshold chosen on the
+training data by 5-fold CV (false removals <= 2%). Held-out test written by qwen3.8-27b, another
+model family: verdicts caught 22/120 (18%) by the patterns, **112/120 (93%)** with the classifier;
+sentences of real analyses wrongly removed 0/100 in both; deliberately hard non-verdict sentences
+(bail, procedure, what a past court held) wrongly removed 0/125 -> 13/125 (10%), the price of the
+gain. Worst-case insertions with the classifier: verdicts 192/192 (was 120/192), fake law 144/144
+(was 120/144), prompt leaks 72/96 (unchanged); no genuine sentence removed. The eight worst-case
+phrasings were not used for training or the threshold. All sentences are AI-written; labels are by
+construction, not checked by a person; one generator refused the dowry-death theme.
+
 **Judgment-citation faithfulness** (`eval_citation_faithfulness.py`; 92 answers by
 gemini-3.5-flash-lite; judges gpt-oss-120b and qwen3.8-27b, blind to each other). 19 sentences cite a
 judgment: both judges SUPPORTED 14/19 (74%), none judged UNSUPPORTED by both; agreement 0.895,
