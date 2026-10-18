@@ -6,7 +6,7 @@
     <title>LegalGPT · Indian Penal Code assistant</title>
     <meta name="description" content="Answers questions about the Indian Penal Code from the statute text, with a source for every claim, fact checks and verifiable proofs. Legal information, not legal advice." />
     <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0b1020" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -18,6 +18,8 @@
         var t = localStorage.getItem('legalgpt.theme')
         var dark = t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
         document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+        var d = localStorage.getItem('legalgpt.darkStyle')
+        document.documentElement.dataset.dark = d === 'midnight' || d === 'warm' ? d : 'graphite'
       } catch (e) {}
     </script>
   </head>

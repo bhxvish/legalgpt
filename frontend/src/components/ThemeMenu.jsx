@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { useTheme } from '../theme.js'
+import { useDarkStyle, useTheme } from '../theme.js'
 
 const base = { viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }
 
@@ -38,10 +38,18 @@ const THEMES = [
   },
 ]
 
+// dark palettes: background, card and accent, as swatches (the values of index.css)
+const DARK = [
+  { id: 'graphite', label: 'Graphite', hint: 'Neutral charcoal', colours: ['oklch(17.6% 0.004 264)', 'oklch(22.5% 0.005 264)', 'oklch(64% 0.12 262)'] },
+  { id: 'warm', label: 'Ink & paper', hint: 'Warm, low glare', colours: ['oklch(18% 0.008 70)', 'oklch(23% 0.009 70)', 'oklch(66% 0.1 255)'] },
+  { id: 'midnight', label: 'Midnight', hint: 'Deep navy', colours: ['oklch(12.9% 0.042 264.7)', 'oklch(18.6% 0.03 262)', 'oklch(58% 0.13 256)'] },
+]
+
 /** Theme picker: a button that opens a small menu (System / Light / Dark), styled like the app
  * instead of the browser's native dropdown. Arrow keys, Enter, Escape and outside clicks work. */
 export default function ThemeMenu() {
   const [theme, setTheme] = useTheme()
+  const [darkStyle, setDarkStyle] = useDarkStyle()
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const rootRef = useRef(null)
@@ -106,6 +114,7 @@ export default function ThemeMenu() {
         </svg>
       </button>
       {open && (
+        <div className="absolute right-0 top-full z-50 mt-2 w-56 origin-top-right animate-pop rounded-xl bg-white p-1 shadow-[0_12px_32px_-12px_rgb(15_23_42/0.35)] ring-1 ring-slate-200">
         <ul
           ref={listRef}
           id={`${id}-list`}
@@ -114,7 +123,7 @@ export default function ThemeMenu() {
           aria-label="Colour theme"
           aria-activedescendant={`${id}-${THEMES[active]?.id}`}
           onKeyDown={onKey}
-          className="absolute right-0 top-full z-50 mt-2 w-48 origin-top-right animate-pop rounded-xl bg-white p-1 shadow-[0_12px_32px_-12px_rgb(15_23_42/0.35)] ring-1 ring-slate-200 outline-none"
+          className="outline-none"
         >
           {THEMES.map((t, i) => (
             <li
@@ -141,6 +150,31 @@ export default function ThemeMenu() {
             </li>
           ))}
         </ul>
+        <div className="mt-1 border-t border-slate-200 px-2.5 pb-1.5 pt-2" role="radiogroup" aria-label="Dark style">
+          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-400">Dark style</p>
+          <div className="grid grid-cols-3 gap-1.5">
+            {DARK.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                role="radio"
+                aria-checked={darkStyle === d.id}
+                title={`${d.label}: ${d.hint}${theme === 'light' ? ' (used when the theme is dark)' : ''}`}
+                onClick={() => setDarkStyle(d.id)}
+                className={`flex flex-col items-center gap-1 rounded-lg p-1.5 text-[11px] font-medium transition ${
+                  darkStyle === d.id ? 'bg-slate-100 text-slate-900 ring-1 ring-indigo-400' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                }`}
+              >
+                <span aria-hidden="true" className="relative h-7 w-full overflow-hidden rounded-md ring-1 ring-black/10" style={{ background: d.colours[0] }}>
+                  <span className="absolute inset-x-1.5 bottom-1 top-1.5 rounded" style={{ background: d.colours[1] }} />
+                  <span className="absolute bottom-2 right-2.5 size-1.5 rounded-full" style={{ background: d.colours[2] }} />
+                </span>
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        </div>
       )}
     </div>
   )

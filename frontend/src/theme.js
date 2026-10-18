@@ -25,6 +25,37 @@ function apply(choice) {
   requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('theme-switching')))
 }
 
+// the dark palette: "graphite" (neutral, default), "warm" (ink and paper) or "midnight" (navy)
+const STYLE_KEY = 'legalgpt.darkStyle'
+export const DARK_STYLES = ['graphite', 'warm', 'midnight']
+
+function readStyle() {
+  try {
+    const v = localStorage.getItem(STYLE_KEY)
+    return DARK_STYLES.includes(v) ? v : 'graphite'
+  } catch {
+    return 'graphite'
+  }
+}
+
+export function useDarkStyle() {
+  const [style, setStyle] = useState(readStyle)
+  useEffect(() => {
+    const root = document.documentElement
+    if (root.dataset.dark !== style) {
+      root.classList.add('theme-switching')
+      root.dataset.dark = style
+      requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('theme-switching')))
+    }
+    try {
+      localStorage.setItem(STYLE_KEY, style)
+    } catch {
+      // private window: the choice lasts until reload
+    }
+  }, [style])
+  return [style, setStyle]
+}
+
 export function useTheme() {
   const [choice, setChoice] = useState(readChoice)
 

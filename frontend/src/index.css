@@ -331,3 +331,45 @@ nav a[data-group-start]::before {
   nav a[data-group-start] { margin-left: 5px; }
   nav a[data-group-start]::before { left: -3px; }
 }
+
+/* Dark styles (ThemeMenu "Dark style"; <html data-dark>): the neutral scale, the raised surface and
+   the accent change; the coloured tints (indigo, red, amber, ...) stay. "midnight" is the original
+   navy above. Surfaces step up in lightness so cards stand off the page. */
+:root[data-theme="dark"][data-dark="graphite"] {
+  --color-white: oklch(22.5% 0.005 264);
+  --color-slate-50: oklch(17.6% 0.004 264);
+  --color-slate-100: oklch(25.5% 0.006 264);
+  --color-slate-200: oklch(31% 0.007 264);
+  --color-slate-300: oklch(39% 0.008 264);
+  --color-slate-400: oklch(53% 0.009 264);
+  --color-slate-500: oklch(67% 0.01 264);
+  --color-slate-600: oklch(77% 0.009 264);
+  --color-slate-700: oklch(87.5% 0.007 264);
+  --color-slate-800: oklch(93% 0.005 264);
+  --color-slate-900: oklch(96.5% 0.003 264);
+  --color-slate-950: oklch(98.5% 0.002 264);
+  --color-indigo-50: oklch(25% 0.03 262);
+  --color-indigo-100: oklch(29% 0.04 262);
+  --color-indigo-200: oklch(36% 0.06 262);
+  --color-accent: oklch(64% 0.12 262);
+  --color-accent-hover: oklch(58.5% 0.125 262);
+}
+:root[data-theme="dark"][data-dark="warm"] {
+  --color-white: oklch(23% 0.009 70);
+  --color-slate-50: oklch(18% 0.008 70);
+  --color-slate-100: oklch(26% 0.01 70);
+  --color-slate-200: oklch(31.5% 0.011 70);
+  --color-slate-300: oklch(39.5% 0.012 70);
+  --color-slate-400: oklch(54% 0.014 72);
+  --color-slate-500: oklch(68% 0.016 75);
+  --color-slate-600: oklch(78% 0.016 78);
+  --color-slate-700: oklch(88% 0.014 80);
+  --color-slate-800: oklch(93.5% 0.011 82);
+  --color-slate-900: oklch(96.8% 0.008 85);
+  --color-slate-950: oklch(98.6% 0.005 85);
+  --color-indigo-50: oklch(25.5% 0.025 258);
+  --color-indigo-100: oklch(29.5% 0.035 258);
+  --color-indigo-200: oklch(36.5% 0.055 258);
+  --color-accent: oklch(66% 0.1 255);
+  --color-accent-hover: oklch(60.5% 0.105 255);
+}
