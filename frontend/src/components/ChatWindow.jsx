@@ -9,6 +9,7 @@ import SourceModal from './SourceModal.jsx'
 import { VerificationResultView } from './VerifyPanel.jsx'
 import WhyPanel from './WhyPanel.jsx'
 import { AnswerProof } from './ZkProof.jsx'
+import AnswerTrace from './AnswerTrace.jsx'
 
 const HISTORY_MESSAGES = 6
 
@@ -183,6 +184,7 @@ const ScalesMini = () => (
 )
 
 function AssistantMessage({ msg, onCite, live = false }) {
+  const box = useRef(null)
   const cited = new Set([...(msg.content || '').matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])))
   const tone = msg.error
     ? 'bg-red-50 ring-red-200'
@@ -190,7 +192,7 @@ function AssistantMessage({ msg, onCite, live = false }) {
       ? 'bg-amber-50 ring-amber-200'
       : 'bg-white ring-slate-200'
   return (
-    <div className={`w-full min-w-0 rounded-2xl px-4 py-3.5 text-[0.9375rem] leading-relaxed text-slate-800 shadow-[0_1px_2px_rgb(15_23_42/0.04)] ring-1 sm:px-5 sm:py-4 ${tone}`} data-testid="assistant-message">
+    <div ref={box} className={`w-full min-w-0 rounded-2xl px-4 py-3.5 text-[0.9375rem] leading-relaxed text-slate-800 shadow-[0_1px_2px_rgb(15_23_42/0.04)] ring-1 sm:px-5 sm:py-4 ${tone}`} data-testid="assistant-message">
       <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
         <LogoMark className="size-6 rounded-md" />
         <span className="font-medium text-slate-700">{msg.mode === 'general' ? 'General answer' : 'Legal answer'}</span>
@@ -278,6 +280,7 @@ function AssistantMessage({ msg, onCite, live = false }) {
           </ul>
         </div>
       )}
+      <AnswerTrace msg={msg} containerRef={box} onCite={onCite} />
       {msg.explanation && <WhyPanel explanation={msg.explanation} sources={msg.sources} retrieval={msg.retrieval} onOpenSource={onCite} />}
       <AnswerProof msg={msg} />
       {msg.verifySection && !msg.verification && !msg.error && (

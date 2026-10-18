@@ -75,10 +75,38 @@ def test_english_questions_are_not_translated(retriever) -> None:  # noqa: F811
     assert "Hindi" not in llm.calls[-1][0].content
 
 
-def test_an_unmatched_hindi_question_is_refused_in_hindi(retriever) -> None:  # noqa: F811
+def test_a_failed_translation_says_so_instead_of_no_match(retriever) -> None:  # noqa: F811
     class Fails(_Model):
         def generate(self, messages):
             raise RuntimeError("quota")
 
-    ev = _events(retriever, Fails(), "मेरे मकान मालिक ने मेरी जमा राशि वापस नहीं की।")
+    ev = _events(retriever, Fails(), HINDI)
+    assert ev["meta"]["refused"] and "could not be translated" in ev["answer"]
+    assert ev["retrieval"]["translation"]["failed"] is True
+
+
+def test_translation_falls_back_to_another_hosted_model(retriever) -> None:  # noqa: F811
+    class Fails(_Model):
+        model_id = "first"
+
+        def generate(self, messages):
+            raise RuntimeError("quota")
+
+    first, second = Fails(reply=ANSWER), _Model(reply=ANSWER)
+    second.model_id = "second"
+    app = FastAPI()
+    app.include_router(ChatRouter(retriever, first, models={"a": first, "b": second}, default_model="a",
+                                  rewriter=QueryRewriter()).router)
+    body = TestClient(app).post("/api/chat", json={"question": HINDI}).text
+    assert f'"translation": {{"from": "hi", "text": "{QUESTION}"' in body  # translated by the second model
+
+
+def test_an_unmatched_hindi_question_is_refused_in_hindi(retriever) -> None:  # noqa: F811
+    class Civil(_Model):
+        def generate(self, messages):
+            if "Translate the user's question" in messages[0].content:
+                return "My landlord did not return my security deposit."
+            return '{"criminal": false, "offences": []}'
+
+    ev = _events(retriever, Civil(), "मेरे मकान मालिक ने मेरी जमा राशि वापस नहीं की।")
     assert ev["meta"]["refused"] and "लीगल मोड" in ev["answer"]

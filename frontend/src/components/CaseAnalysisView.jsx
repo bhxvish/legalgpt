@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import WhereItFits from './WhereItFits.jsx'
 import { caseApi } from '../api.js'
 import { AnswerText } from './ChatWindow.jsx'
 import { CaseFileArt, HeaderArt } from './LawArt.jsx'
@@ -10,11 +11,12 @@ import WhyPanel from './WhyPanel.jsx'
 const stroke = { viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }
 
 const STEPS = [
-  { id: 'facts', label: 'Reading the facts' },
-  { id: 'law', label: 'Finding the law' },
-  { id: 'elements', label: 'Checking each element' },
-  { id: 'similar', label: 'Similar judgments' },
-  { id: 'analysis', label: 'Writing the analysis' },
+  // module: the part of the system that does the step (System overview, the paper's module numbers)
+  { id: 'facts', label: 'Reading the facts', module: 'LLM', title: 'Facts with quotes, each checked against the file' },
+  { id: 'law', label: 'Finding the law', module: 'M0', title: 'IPC retrieval; the section must exist and its title match' },
+  { id: 'elements', label: 'Checking each element', module: 'M5', title: 'The Prolog rule engine for encoded sections; the model otherwise' },
+  { id: 'similar', label: 'Similar judgments', module: 'M2', title: 'Facts passages of the role-labelled judgment library' },
+  { id: 'analysis', label: 'Writing the analysis', module: 'M4', title: 'Cited analysis with its explanation, through the output guard' },
 ]
 
 const ELEMENT = {
@@ -59,7 +61,7 @@ function Stepper({ steps }) {
       {STEPS.map((s) => {
         const st = steps[s.id] || 'waiting'
         return (
-          <li key={s.id} className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs ring-1 transition-colors duration-300 ${
+          <li key={s.id} title={s.title} className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs ring-1 transition-colors duration-300 ${
             st === 'done' ? 'bg-emerald-50 text-emerald-800 ring-emerald-200' : st === 'running' ? 'bg-indigo-50 text-indigo-800 ring-indigo-200' : 'bg-white text-slate-400 ring-slate-200'
           }`}>
             {st === 'done' ? (
@@ -70,6 +72,7 @@ function Stepper({ steps }) {
               <span aria-hidden="true" className="size-3.5 shrink-0 rounded-full border-2 border-current opacity-50" />
             )}
             <span className={st === 'running' ? 'text-shimmer font-medium' : 'font-medium'}>{s.label}</span>
+            <span className="ml-auto font-mono text-[9.5px] font-semibold opacity-60">{s.module}</span>
           </li>
         )
       })}
@@ -234,6 +237,7 @@ export default function CaseAnalysisView() {
             finds the IPC sections they may engage, checks every element, finds similar past judgments, and writes a
             cited analysis. It shows what the law requires and what the file shows or leaves open; it does not decide guilt.
           </p>
+          <WhereItFits part="case" className="mt-4 animate-rise" />
         </header>
 
         <section className="grid animate-rise gap-5 rounded-2xl bg-white p-5 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_12px_32px_-20px_rgb(15_23_42/0.25)] ring-1 ring-slate-200 sm:p-6" style={stagger(3)}>

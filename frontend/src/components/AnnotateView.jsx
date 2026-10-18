@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import WhereItFits from './WhereItFits.jsx'
 import { annotationApi } from '../api.js'
 import { HeaderArt, BookArt } from './LawArt.jsx'
 import { stagger } from './motion.jsx'
@@ -498,6 +499,7 @@ export default function AnnotateView() {
               Change
             </button>
           </div>
+          <WhereItFits part="annotate" className="mt-4 animate-rise" />
         </header>
 
         <div className="animate-rise" style={stagger(3)}>

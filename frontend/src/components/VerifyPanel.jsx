@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import WhereItFits from './WhereItFits.jsx'
 import { verifyApi } from '../api.js'
+import { takeHandoff } from '../handoff.js'
 import { HeaderArt, ScalesArt } from './LawArt.jsx'
 import { stagger } from './motion.jsx'
 import { VerdictProof } from './ZkProof.jsx'
@@ -238,8 +240,10 @@ function Checking({ section }) {
 }
 
 export default function VerifyPanel() {
+  // sent from a chat answer ("Check the facts against s.X"): the question and the section
+  const [handoff] = useState(() => takeHandoff('verify'))
   const [meta, setMeta] = useState(null)
-  const [text, setText] = useState('')
+  const [text, setText] = useState(handoff?.text || '')
   const [section, setSection] = useState('')
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -251,7 +255,8 @@ export default function VerifyPanel() {
       .sections()
       .then((m) => {
         setMeta(m)
-        setSection((s) => s || m.sections.find((x) => x.section === '304A')?.section || m.sections[0]?.section || '')
+        const sent = m.sections.find((x) => x.section === handoff?.section)?.section
+        setSection((s) => sent || s || m.sections.find((x) => x.section === '304A')?.section || m.sections[0]?.section || '')
       })
       .catch((e) => setError(e.message.includes('404') ? 'Verification is not available: the server could not start SWI-Prolog.' : e.message))
   }, [])
@@ -301,6 +306,12 @@ export default function VerifyPanel() {
                 <path d="M10 9v4.5M10 6.6v.1" />
               </svg>
               {meta.disclaimer}
+            </p>
+          )}
+          <WhereItFits part="verify" className="mt-4 animate-rise" />
+          {handoff && (
+            <p className="mt-3 animate-rise rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-900 ring-1 ring-indigo-200" data-testid="verify-handoff">
+              Your question from the chat is filled in below{handoff.section ? `, with s.${handoff.section}` : ''}. Check it reads as the facts of a case, then run the check.
             </p>
           )}
         </header>

@@ -259,6 +259,9 @@ def create_app(chat_router: ChatRouter | None = None, annotation_router: Annotat
             return VerificationService(FactExtractor(llm), verifier.engine) if verifier is not None else None
 
         app.include_router(CaseRouter(chat_router, local_verifier).router)
+    from app.system_router import SystemRouter
+
+    app.include_router(SystemRouter(settings, chat_router, verifier).router)  # the System overview page
     return app
 
 

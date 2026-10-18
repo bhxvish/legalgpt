@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import WhereItFits from './WhereItFits.jsx'
 import { annotationApi, reviewApi } from '../api.js'
 import { HeaderArt, GavelArt } from './LawArt.jsx'
 import { stagger } from './motion.jsx'
@@ -653,6 +654,7 @@ export default function ReviewView() {
               Change
             </button>
           </div>
+          <WhereItFits part="review" className="mt-4 animate-rise" />
         </header>
 
         {cases && cases.length > 0 && (

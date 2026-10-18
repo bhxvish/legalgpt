@@ -183,16 +183,27 @@ class ChatRouter:
 
         if not text or detect(text) != "hi" or self.translator is None:
             return text, None
-        english = self.translator.to_english(text, self._rewrite_llm(llm))
-        return english or text, english
+        # the rewrite's model first, then the other hosted models (a used-up quota is common on free tiers)
+        first = self._rewrite_llm(llm)
+        others = [] if self.offline else [m for m in self.models.values() if m is not first and not getattr(m, "is_local", False)]
+        for model in [first, *others]:
+            english = self.translator.to_english(text, model)
+            if english:
+                return english, english
+        return text, None
 
     def _legal(self, question: str, history: list[Message], llm: LLMClient) -> Iterator[str]:
-        from app.core.language import HINDI_RULE, SCOPE_REFUSAL_HI, detect
+        from app.core.language import HINDI_RULE, SCOPE_REFUSAL_HI, TRANSLATION_FAILED, detect
 
         hindi = detect(question) == "hi"
         previous = next((m.content for m in reversed(history) if m.role == "user"), None)
         # the IPC text and the embedding model are English: a Hindi question is searched in translation
         search, english = self._translate(question, llm)
+        if hindi and english is None:  # say so, rather than "no IPC section matched"
+            yield sse("meta", {"mode": "legal", "model": llm.model_id, "refused": True})
+            yield sse("retrieval", {"translation": {"from": "hi", "text": None, "failed": True}, "sources": []})
+            yield sse("token", {"text": TRANSLATION_FAILED})
+            return
         previous, _ = self._translate(previous, llm)
         result = self._retrieve(search, previous, llm)
         sources = result.sources

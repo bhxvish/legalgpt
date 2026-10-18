@@ -135,3 +135,11 @@ export const caseApi = {
   models: () => fetch(`${API_BASE_URL}/api/models`).then(json),
   analyze: (body, onEvent, signal) => streamSSE('/api/case/analyze', body, onEvent, signal),
 }
+
+export const systemApi = {
+  overview: () => fetch(`${API_BASE_URL}/api/system`).then(json),
+}
+
+// encoded Prolog sections, fetched once and shared (chat answers offer "check in the rule engine")
+let ruleSections
+export const ruleSectionsOnce = () => (ruleSections ??= verifyApi.sections().then((m) => m.sections.map((s) => s.section)).catch(() => []))

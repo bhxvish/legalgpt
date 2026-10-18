@@ -38,6 +38,15 @@ export function LogoMark({ className = 'size-9' }) {
 const tab = { viewBox: '0 0 20 20', ...line, strokeWidth: 1.5, className: 'size-4 shrink-0' }
 
 export const TabIcons = {
+  system: (
+    // three connected stages
+    <svg {...tab}>
+      <rect x="2.5" y="3" width="5" height="4.5" rx="1.2" />
+      <rect x="12.5" y="3" width="5" height="4.5" rx="1.2" />
+      <rect x="7.5" y="12.5" width="5" height="4.5" rx="1.2" />
+      <path d="M7.5 5.25h5M15 7.5v2.5a1.5 1.5 0 0 1-1.5 1.5h-1M5 7.5v2.5a1.5 1.5 0 0 0 1.5 1.5h1" />
+    </svg>
+  ),
   chat: (
     <svg {...tab}>
       <path d="M4 4.5h12a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.75V14.5H4A1.5 1.5 0 0 1 2.5 13V6A1.5 1.5 0 0 1 4 4.5Z" />

@@ -295,3 +295,39 @@
     *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; }
   }
 }
+
+/* System overview: dashes travel along the connectors between pipeline stages */
+@keyframes flow {
+  to { background-position: 14px 0; }
+}
+@keyframes flow-y {
+  to { background-position: 0 14px; }
+}
+@utility flow-x {
+  background-image: linear-gradient(90deg, var(--color-indigo-400) 50%, transparent 0);
+  background-size: 7px 2px;
+  background-repeat: repeat-x;
+  animation: flow 0.9s linear infinite;
+}
+@utility flow-y {
+  background-image: linear-gradient(180deg, var(--color-indigo-400) 50%, transparent 0);
+  background-size: 2px 7px;
+  background-repeat: repeat-y;
+  animation: flow-y 0.9s linear infinite;
+}
+
+/* the header tabs: a hairline between the groups (overview | build the knowledge | use it) */
+nav a[data-group-start] { margin-left: 9px; }
+nav a[data-group-start]::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 28%;
+  height: 44%;
+  width: 1px;
+  background: var(--color-slate-300);
+}
+@media (max-width: 767px) {
+  nav a[data-group-start] { margin-left: 5px; }
+  nav a[data-group-start]::before { left: -3px; }
+}

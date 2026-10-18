@@ -104,13 +104,13 @@ def questions() -> list[dict]:
             if it["id"].startswith(("sc-", "pun-"))]
 
 
-def get_answers(items, model: str) -> list[dict]:
+def get_answers(items, model: str, cached_only: bool = False) -> list[dict]:
     from app.core.chat_router import ChatRequest
     from app.main import build_chat_router
 
     path = OUT / f"answers_{safe(model)}.jsonl"
     done = {r["id"]: r for r in map(json.loads, path.read_text(encoding="utf-8").splitlines())} if path.exists() else {}
-    todo = [q for q in items if q["id"] not in done]
+    todo = [] if cached_only else [q for q in items if q["id"] not in done]
     if todo:
         chat = build_chat_router(get_settings())
         name = next((k for k, m in chat.models.items() if k == model or f"groq:{m.model_id}" == model), None)
@@ -226,9 +226,10 @@ def main() -> int:
     ap.add_argument("--model", default="groq", help="the chat model whose answers are checked (an app model id)")
     ap.add_argument("--judges", nargs=2, default=["gemini:gemini-3.5-flash-lite", "groq:qwen/qwen3.8-27b"])
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--cached-answers", action="store_true", help="judge only the answers already generated")
     args = ap.parse_args()
 
-    answers = get_answers(questions()[: args.limit], args.model)
+    answers = get_answers(questions()[: args.limit], args.model, args.cached_answers)
     print(f"{len(answers)} answers; {sum(not a['refused'] for a in answers)} not refused; "
           f"{sum(any(s.get('kind') == 'judgment' for s in a['sources']) for a in answers)} with judgment sources")
     all_claims = claims(answers)

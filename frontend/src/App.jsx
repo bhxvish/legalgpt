@@ -5,6 +5,7 @@ import CaseAnalysisView from './components/CaseAnalysisView.jsx'
 import ChatWindow from './components/ChatWindow.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import ReviewView from './components/ReviewView.jsx'
+import SystemView from './components/SystemView.jsx'
 import VerifyPanel from './components/VerifyPanel.jsx'
 import { LogoMark, TabIcons } from './components/LawArt.jsx'
 import { SlidingPill } from './components/motion.jsx'
@@ -65,15 +66,17 @@ function HealthBadge() {
   )
 }
 
-// Review comes before Annotate: new judgments are labelled by checking the classifier's
-// suggestions; full manual annotation is for the cases listed in the Annotate tab ("When to annotate by hand").
+// In pipeline order, in the groups of the System overview: building the knowledge (offline), then
+// using it (every question). `module`: the module number in the paper.
 const VIEWS = [
-  { id: 'chat', label: 'Chat' },
-  { id: 'case', label: 'Case analysis', short: 'Case' },
-  { id: 'review', label: 'Review' },
-  { id: 'annotate', label: 'Annotate' },
-  { id: 'verify', label: 'Verify' },
+  { id: 'system', label: 'Overview', short: 'Home', group: 'overview' },
+  { id: 'annotate', label: 'Annotate', group: 'build', module: 'M1' },
+  { id: 'review', label: 'Review', group: 'build', module: 'M2' },
+  { id: 'chat', label: 'Chat', group: 'use', module: 'M0' },
+  { id: 'case', label: 'Case analysis', short: 'Case', group: 'use' },
+  { id: 'verify', label: 'Verify', group: 'use', module: 'M5' },
 ]
+const GROUP_TITLE = { build: 'Build the knowledge (offline)', use: 'Use it (every question)' }
 
 function Nav({ view, className }) {
   const ref = useRef(null)
@@ -85,12 +88,14 @@ function Nav({ view, className }) {
         deps={[view]}
         className="rounded-full bg-white shadow-[0_1px_2px_rgb(15_23_42/0.08),0_2px_8px_-2px_rgb(15_23_42/0.12)] ring-1 ring-slate-900/5"
       />
-      {VIEWS.map((v) => (
+      {VIEWS.map((v, i) => (
         <a
           key={v.id}
           href={`#${v.id}`}
+          title={GROUP_TITLE[v.group] ? `${GROUP_TITLE[v.group]}${v.module ? ` · module ${v.module.slice(1)}` : ''}` : 'How the parts fit together'}
           aria-current={view === v.id ? 'page' : undefined}
-          className={`group relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium max-md:min-w-0 max-md:flex-1 max-md:px-1.5 ${
+          data-group-start={i > 0 && VIEWS[i - 1].group !== v.group ? '' : undefined}
+          className={`group relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium max-md:min-w-0 max-md:flex-1 max-md:px-1 max-md:text-[13px] ${
             view === v.id ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'
           }`}
         >
@@ -105,6 +110,9 @@ function Nav({ view, className }) {
           ) : (
             v.label
           )}
+          {v.module && (
+            <span className={`hidden font-mono text-[9.5px] font-semibold xl:inline ${view === v.id ? 'text-indigo-500' : 'text-slate-400'}`}>{v.module}</span>
+          )}
         </a>
       ))}
     </nav>
@@ -112,8 +120,8 @@ function Nav({ view, className }) {
 }
 
 function viewFromHash() {
-  const id = window.location.hash.replace('#', '')
-  return VIEWS.some((v) => v.id === id) ? id : 'chat'
+  const id = window.location.hash.replace('#', '').split('?')[0]
+  return VIEWS.some((v) => v.id === id) ? id : 'system'
 }
 
 export default function App() {
@@ -133,13 +141,13 @@ export default function App() {
       </a>
       <header className="relative z-10 bg-white/75 px-3 backdrop-blur-xl backdrop-saturate-150 sm:px-5">
         <div className="flex h-14 items-center justify-between gap-3 md:grid md:grid-cols-[1fr_auto_1fr]">
-          <a href="#chat" className="group flex min-w-0 items-center gap-2.5 justify-self-start rounded-xl pr-2" aria-label="LegalGPT, go to Chat">
+          <a href="#system" className="group flex min-w-0 items-center gap-2.5 justify-self-start rounded-xl pr-2" aria-label="LegalGPT, go to the overview">
             <LogoMark className="size-9 transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-105" />
             <span className="min-w-0">
               <h1 className="text-[1.05rem] font-semibold leading-none tracking-tight text-slate-900">
                 Legal<span className="text-indigo-600">GPT</span>
               </h1>
-              <span className="mt-1 hidden truncate text-[11px] font-medium leading-none tracking-wide text-slate-500 sm:block">
+              <span className="mt-1 hidden truncate text-[11px] font-medium leading-none tracking-wide text-slate-500 sm:block md:hidden xl:block">
                 Indian Penal Code assistant
               </span>
             </span>
@@ -164,7 +172,13 @@ export default function App() {
           <ChatWindow />
         </ErrorBoundary>
       </div>
-      {view === 'annotate' ? (
+      {view === 'system' ? (
+        <div key="system" className="flex min-h-0 flex-1 animate-rise flex-col">
+          <ErrorBoundary>
+            <SystemView />
+          </ErrorBoundary>
+        </div>
+      ) : view === 'annotate' ? (
         <div key="annotate" className="flex min-h-0 flex-1 animate-rise flex-col">
           <AnnotateView />
         </div>

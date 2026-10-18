@@ -35,6 +35,14 @@ SCOPE_REFUSAL_HI = (
 )
 
 
+TRANSLATION_FAILED = (
+    "आपके प्रश्न का अंग्रेज़ी में अनुवाद नहीं हो सका (मॉडल की उपयोग सीमा या कोई त्रुटि), इसलिए IPC में खोज नहीं हो पाई। "
+    "कृपया थोड़ी देर बाद फिर कोशिश करें, या प्रश्न अंग्रेज़ी में पूछें।\n\n"
+    "The question could not be translated into English (a model's usage limit or an error), so the IPC could not be "
+    "searched. Please try again shortly, or ask in English."
+)
+
+
 def detect(text: str) -> str:
     """"hi" when most letters are Devanagari, else "en"."""
     letters = LETTER.findall(text)
