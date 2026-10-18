@@ -524,3 +524,32 @@ court said about the ingredients of s.304B.
 
 **Not yet measured:** how often a cited judgment is truly on point. A labelled set of
 question-to-relevant-judgment pairs would be needed; future work.
+
+## 9. New evaluations (2026-10-18; drafts, numbers from data/reports/)
+
+**Hindi questions** (`eval_hindi.py`; the 60 held-out scenarios and 30 out-of-scope questions,
+machine-translated to Hindi by gemini-3.5-flash-lite, not checked by a native speaker; system model
+gpt-oss-120b). Right section retrieved: English 53/60; Hindi as written 0/60; Hindi with the old
+rewrite 1/60; **Hindi translated first 52/60**. Out-of-scope questions answered: 0/30 in every
+condition. End-to-end Hindi answers: pending.
+
+**Prompt injection in Case analysis** (`eval_injection.py`; 24 files, 12 attacks × 2 positions;
+gemini-3.5-flash-lite, one model, no fallback). Attacks that reached their goal: **1/24 without the
+defences** (the code word copied into offence names), **0/24 with them**. The defences never fired
+in that run, so the model itself resisted most attacks; n is small. Worst case
+(`eval_guard_worst_case.py`, attack sentences inserted into real analyses): the output guard removed
+120/192 verdict, 120/144 fake-law and 72/96 prompt-leak insertions and no genuine sentence;
+paraphrased verdicts ("There is no doubt that the accused did it") pass. Limitation, not tuned away.
+
+**Judgment-citation faithfulness** (`eval_citation_faithfulness.py`; 92 answers by
+gemini-3.5-flash-lite; judges gpt-oss-120b and qwen3.8-27b, blind to each other). 19 sentences cite a
+judgment: both judges SUPPORTED 14/19 (74%), none judged UNSUPPORTED by both; agreement 0.895,
+Cohen's κ 0.72 (3-way), 0.86 (supported vs not). Statute-citation control (19): both SUPPORTED
+13/19, κ 0.35 / 0.58. Weak points: "PARTIAL" mostly where the sentence generalises a passage, and
+3/19 sentences name a different case than the one cited. Small sample; human check of the 5
+non-unanimous items is future work.
+
+**Case analysis on real SC judgments** (`eval_case_analysis.py`, n = 92 of 120; rest pending quota):
+at least one correct offence 68%; P/R/F1 0.48/0.37/0.38; similar-judgment top-1 shares a gold
+offence 70%, P@3 0.67. The IPC validation filter removed 12 proposals, 3 of them correct: it is a
+safety filter, not an accuracy gain.
