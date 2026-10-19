@@ -9,18 +9,19 @@ analysis: never a verdict.
 
 [![CI](https://github.com/bhxvish/legalgpt/actions/workflows/ci.yml/badge.svg)](https://github.com/bhxvish/legalgpt/actions/workflows/ci.yml)
 
-> ⚖️ **Legal information, not legal advice.** LegalGPT covers substantive offences under the IPC
+> **Legal information, not legal advice.** LegalGPT covers substantive offences under the IPC
 > (offences before 1 July 2024) and the BNS (from 1 July 2024). It declines civil matters, criminal
 > procedure (CrPC/BNSS) and special Acts such as the UAPA or NDPS Act, and it never says whether
 > anyone is guilty.
 
-![LegalGPT answering a question with cited sources and the "Why this answer?" panel](docs/images/chat.jpg)
+![The Overview tab: how the knowledge is built and what every question runs through, with the headline results](docs/images/overview.jpg)
 
 ---
 
 ## Contents
 
 - [What it does](#what-it-does)
+- [Screenshots](#screenshots)
 - [How it works](#how-it-works)
 - [Results](#results)
 - [Try it](#try-it)
@@ -33,18 +34,51 @@ analysis: never a verdict.
 
 ## What it does
 
-| | Feature | In plain words |
-|---|---|---|
-| 💬 | **Grounded, cited answers** | Retrieves the relevant sections and answers only from them, citing each as `[1]`, `[2]`… Questions outside the indexed law are declined instead of guessed. |
-| 🇮🇳 | **IPC and BNS** | A **Law** switch: *Auto* answers under the BNS when you name it or the events are on or after 1 July 2024, otherwise under the IPC. IPC sources show their BNS number and BNS sources the IPC sections they replaced, from the official BPRD correspondence table. |
-| हिं | **Hindi** | Ask in Hindi: the question is searched in English translation and answered in Hindi with the same citations. If no model can translate (free quotas), it says so instead of guessing. |
-| 📚 | **Real judgments** | 349 judgments (312 Supreme Court criminal judgments, 2020–2023, plus 37 annotated) split into 28,055 passages labelled by role. The chat cites rulings and precedents next to the statute; the citation check warns when a sentence names a different case than the one it cites. |
-| 🗂️ | **Case analysis** | Upload an FIR, charge sheet or case note: facts (each checked against a quote from the file), the offences they may engage, an element-by-element check (Prolog rules where encoded), similar past judgments, and a cited analysis. An output guard (patterns plus a small classifier) removes any sentence that states a verdict; prompt-injection defences treat the file as untrusted data. |
-| 🔍 | **"Why this answer?" and the pipeline trace** | Each answer shows the stages it went through (translation, sections retrieved, judgments, model, statements backed, BNS, signature), how closely each sentence is supported by a source, and any warnings. |
-| ✅ | **Fact check with rules** | Describe a case and pick a section: an AI extracts the facts, each with a quote, and a Prolog engine checks them against the section's elements. Opens pre-filled from a chat answer. |
-| 🏷️ | **Labelling with InLegalBERT** | Upload judgments; an InLegalBERT ensemble suggests a role for every sentence (Facts, Law Applied, Precedent, Argument, Ruling). People check only the uncertain ones; 1 judgment in 10 is labelled blind to keep measuring the model. |
-| 🔐 | **Verifiable results** | Every answer is signed (Ed25519); zero-knowledge proofs (EZKL) show that a fact-check verdict follows from the published rules and that an answer's IPC sources are exactly what retrieval picks. [How it works](docs/zk/README.md) |
-| 🧪 | **Models** | Groq (gpt-oss-120b, default) and Gemini on free tiers, local LoRA-tuned Qwen models via llama.cpp (fully offline), and optional paid GPT models. Paid models are never used as fallbacks. |
+| Feature | Description |
+|---|---|
+| **Grounded, cited answers** | Retrieves the relevant sections and answers only from them, citing each as `[1]`, `[2]`… Questions outside the indexed law are declined instead of guessed. |
+| **IPC and BNS** | A **Law** switch: *Auto* answers under the BNS when you name it or the events are on or after 1 July 2024, otherwise under the IPC. IPC sources show their BNS number and BNS sources the IPC sections they replaced, from the official BPRD correspondence table. |
+| **Hindi** | Ask in Hindi: the question is searched in English translation and answered in Hindi with the same citations. If no model can translate (free quotas), it says so instead of guessing. |
+| **Real judgments** | 349 judgments (312 Supreme Court criminal judgments, 2020–2023, plus 37 annotated) split into 28,055 passages labelled by role. The chat cites rulings and precedents next to the statute; the citation check warns when a sentence names a different case than the one it cites. |
+| **Case analysis** | Upload an FIR, charge sheet or case note: facts (each checked against a quote from the file), the offences they may engage, an element-by-element check (Prolog rules where encoded), similar past judgments, and a cited analysis. An output guard (patterns plus a small classifier) removes any sentence that states a verdict; prompt-injection defences treat the file as untrusted data. |
+| **"Why this answer?" and the pipeline trace** | Each answer shows the stages it went through (translation, sections retrieved, judgments, model, statements backed, BNS, signature), how closely each sentence is supported by a source, and any warnings. |
+| **Fact check with rules** | Describe a case and pick a section: an AI extracts the facts, each with a quote, and a Prolog engine checks them against the section's elements. Opens pre-filled from a chat answer. |
+| **Labelling with InLegalBERT** | Upload judgments; an InLegalBERT ensemble suggests a role for every sentence (Facts, Law Applied, Precedent, Argument, Ruling). People check only the uncertain ones; 1 judgment in 10 is labelled blind to keep measuring the model. |
+| **Verifiable results** | Every answer is signed (Ed25519); zero-knowledge proofs (EZKL) show that a fact-check verdict follows from the published rules and that an answer's IPC sources are exactly what retrieval picks. [How it works](docs/zk/README.md) |
+| **Models** | Groq (gpt-oss-120b, default) and Gemini on free tiers, local LoRA-tuned Qwen models via llama.cpp (fully offline), and optional paid GPT models. Paid models are never used as fallbacks. |
+
+## Screenshots
+
+**A cited answer.** Every claim cites its source, the line under the answer gives the BNS equivalent,
+judgments are cited next to the statute, and the pipeline trace shows each stage the answer went
+through.
+
+![A legal answer about causing death by negligence, with citations, the BNS mapping, sources and the pipeline trace](docs/images/chat.jpg)
+
+**A question in Hindi.** The question is searched in English translation and answered in Hindi with
+the same citations; the trace starts with the translation step.
+
+![A Hindi question about a stolen bicycle answered in Hindi with citations](docs/images/chat-hindi.jpg)
+
+**Case analysis.** Facts are read from the file, each with a quote that is checked against it, and the
+offences they may engage are listed with their BNS numbers, followed by element checks, similar
+judgments and a cited analysis.
+
+![Case analysis of a house-theft FIR: verified facts and the offences with BNS equivalents](docs/images/case-analysis.jpg)
+
+**Rule-based fact check.** The facts are tested element by element against a section encoded in
+Prolog; each element shows the quote it rests on, and the panel says what would change the verdict.
+
+![The Verify tab checking a road-accident case against section 304A](docs/images/verify.jpg)
+
+**Labelling.** Judgments are labelled with InLegalBERT's help; the list shows what each judgment still
+needs and who labelled it.
+
+![The Label tab listing judgments by status](docs/images/label.jpg)
+
+The interface has light and dark themes, with three dark styles.
+
+![The Overview tab in the dark theme](docs/images/overview-dark.jpg)
 
 ## How it works
 
@@ -221,6 +255,8 @@ docs/                             guide, annotation guideline, paper analysis, r
   question, not whether the answer is right.
 - **Retrieval proofs cover the IPC index;** BNS answers are signed but not proved. The Prolog rules
   encode IPC sections (a BNS answer is checked through the section it replaced).
+- **Sentence-level support is measured for English answers only** (the embedding model is English);
+  Hindi answers keep their citation and case-name checks.
 - **Free tiers:** daily quotas run out; the app says so, and the local model keeps working.
 - **No login or rate limiting:** run it locally or behind your own access control.
 

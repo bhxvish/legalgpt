@@ -132,3 +132,20 @@ def test_translation_never_falls_back_to_a_paid_model(retriever) -> None:  # noq
 def test_urdu_with_a_few_devanagari_letters_is_not_hindi() -> None:
     assert detect("नकاب پوش آدمیوں نے پٹرول پمپ کے ملازم کو بندوق سے دھمکی دی") == "en"
     assert detect("बाज़ार में दो गुटों के बीच झगड़ा हो गया") == "hi"
+
+
+def test_a_hindi_answer_gets_no_sentence_matching_warnings() -> None:
+    from types import SimpleNamespace
+
+    from app.explainability.explanation_builder import ExplanationBuilder
+
+    class Analyzer:
+        support_threshold = 0.55
+
+        def attribute(self, text, sources):
+            raise AssertionError("no English sentence matching on a Hindi answer")
+
+    src = SimpleNamespace(marker=1, citation_path="IPC > Section 379", section="379", title="Theft", similarity=0.8,
+                          kind="statute", text="Whoever commits theft shall be punished.")
+    rec = ExplanationBuilder(Analyzer()).build("q", [src], "यह चोरी है, धारा 379 के तहत दंडनीय [1]।", "m")
+    assert rec.attributions == [] and not any("not supported" in w for w in rec.warnings)

@@ -87,7 +87,11 @@ class ExplanationBuilder:
         # The "I don't know" sentence is a statement about the sources, not a claim drawn from
         # them; attributing it would flag a correct refusal as an unsupported answer.
         claims = re.sub(re.escape(NOT_COVERED_REPLY), " ", answer, flags=re.I)
-        attributions = self.analyzer.attribute(claims, sources)
+        from app.core.language import devanagari_share
+
+        # sentence matching uses an English embedding model: on a Hindi answer every sentence would
+        # read as unsupported, which says nothing about the answer. The citation checks still run.
+        attributions = [] if devanagari_share(answer) >= 0.5 else self.analyzer.attribute(claims, sources)
         ratio = self.analyzer.support_ratio(attributions) if attributions else None  # nothing to attribute
         supports: dict[int, list[int]] = {s.marker: [] for s in sources}
         for a in attributions:
