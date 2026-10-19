@@ -16,7 +16,6 @@ from app.core.models import Message
 logger = logging.getLogger(__name__)
 
 DEVANAGARI = re.compile(r"[ऀ-ॿ]")
-LETTER = re.compile(r"[A-Za-zऀ-ॿ]")
 
 TRANSLATE_PROMPT = """Translate the user's question about Indian criminal law into plain English.
 Keep names, places, amounts, dates and any section numbers exactly as given. Keep legal terms in
@@ -43,9 +42,15 @@ TRANSLATION_FAILED = (
 )
 
 
+def _letters(text: str) -> list[str]:
+    """Letters of any script (Devanagari vowel signs included), so Urdu or other text is not
+    mistaken for Hindi because a few Devanagari letters happen to be in it."""
+    return [c for c in text if c.isalpha() or DEVANAGARI.match(c)]
+
+
 def detect(text: str) -> str:
     """"hi" when most letters are Devanagari, else "en"."""
-    letters = LETTER.findall(text)
+    letters = _letters(text)
     if not letters:
         return "en"
     return "hi" if len(DEVANAGARI.findall(text)) / len(letters) >= 0.5 else "en"
@@ -53,8 +58,8 @@ def detect(text: str) -> str:
 
 def devanagari_share(text: str) -> float:
     """Share of letters in Devanagari (the eval's 'answered in Hindi' check)."""
-    letters = LETTER.findall(re.sub(r"\[\d+\]", "", text))
-    return len(DEVANAGARI.findall(text)) / len(letters) if letters else 0.0
+    letters = _letters(re.sub(r"\[\d+\]", "", text))
+    return min(1.0, len(DEVANAGARI.findall(text)) / len(letters)) if letters else 0.0
 
 
 class Translator:

@@ -127,3 +127,8 @@ def test_translation_never_falls_back_to_a_paid_model(retriever) -> None:  # noq
                                   rewriter=QueryRewriter()).router)
     body = TestClient(app).post("/api/chat", json={"question": HINDI}).text
     assert "could not be translated" in body and not paid.calls
+
+
+def test_urdu_with_a_few_devanagari_letters_is_not_hindi() -> None:
+    assert detect("नकاب پوش آدمیوں نے پٹرول پمپ کے ملازم کو بندوق سے دھمکی دی") == "en"
+    assert detect("बाज़ार में दो गुटों के बीच झगड़ा हो गया") == "hi"

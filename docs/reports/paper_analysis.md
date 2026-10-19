@@ -577,7 +577,25 @@ names: 5 of the 19 sentences name the case they cite; **none names a different j
 own check, `app/explainability/case_names.py`, over all 92 answers: 0 flags). An earlier, looser
 version of this check reported 3; on inspection two were one sentence correctly naming both cases
 it cites, and one a case title split mid-name. The check now runs on every chat answer and warns in
-"Why this answer?". Small sample; human check of the 5 non-unanimous items is future work.
+"Why this answer?". Small sample.
+
+**Human spot-check of the AI judges** (`spotcheck.py`; 2026-10-19; labels in
+`benchmark/spotcheck/human_labels.csv`). One person (the author, not a lawyer) labelled the 38
+citations blind to the AI labels, with the same three-way definitions, judging only whether the cited
+text says what the sentence attributes to it. Human labels: 31 SUPPORTED, 7 PARTIAL, **0 UNSUPPORTED**
+(judgment citations 15 / 4 / 0; statute citations 16 / 3 / 0). Agreement with the judges: gpt-oss-120b
+76% (Cohen's kappa 0.36 three-way, 0.47 supported-vs-not), qwen3.8-27b 79% (0.36 / 0.42); where both
+judges agree (31 items) the human agrees with them on 87%. The judges are stricter than the human:
+every UNSUPPORTED came from a judge, mostly on sentences citing several sources at once, and on two
+(S05, S21) the cited source states the claim verbatim. So the AI-judged faithfulness above is, if
+anything, conservative; with one non-expert annotator and n = 38 this checks the judges, it is not a
+ground truth. The labels are kept as first entered (no adjudication).
+
+The same check rated 12 of the machine-translated Hindi questions: 10 same meaning, 1 minor slip,
+1 wrong. The wrong one (`sc-057`) was in Urdu (Arabic script); it passed the language check, which
+counted only Latin and Devanagari letters. The check now counts every script, the question was
+re-translated, and the Hindi results re-run: unchanged (52/60 retrieved, 51/60 cite an acceptable
+section end to end).
 
 **Case analysis on real SC judgments** (`eval_case_analysis.py`, 120 judgments; facts with every
 section number masked; gold = offences cited in the judgment's Facts and Ruling; 110 analysed by
