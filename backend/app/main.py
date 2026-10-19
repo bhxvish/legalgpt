@@ -3,6 +3,7 @@ models, open ChromaDB or call Groq; the embedding model warms up in the backgrou
 
 import logging
 import threading
+from pathlib import Path
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
@@ -149,7 +150,8 @@ def build_chat_router(settings: Settings, verifier: "VerificationService | None"
     retriever = build_retriever(settings, embedder)
     bns_retriever = None
     try:  # the BNS index (ingest_corpus.py data/corpus/bns_chunks.jsonl --collection bns_bare_act); IPC only without it
-        if VectorStore(settings.chroma_persist_dir, settings.bns_collection).count() > 0:
+        # built on first start from the committed chunks (warmup below), like the IPC index
+        if Path(settings.bns_chunks_path).exists() or VectorStore(settings.chroma_persist_dir, settings.bns_collection).count() > 0:
             bns_retriever = build_retriever(settings, embedder, law="bns")
     except Exception:
         logger.exception("BNS index unavailable: answering under the IPC only")
@@ -226,6 +228,12 @@ def create_app(chat_router: ChatRouter | None = None, annotation_router: Annotat
                         ensure_index(store, embedder, settings.corpus_chunks_path)
                     except Exception:
                         logger.exception("could not build the vector index")
+                bns_store = getattr(getattr(chat_router, "bns_retriever", None), "store", None)
+                if isinstance(bns_store, VectorStore) and Path(settings.bns_chunks_path).exists():
+                    try:
+                        ensure_index(bns_store, embedder, settings.bns_chunks_path)
+                    except Exception:
+                        logger.exception("could not build the BNS index")
 
             threading.Thread(target=warmup, name="embedding-warmup", daemon=True).start()
         yield

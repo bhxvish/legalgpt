@@ -18,6 +18,7 @@ services:
       ANNOTATION_STORE_DIR: /app/data/annotation_store
       RAW_JUDGMENTS_DIR: /app/data/raw_judgments
       CORPUS_CHUNKS_PATH: /app/data/corpus/ipc_chunks.jsonl
+      BNS_CHUNKS_PATH: /app/data/corpus/bns_chunks.jsonl
       LORA_DIR: /app/data/models/lora
       ADAPTER_PATH: ""  # a host path from .env would not exist in the container; newest under LORA_DIR is used
       CORS_ORIGINS: http://localhost:5173
