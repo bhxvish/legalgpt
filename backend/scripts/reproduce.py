@@ -104,6 +104,8 @@ def main() -> int:
             out = "\n".join(ln for ln in (r.stdout + r.stderr).splitlines() if not any(n in ln for n in noise))
             ok = r.returncode == 0
             shown = "`" + " ".join(Path(c).name if i == 0 else c for i, c in enumerate(cmd)) + "`"
+        for root in {str(ROOT), str(ROOT).replace("\\", "/")}:  # repo-relative paths, not this machine's
+            out = out.replace(root + "\\", "").replace(root + "/", "").replace(root, ".")
         status.append((sid, "ok" if ok else "FAILED"))
         print(f"[{'ok' if ok else 'FAILED'}] {sid} ({time.time() - t0:.0f}s)", flush=True)
         lines += [f"Command: {shown} · {'ok' if ok else '**failed**'}", "", "```", out.strip()[-12000:], "```", ""]
