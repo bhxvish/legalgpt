@@ -589,10 +589,19 @@ judges agree (31 items) the human agrees with them on 87%. The judges are strict
 every UNSUPPORTED came from a judge, mostly on sentences citing several sources at once, and on two
 (S05, S21) the cited source states the claim verbatim. So the AI-judged faithfulness above is, if
 anything, conservative; with one non-expert annotator and n = 38 this checks the judges, it is not a
-ground truth. The labels are kept as first entered (no adjudication).
+ground truth. These are the labels as first entered.
+
+*After review.* The author then compared the labels with a second reading (by Claude, an AI) and
+changed four: S45 SUPPORTED -> PARTIAL (the judgment passage gives the term but not the fine the
+sentence adds), S40 SUPPORTED -> PARTIAL (the sentence extends "unwelcome" from advances to remarks),
+S15 PARTIAL -> SUPPORTED, and Hindi S47 SAME -> MINOR. After review: 30 SUPPORTED, 8 PARTIAL,
+0 UNSUPPORTED (judgment 13 / 6 / 0; statute 17 / 2 / 0); agreement with gpt-oss-120b 76% (kappa 0.39
+/ 0.42), with qwen3.8-27b 76% (0.31 / 0.37); 87% where both judges agree. Both versions are in
+`benchmark/spotcheck/human_labels.csv`; the first-entered labels are the blind measurement, the
+reviewed ones are not independent of the AI reading.
 
 The same check rated 12 of the machine-translated Hindi questions: 10 same meaning, 1 minor slip,
-1 wrong. The wrong one (`sc-057`) was in Urdu (Arabic script); it passed the language check, which
+1 wrong (after review: 9 same, 2 minor, 1 wrong). The wrong one (`sc-057`) was in Urdu (Arabic script); it passed the language check, which
 counted only Latin and Devanagari letters. The check now counts every script, the question was
 re-translated, and the Hindi results re-run: unchanged (52/60 retrieved, 51/60 cite an acceptable
 section end to end).
