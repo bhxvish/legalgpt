@@ -136,6 +136,143 @@ function ModelCheck({ c, facts }) {
   )
 }
 
+const FOLLOW_UPS = [
+  'Which facts still need to be proved?',
+  'Which element is weakest on these facts?',
+  'How did the similar judgments treat facts like these?',
+]
+
+// What the server needs to answer a follow-up: it kept nothing, so the analysis goes back with the question.
+function analysisContext(run) {
+  return {
+    summary: run.facts?.summary || '',
+    facts: (run.facts?.facts || []).map(({ id, fact, verified }) => ({ id, fact, verified })),
+    offences: run.facts?.offences || [],
+    checks: (run.elements?.checks || []).map((c) => ({
+      section: c.section, title: c.title, status: c.status || '',
+      elements: (c.elements || []).map((e) => ({ element: e.element, status: e.status })),
+    })),
+    analysis: run.answer || '',
+    sources: run.sources || [],
+  }
+}
+
+// Follow-up questions about the finished analysis, answered from its sources (plus any IPC section the
+// question needs) and under the same rule as the analysis: what the law requires, never a verdict.
+function AskAboutAnalysis({ run, model, localOnly, turns, setTurns, onOpenSource }) {
+  const [question, setQuestion] = useState('')
+  const [busy, setBusy] = useState(false)
+  const abortRef = useRef(null)
+  const endRef = useRef(null)
+
+  const ask = async (q) => {
+    q = q.trim()
+    if (!q || busy) return
+    setQuestion('')
+    setBusy(true)
+    const history = turns.filter((t) => t.answer && !t.error).slice(-4)
+      .flatMap((t) => [{ role: 'user', content: t.question }, { role: 'assistant', content: t.answer.slice(0, 7000) }])
+    const i = turns.length
+    setTurns((ts) => [...ts, { question: q, answer: '' }])
+    const update = (fn) => setTurns((ts) => ts.map((t, j) => (j === i ? fn({ ...t }) : t)))
+    requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }))
+    const controller = new AbortController()
+    abortRef.current = controller
+    try {
+      await caseApi.ask({ question: q, context: analysisContext(run), history, model, local_only: localOnly }, (event, data) => {
+        if (event === 'token') update((t) => ({ ...t, answer: t.answer + data.text }))
+        else if (event === 'answer_replace') update((t) => ({ ...t, answer: data.text }))
+        else if (event === 'guard') update((t) => ({ ...t, guard: data.message }))
+        else if (event === 'error') update((t) => ({ ...t, error: String(data?.message || data) }))
+        else update((t) => ({ ...t, [event]: data }))
+      }, controller.signal)
+    } catch (e) {
+      if (e.name !== 'AbortError') update((t) => ({ ...t, error: e.message.replace(/^HTTP \d+: /, '') }))
+    } finally {
+      setBusy(false)
+      abortRef.current = null
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {turns.map((t, i) => (
+        <div key={i} className="space-y-2.5">
+          <p className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-accent px-3.5 py-2 text-sm text-on-accent">{t.question}</p>
+          <div className="rounded-xl bg-slate-50/70 px-4 py-3 ring-1 ring-slate-200">
+            {t.error ? (
+              <p className="text-sm text-red-700">{t.error}</p>
+            ) : (
+              <div className="text-[0.9375rem] leading-relaxed text-slate-800">
+                <AnswerText text={t.answer} sources={t.sources || run.sources} onCite={onOpenSource} caret={busy && i === turns.length - 1} />
+              </div>
+            )}
+            {t.guard && <p className="mt-2 text-xs text-red-700">{t.guard}</p>}
+            {(() => {
+              // sections retrieved for this question beyond the analysis's own sources: shown only if the answer cites them
+              const cited = new Set([...(t.answer || '').matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])))
+              const extra = (t.sources || []).slice(run.sources?.length || 0).filter((s) => cited.has(s.marker))
+              return extra.length > 0 && (
+                <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-2.5">
+                  <span className="text-[11px] text-slate-500">Also used for this question:</span>
+                  {extra.map((s) => <SourceChip key={s.chunk_id + s.marker} s={s} onOpen={onOpenSource} />)}
+                </div>
+              )
+            })()}
+            {t.done?.model && <p className="mt-2 text-[11px] text-slate-400">Model: {t.done.model}{t.done.model_note ? ` · ${t.done.model_note}` : ''}</p>}
+          </div>
+        </div>
+      ))}
+      {turns.length === 0 && (
+        <div className="flex flex-wrap gap-2">
+          {FOLLOW_UPS.map((q) => (
+            <button key={q} onClick={() => ask(q)} className="rounded-xl bg-white px-3 py-1.5 text-left text-sm text-slate-700 ring-1 ring-slate-200 transition-colors hover:bg-slate-50 hover:text-slate-900">
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+      <form
+        ref={endRef}
+        onSubmit={(e) => {
+          e.preventDefault()
+          ask(question)
+        }}
+        className="flex items-end gap-2"
+      >
+        <textarea
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              ask(question)
+            }
+          }}
+          rows={1}
+          maxLength={2000}
+          placeholder="Ask about this analysis, e.g. what evidence would establish intent?"
+          aria-label="Question about this analysis"
+          className="block min-h-[2.75rem] w-full resize-y rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+        />
+        {busy ? (
+          <button type="button" onClick={() => abortRef.current?.abort()} className="shrink-0 rounded-xl bg-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-300">
+            Stop
+          </button>
+        ) : (
+          <button type="submit" disabled={!question.trim()} className="shrink-0 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-on-accent hover:bg-accent-hover disabled:bg-slate-200 disabled:text-slate-400">
+            Ask
+          </button>
+        )}
+      </form>
+      <p className="text-[11px] leading-relaxed text-slate-500">
+        Answers use this analysis and its sources only. Like the analysis, they explain what the law requires and what the file
+        shows; they do not say whether anyone is guilty.
+      </p>
+    </div>
+  )
+}
+
 export default function CaseAnalysisView() {
   const [info, setInfo] = useState(null)
   const [models, setModels] = useState([])
@@ -147,6 +284,7 @@ export default function CaseAnalysisView() {
   const [run, setRun] = useState(null)
   const [busy, setBusy] = useState(false)
   const [openSource, setOpenSource] = useState(null)
+  const [followUps, setFollowUps] = useState([]) // questions about the current analysis
   const fileRef = useRef(null)
   const fileData = useRef('')
   const abortRef = useRef(null)
@@ -180,6 +318,7 @@ export default function CaseAnalysisView() {
     setBusy(true)
     const r = { steps: {}, answer: '' }
     setRun({ ...r })
+    setFollowUps([]) // they belonged to the previous analysis
     const controller = new AbortController()
     abortRef.current = controller
     requestAnimationFrame(() => reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
@@ -482,6 +621,12 @@ export default function CaseAnalysisView() {
                 </div>
               )}
               {run.explanation && <WhyPanel explanation={run.explanation} sources={run.sources} retrieval={null} onOpenSource={setOpenSource} />}
+            </Section>
+          )}
+
+          {run?.done && !run.done.out_of_scope && run.sources?.length > 0 && (
+            <Section n={6} title="Ask about this analysis" hint="Follow-up questions, answered from this analysis and its sources.">
+              <AskAboutAnalysis run={run} model={model} localOnly={localOnly} turns={followUps} setTurns={setFollowUps} onOpenSource={setOpenSource} />
             </Section>
           )}
 

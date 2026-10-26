@@ -163,12 +163,18 @@ export default function App() {
           <div className="h-full w-full animate-[sheen_9s_linear_infinite] bg-[linear-gradient(90deg,transparent_0%,transparent_35%,var(--color-indigo-400)_50%,transparent_65%,transparent_100%)] bg-[length:200%_100%] opacity-70" />
         </div>
       </header>
-      {/* The chat stays mounted on other tabs (only hidden), so the conversation and an answer that
-          is still streaming survive switching to Review or Verify and back. */}
+      {/* The chat and the case analysis stay mounted on other tabs (only hidden), so a conversation,
+          an analysis and its follow-up questions, and anything still streaming, survive switching
+          tabs and back. */}
       <main id="main" tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
       <div className={view === 'chat' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
         <ErrorBoundary>
           <ChatWindow />
+        </ErrorBoundary>
+      </div>
+      <div className={view === 'case' ? 'flex min-h-0 flex-1 animate-rise flex-col' : 'hidden'}>
+        <ErrorBoundary>
+          <CaseAnalysisView />
         </ErrorBoundary>
       </div>
       {view === 'system' ? (
@@ -181,12 +187,6 @@ export default function App() {
         <div key="label" className="flex min-h-0 flex-1 animate-rise flex-col">
           <ErrorBoundary>
             <LabelView />
-          </ErrorBoundary>
-        </div>
-      ) : view === 'case' ? (
-        <div key="case" className="flex min-h-0 flex-1 animate-rise flex-col">
-          <ErrorBoundary>
-            <CaseAnalysisView />
           </ErrorBoundary>
         </div>
       ) : view === 'verify' ? (

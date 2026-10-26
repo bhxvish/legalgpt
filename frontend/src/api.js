@@ -134,6 +134,8 @@ export const caseApi = {
   info: () => fetch(`${API_BASE_URL}/api/case/info`).then(json),
   models: () => fetch(`${API_BASE_URL}/api/models`).then(json),
   analyze: (body, onEvent, signal) => streamSSE('/api/case/analyze', body, onEvent, signal),
+  // a follow-up question about a finished analysis (the analysis is sent back: the server keeps nothing)
+  ask: (body, onEvent, signal) => streamSSE('/api/case/ask', body, onEvent, signal),
 }
 
 export const systemApi = {

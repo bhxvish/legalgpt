@@ -4,6 +4,10 @@ back as Server-Sent Events (step, facts, law, elements, similar, sources, token,
 local_only=true runs every model step on a model of this machine (Local (LoRA) / Local heavy), so
 the case file is not sent to any hosted service; the judgment and IPC searches are local anyway.
 Nothing is stored: the text exists only for the duration of the request.
+
+POST /api/case/ask: a follow-up question about a finished analysis. The browser sends the analysis
+back with the question (nothing was kept here); the answer streams as sources, token, explanation, done,
+and passes the same output guard as the analysis (answer_replace / guard when a sentence was removed).
 """
 
 import base64
@@ -11,7 +15,7 @@ import binascii
 import json
 import logging
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -30,6 +34,22 @@ class AnalyzeRequest(BaseModel):
     text: str = Field("", max_length=200_000)
     filename: str = ""
     file_base64: str = Field("", max_length=12_000_000)
+    model: str = ""
+    local_only: bool = False
+
+
+class Turn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=8000)
+
+
+class AskRequest(BaseModel):
+    """A question about a finished analysis. The server kept nothing, so the browser sends the analysis
+    back: summary, facts, offences, element checks, the analysis text and its numbered sources."""
+
+    question: str = Field(min_length=1, max_length=2000)
+    context: dict[str, Any]
+    history: list[Turn] = Field(default_factory=list, max_length=16)
     model: str = ""
     local_only: bool = False
 
@@ -109,6 +129,7 @@ class CaseRouter:
                                      getattr(chat_router, "judgments", None), verifier_factory, ipc_sections())
         self.router = APIRouter(prefix="/api/case", tags=["case analysis"])
         self.router.add_api_route("/analyze", self.analyze, methods=["POST"])
+        self.router.add_api_route("/ask", self.ask, methods=["POST"])
         self.router.add_api_route("/info", self.info, methods=["GET"])
 
     def info(self) -> dict[str, Any]:
@@ -141,24 +162,43 @@ class CaseRouter:
         text = (text or "").strip()
         if len(text) < MIN_CHARS:
             raise HTTPException(422, f"the case text is too short (at least {MIN_CHARS} characters)")
-        name = req.model or self.chat.default_model
+        llm = self._pick_llm(req.model, req.local_only)
+        return StreamingResponse(self._stream(self.analyzer.analyze(text, llm, local_only=req.local_only)),
+                                 media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    async def ask(self, req: AskRequest) -> StreamingResponse:
+        if not req.context.get("sources"):
+            raise HTTPException(422, "there is no analysis with sources to ask about")
+        try:
+            from app.core.models import SourceEvidence
+
+            [SourceEvidence(**s) for s in req.context["sources"]]
+        except Exception as e:
+            raise HTTPException(422, f"the analysis sources are malformed: {e}") from e
+        from app.core.models import Message
+
+        llm = self._pick_llm(req.model, req.local_only)
+        history = [Message(t.role, t.content) for t in req.history]
+        return StreamingResponse(self._stream(self.analyzer.follow_up(req.question, req.context, history, llm)),
+                                 media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    def _pick_llm(self, model: str, local_only: bool) -> Any:
+        name = model or self.chat.default_model
         if name not in self.chat.models:
             raise HTTPException(422, f"unknown model {name!r}")
         llm = self.chat.models[name]
-        local_only = req.local_only
+        if local_only and not getattr(llm, "is_local", False):
+            raise HTTPException(422, "local-only analysis needs a local model (Local (LoRA) or Local heavy)")
         if not local_only and not getattr(llm, "is_local", False):
             # free hosted models to fall back on (Groq, Gemini); paid providers are never added
             backups = [m for k, m in self.chat.models.items() if m is not llm and not getattr(m, "is_local", False)
                        and (k == "groq" or str(getattr(m, "model_id", "")).startswith("gemini:"))]
             llm = StickyFallback([llm] + backups)
-        if local_only and not getattr(llm, "is_local", False):
-            raise HTTPException(422, "local-only analysis needs a local model (Local (LoRA) or Local heavy)")
-        return StreamingResponse(self._stream(text, llm, local_only), media_type="text/event-stream",
-                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        return llm
 
-    def _stream(self, text: str, llm: Any, local_only: bool) -> Iterator[str]:
+    def _stream(self, events: Iterator[tuple[str, Any]]) -> Iterator[str]:
         try:
-            for event, data in self.analyzer.analyze(text, llm, local_only=local_only):
+            for event, data in events:
                 yield sse(event, data)
         except Exception as e:  # report on the stream: the response has already started
             logger.exception("case analysis failed")

@@ -185,3 +185,63 @@ def test_the_verdict_classifier_backs_up_the_patterns(tmp_path):
     cleaned, removed = a.guard_output(text, [])
     assert [r["why"] for r in removed] == ["states a verdict"] and "no doubt" not in cleaned
     assert VerdictClassifier.load(None) is None  # no embedder: patterns alone
+
+
+class FollowUpRetriever:
+    """The question about rash driving also retrieves s.279, which the analysis did not cite."""
+
+    def retrieve_with_diagnostics(self, question, context=None, rewrite=None):
+        return SimpleNamespace(sources=[statute("304A", 1), statute("279", 2)], best_similarity=0.7, min_similarity=0.3)
+
+
+class VerdictLLM(FakeLLM):
+    def __init__(self):
+        super().__init__([])
+        self.messages = None
+
+    def stream(self, messages):
+        self.messages = messages
+        yield "Rash driving is covered by section 279 [2]. "
+        yield "The accused is guilty of causing death by negligence."
+
+
+def analysis_context():
+    return {"summary": "A truck killed a pedestrian.",
+            "facts": [{"id": "F1", "fact": "The truck was driven at very high speed.", "verified": True},
+                      {"id": "F3", "fact": "The driver was drunk.", "verified": False}],
+            "offences": [{"name": "Causing death by negligence", "section": "304A"}],
+            "checks": [{"section": "304A", "title": "Causing death by negligence", "status": "INSUFFICIENT"}],
+            "analysis": "The facts may engage section 304A [1].",
+            "sources": [statute("304A", 1).model_dump()]}
+
+
+def test_follow_up_answers_from_the_analysis_and_removes_a_verdict():
+    llm = VerdictLLM()
+    analyzer = CaseAnalyzer(FollowUpRetriever(), valid_sections=TITLES)
+    analyzer._clf = None  # patterns only in this test
+    history = [__import__("app.core.models", fromlist=["Message"]).Message("user", "Which offence fits?")]
+    events = list(analyzer.follow_up("What about rash driving?", analysis_context(), history, llm))
+    got = dict(events)
+    assert [s["section"] for s in got["sources"]] == ["304A", "279"]  # the analysis's source, then the new one
+    assert [s["marker"] for s in got["sources"]] == [1, 2]
+    assert "guilty" not in got["answer_replace"]["text"] and "section 279 [2]" in got["answer_replace"]["text"]
+    assert got["guard"]["count"] == 1 and events[-1][0] == "done"
+    prompt = "\n".join(m.content for m in llm.messages)
+    assert "The driver was drunk" not in prompt  # an unverified fact is not given to the model
+    assert "Which offence fits?" in prompt and llm.messages[-1].content == "What about rash driving?"
+
+
+def test_ask_endpoint_needs_an_analysis_with_sources():
+    import asyncio
+
+    import pytest
+    from fastapi import HTTPException
+
+    from app.case_analysis.router import AskRequest, CaseRouter
+
+    router = CaseRouter.__new__(CaseRouter)
+    with pytest.raises(HTTPException) as e:
+        asyncio.run(router.ask(AskRequest(question="Is he guilty?", context={"sources": []})))
+    assert e.value.status_code == 422
+    with pytest.raises(HTTPException):
+        asyncio.run(router.ask(AskRequest(question="x", context={"sources": [{"marker": 1}]})))
