@@ -1,6 +1,4 @@
-// Line drawings with a legal theme: the logo mark, small tab icons, and large faint header
-// illustrations (scales, gavel, statute book). All use currentColor; motion stops under
-// prefers-reduced-motion (index.css).
+// The app's seal and the icons of the navigation rail.
 
 const line = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }
 
@@ -20,24 +18,38 @@ function ScalesGlyph({ strokeWidth = 1.6, className }) {
   )
 }
 
-/** The app's logo: white scales on a deep ink tile with a soft inner highlight. */
-export function LogoMark({ className = 'size-9' }) {
+const SEAL_EDGE = 'M24.00 0.00L26.44 2.34L29.34 0.60L31.20 3.42L34.41 2.38L35.60 5.54L38.96 5.24L39.41 8.59L42.76 9.04L42.46 12.40L45.62 13.59L44.58 16.80L47.40 18.66L45.66 21.56L48.00 24.00L45.66 26.44L47.40 29.34L44.58 31.20L45.62 34.41L42.46 35.60L42.76 38.96L39.41 39.41L38.96 42.76L35.60 42.46L34.41 45.62L31.20 44.58L29.34 47.40L26.44 45.66L24.00 48.00L21.56 45.66L18.66 47.40L16.80 44.58L13.59 45.62L12.40 42.46L9.04 42.76L8.59 39.41L5.24 38.96L5.54 35.60L2.38 34.41L3.42 31.20L0.60 29.34L2.34 26.44L0.00 24.00L2.34 21.56L0.60 18.66L3.42 16.80L2.38 13.59L5.54 12.40L5.24 9.04L8.59 8.59L9.04 5.24L12.40 5.54L13.59 2.38L16.80 3.42L18.66 0.60L21.56 2.34Z'
+
+/** The mark: a notary's seal, gold, with the scales of justice pressed into it. */
+export function LogoMark({ className = 'size-10' }) {
   return (
-    <span
-      aria-hidden="true"
-      className={`relative grid shrink-0 place-items-center overflow-hidden rounded-xl bg-[linear-gradient(145deg,oklch(52%_0.13_256),oklch(32%_0.09_262))] text-white shadow-[0_6px_16px_-6px_oklch(35%_0.1_260/0.6),inset_0_1px_0_rgb(255_255_255/0.25)] ring-1 ring-black/5 ${className}`}
-    >
-      <span className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/15 to-transparent" />
-      <ScalesGlyph strokeWidth={1.7} className="relative size-[62%]" />
-    </span>
+    <svg viewBox="0 0 48 48" aria-hidden="true" className={`shrink-0 text-ink ${className}`}>
+      <path d={SEAL_EDGE} fill="var(--color-field-gold)" />
+      <circle cx="24" cy="24" r="18.4" fill="none" stroke="currentColor" strokeWidth="0.9" />
+      <circle cx="24" cy="12.6" r="1.7" fill="currentColor" />
+      <rect x="23.05" y="13" width="1.9" height="20.5" fill="currentColor" />
+      <rect x="12.2" y="15.4" width="23.6" height="1.9" fill="currentColor" />
+      <path d="M15.2 16.6 11 25.4M15.2 16.6l4.2 8.8M32.8 16.6 28.6 25.4M32.8 16.6l4.2 8.8" fill="none" stroke="currentColor" strokeWidth="0.95" />
+      <path d="M9.7 25.2h11a5.5 5.5 0 0 1-11 0ZM27.3 25.2h11a5.5 5.5 0 0 1-11 0Z" fill="currentColor" />
+      <path d="M18.4 33.2h11.2l1.4 2.2H17Z" fill="currentColor" />
+    </svg>
   )
 }
 
 /* ---------- tab icons (16 px, 20-unit grid) ---------- */
 
-const tab = { viewBox: '0 0 20 20', ...line, strokeWidth: 1.5, className: 'size-4 shrink-0' }
+const tab = { viewBox: '0 0 20 20', ...line, strokeWidth: 1.5, className: 'size-5 shrink-0' }
 
 export const TabIcons = {
+  explain: (
+    // a magnifier over a node: looking inside the model
+    <svg {...tab}>
+      <circle cx="8.5" cy="8.5" r="5.25" />
+      <path d="m12.5 12.5 4.75 4.75" />
+      <circle cx="8.5" cy="8.5" r="1.4" />
+      <path d="M8.5 5.25v1.85M8.5 9.9v1.85M5.25 8.5h1.85M9.9 8.5h1.85" />
+    </svg>
+  ),
   system: (
     // three connected stages
     <svg {...tab}>
@@ -72,7 +84,7 @@ export const TabIcons = {
       <path d="M3.5 17.5h6" />
     </svg>
   ),
-  verify: <ScalesGlyph strokeWidth={1.4} className="size-4 shrink-0" />,
+  verify: <ScalesGlyph strokeWidth={1.4} className="size-5 shrink-0" />,
   case: (
     // a case file (folder with a document)
     <svg {...tab}>
@@ -84,88 +96,3 @@ export const TabIcons = {
 
 TabIcons.label = TabIcons.annotate // the Label tab (annotation and review, merged)
 
-/* ---------- large faint header illustrations ---------- */
-
-const art = { ...line, strokeWidth: 1.1 }
-
-/** Scales of justice; the beam and pans sway gently. */
-export function ScalesArt({ className }) {
-  return (
-    <svg viewBox="0 0 200 200" {...art} className={className}>
-      <path d="M100 40v128" />
-      <path d="M70 176h60M80 168h40" />
-      <path d="M92 168c0-10 3-14 8-16 5 2 8 6 8 16" />
-      <circle cx="100" cy="32" r="6" />
-      <g className="origin-[100px_52px] animate-[sway_7s_ease-in-out_infinite_alternate]">
-        <path d="M34 52h132" />
-        <circle cx="100" cy="52" r="3" />
-        <path d="M40 52 22 108M40 52l18 56" />
-        <path d="M16 108c4 16 44 16 48 0Z" />
-        <path d="M160 52l-18 56M160 52l18 56" />
-        <path d="M136 108c4 16 44 16 48 0Z" />
-      </g>
-    </svg>
-  )
-}
-
-/** A gavel above its round sound block; it gives a small tap now and then. */
-export function GavelArt({ className }) {
-  return (
-    <svg viewBox="0 0 200 200" {...art} className={className}>
-      <g className="origin-[150px_150px] animate-[tap_6s_ease-in-out_infinite]">
-        <g transform="rotate(-38 92 78)">
-          <rect x="44" y="58" width="96" height="40" rx="9" />
-          <path d="M62 58v40M122 58v40" />
-          <rect x="34" y="64" width="10" height="28" rx="3" />
-          <rect x="140" y="64" width="10" height="28" rx="3" />
-          <path d="M88 98v84M96 98v84" />
-          <path d="M88 182c0 5 8 5 8 0" />
-        </g>
-      </g>
-      <ellipse cx="128" cy="166" rx="44" ry="9" />
-      <path d="M84 166v10c0 5 20 9 44 9s44-4 44-9v-10" />
-    </svg>
-  )
-}
-
-/** An open statute book with a section mark. */
-export function BookArt({ className }) {
-  return (
-    <svg viewBox="0 0 200 200" {...art} className={className}>
-      <path d="M100 58c-18-12-48-14-72-8v104c24-6 54-4 72 8 18-12 48-14 72-8V50c-24-6-54-4-72 8Z" />
-      <path d="M100 58v104" />
-      <path d="M40 74c16-3 32-2 46 4M40 90c16-3 32-2 46 4M40 106c16-3 32-2 46 4M40 122c16-3 32-2 46 4" />
-      <path d="M114 78c14-6 30-7 46-4M114 94c14-6 30-7 46-4M114 126c14-6 30-7 46-4" />
-      <text x="137" y="117" textAnchor="middle" fontFamily="Georgia, serif" fontSize="22" fill="currentColor" stroke="none">
-        §
-      </text>
-    </svg>
-  )
-}
-
-/** A bundle of case papers, tied, with a seal. */
-export function CaseFileArt({ className }) {
-  return (
-    <svg viewBox="0 0 200 200" {...art} className={className}>
-      <path d="M46 52h86l22 22v92a6 6 0 0 1-6 6H46a6 6 0 0 1-6-6V58a6 6 0 0 1 6-6Z" />
-      <path d="M132 52v22h22" />
-      <path d="M38 64h-4a6 6 0 0 0-6 6v100a6 6 0 0 0 6 6h102" opacity="0.6" />
-      <path d="M58 92h60M58 106h76M58 120h70M58 134h44" />
-      <path d="M40 150h114" strokeWidth="2.2" opacity="0.7" />
-      <g className="origin-[132px_150px] animate-[bob_6s_ease-in-out_infinite_alternate]">
-        <circle cx="132" cy="150" r="16" />
-        <circle cx="132" cy="150" r="10" />
-        <path d="M124 164l-4 18 12-6 12 6-4-18" />
-      </g>
-    </svg>
-  )
-}
-
-/** A faint illustration in the top-right of a tab header (wide screens), floating gently. */
-export function HeaderArt({ children }) {
-  return (
-    <div aria-hidden="true" className="pointer-events-none absolute -right-6 -top-10 -z-10 hidden animate-[fade_1s_ease-out] md:block">
-      <div className="size-56 animate-[bob_8s_ease-in-out_infinite_alternate] text-indigo-900/[0.09] [&>svg]:size-full">{children}</div>
-    </div>
-  )
-}

@@ -1,11 +1,3 @@
-import { useState } from 'react'
-
-const BAND = {
-  High: 'bg-emerald-100 text-emerald-800 ring-emerald-300',
-  Medium: 'bg-amber-100 text-amber-800 ring-amber-300',
-  Low: 'bg-red-100 text-red-800 ring-red-300',
-}
-
 const pct = (x) => `${Math.round(x * 100)}%`
 
 function Bar({ value, threshold }) {
@@ -17,160 +9,161 @@ function Bar({ value, threshold }) {
   )
 }
 
+/** A sentence as a reader should see it: no table bars, no [n] markers. */
+const plain = (t) => t.replace(/\|/g, ' ').replace(/\s*\[\d+\]/g, '').replace(/\s+/g, ' ').trim()
+
+function Sentence({ a, tone, children, onOpenSource, byMarker }) {
+  const source = byMarker.get(a.source_marker)
+  return (
+    <li className={`border-l-2 py-1 pl-3 ${tone}`} data-testid="why-sentence" data-supported={a.supported}>
+      <p className="text-[15px] leading-snug text-slate-900">{plain(a.sentence)}</p>
+      <p className="mt-0.5 text-[13px] leading-snug text-slate-600">
+        {children}{' '}
+        {source && (
+          <button onClick={() => onOpenSource(source)} className="press font-medium text-indigo-600 underline underline-offset-2">
+            [{a.source_marker}] {source.section ? `s.${source.section}` : 'source'}
+          </button>
+        )}
+      </p>
+    </li>
+  )
+}
+
+function Group({ title, note, open = false, children, count }) {
+  if (!count) return null
+  return (
+    <details className="group" open={open}>
+      <summary className="press inline-flex cursor-pointer select-none items-center gap-2 text-[15px] font-medium text-slate-900">
+        <span aria-hidden="true" className="text-slate-500 transition-transform duration-200 group-open:rotate-90">›</span>
+        {title} ({count})
+      </summary>
+      {note && <p className="mt-1 text-[14px] leading-snug text-slate-600">{note}</p>}
+      <ol className="mt-2 space-y-2">{children}</ol>
+    </details>
+  )
+}
+
 /**
- * "Why this answer?" — built from the explanation SSE event. Every number here describes how the
- * answer relates to the retrieved IPC text; none of them says the answer is legally correct.
+ * Every sentence of the answer against the sources, built from the explanation SSE event. What needs
+ * reading comes first and is open; the rest waits. Every number here describes how the answer relates
+ * to the retrieved text; none of them says the answer is legally correct.
  */
-export default function WhyPanel({ explanation: ex, sources, retrieval, onOpenSource }) {
-  const [hoverSentence, setHoverSentence] = useState(null)
-  const [hoverSource, setHoverSource] = useState(null)
+export function WhatToCheck({ explanation: ex, sources, onOpenSource }) {
   const byMarker = new Map((sources || []).map((s) => [s.marker, s]))
   const atts = ex.attributions || []
-  // legal claims (section numbers, punishments, quotes) must be backed by a source: unsupported ones
-  // are red. Other unsupported sentences are amber: often the law applied to the user's facts, which
-  // text similarity cannot verify, but possibly off-topic (attribution_analyzer.sentence_kind)
+  // legal claims (section numbers, punishments, quotes) must be backed by a source. Other unsupported
+  // sentences are often the law applied to the user's facts, which text similarity cannot verify, but
+  // possibly off-topic (attribution_analyzer.sentence_kind)
   const isAnalysis = (a) => a.kind === 'analysis'
   const claims = atts.filter((a) => !isAnalysis(a))
-  const supported = claims.filter((a) => a.supported).length
-  const others = atts.filter(isAnalysis)
-  const othersMatched = others.filter((a) => a.supported).length
-  const highlightedSource = hoverSentence != null ? atts[hoverSentence]?.source_marker : null
-  const highlightedSentences = hoverSource != null ? new Set(ex.sources.find((s) => s.marker === hoverSource)?.supports || []) : new Set()
+  const supportedClaims = claims.filter((a) => a.supported).length
+  const unsupported = atts.filter((a) => !a.supported && !isAnalysis(a))
+  const mismatched = atts.filter((a) => a.supported && a.cited_supported === false)
+  const applied = atts.filter((a) => !a.supported && isAnalysis(a))
+  const backed = atts.filter((a) => a.supported && a.cited_supported !== false)
+  const props = { onOpenSource, byMarker }
 
   return (
-    <details className="mt-3 rounded-lg bg-slate-50 text-xs ring-1 ring-slate-200" open={ex.warnings.length > 0} data-testid="why-panel">
-      <summary className="flex cursor-pointer select-none flex-wrap items-center gap-2 px-3 py-2">
-        <span className="font-medium text-slate-700">Why this answer?</span>
-        <span className={`rounded px-1.5 py-0.5 font-semibold ring-1 ${BAND[ex.band]}`} data-testid="why-band">
-          Evidence match: {ex.band} ({ex.relevance.toFixed(2)})
-        </span>
+    <div className="space-y-4">
+      <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
         {!ex.refused && claims.length > 0 && (
-          <span className={supported === claims.length ? 'text-emerald-700' : 'text-red-700'} data-testid="why-support">
-            {supported} of {claims.length} legal statements supported by a source
-          </span>
+          <div data-testid="why-support">
+            <p className="text-[1.75rem] font-semibold leading-none tracking-[-0.03em]">{supportedClaims} of {claims.length}</p>
+            <p className="mt-1 text-[14px] leading-snug text-slate-600">legal statements have a source</p>
+          </div>
         )}
-        {!ex.refused && others.length > 0 && (
-          <span className={othersMatched === others.length ? 'text-slate-500' : 'text-amber-700'} data-testid="why-analysis">
-            · {othersMatched} of {others.length} other sentences matched to a source
-          </span>
-        )}
-        {ex.warnings.length > 0 && (
-          <span className="rounded bg-red-600 px-1.5 py-0.5 font-semibold text-red-50">
-            {ex.warnings.length} warning{ex.warnings.length > 1 ? 's' : ''}
-          </span>
-        )}
-      </summary>
+        <div data-testid="why-band">
+          <p className="text-[1.75rem] font-semibold leading-none tracking-[-0.03em]">{ex.band} <span className="text-[1rem] font-medium text-slate-600">({ex.relevance.toFixed(2)})</span></p>
+          <p className="mt-1 text-[14px] leading-snug text-slate-600" data-testid="why-band-note">match between the law found and your question. It does not say the answer is correct.</p>
+        </div>
+      </div>
 
-      <div className="space-y-3 border-t border-slate-200 px-3 py-3">
-        <p className="text-slate-500" data-testid="why-band-note">
-          {ex.band_note} A strong match means closely related IPC text was found; check the answer against it, and
-          consult a lawyer for advice.
-        </p>
+      <Group title="Read these first" count={unsupported.length + mismatched.length} open>
+        {unsupported.map((a) => (
+          <Sentence key={a.sentence_idx} a={a} tone="border-red-500" {...props}>
+            No source says this. Closest match {pct(a.similarity)}, needs {pct(ex.support_threshold)}.
+          </Sentence>
+        ))}
+        {mismatched.map((a) => (
+          <Sentence key={a.sentence_idx} a={a} tone="border-amber-500" {...props}>
+            It cites {a.cited_markers.map((m) => `[${m}]`).join('')}, but a different source supports it.
+          </Sentence>
+        ))}
+      </Group>
 
-        {ex.warnings.length > 0 && (
-          <ul className="space-y-1 rounded-md bg-red-50 px-3 py-2 text-red-800 ring-1 ring-red-200" data-testid="why-warnings">
+      <Group title="The law applied to your facts" count={applied.length} note="These sentences use your own situation, so they cannot be matched to the text of a section. Read them against the cited section.">
+        {applied.map((a) => (
+          <Sentence key={a.sentence_idx} a={a} tone="border-slate-300" {...props}>
+            Closest source, at {pct(a.similarity)}.
+          </Sentence>
+        ))}
+      </Group>
+
+      <Group title="Backed by a source" count={backed.length}>
+        {backed.map((a) => (
+          <Sentence key={a.sentence_idx} a={a} tone="border-emerald-500" {...props}>
+            {pct(a.similarity)} similar.
+          </Sentence>
+        ))}
+      </Group>
+
+      {ex.warnings.length > 0 && (
+        <details className="group text-[14px] text-slate-600">
+          <summary className="press inline-flex cursor-pointer select-none items-center gap-2 font-medium text-slate-800">
+            <span aria-hidden="true" className="text-slate-500 transition-transform duration-200 group-open:rotate-90">›</span>
+            All notes from the check ({ex.warnings.length})
+          </summary>
+          <ul className="mt-1 space-y-0.5 pl-4" data-testid="why-warnings">
             {ex.warnings.map((w) => (
-              <li key={w}>⚠ {w}</li>
+              <li key={w}>{w}</li>
             ))}
           </ul>
-        )}
+        </details>
+      )}
+    </div>
+  )
+}
 
-        {atts.length > 0 && (
-          <section>
-            <h4 className="mb-1 font-semibold text-slate-700">The answer, sentence by sentence</h4>
-            <ol className="space-y-1">
-              {atts.map((a) => {
-                const mismatch = a.supported && a.cited_supported === false
-                const applied = !a.supported && isAnalysis(a)
-                const lit = hoverSentence === a.sentence_idx || highlightedSentences.has(a.sentence_idx)
-                return (
-                  <li
-                    key={a.sentence_idx}
-                    onMouseEnter={() => setHoverSentence(a.sentence_idx)}
-                    onMouseLeave={() => setHoverSentence(null)}
-                    data-testid="why-sentence"
-                    data-supported={a.supported}
-                    className={`rounded-md px-2 py-1.5 ring-1 ${
-                      applied ? 'bg-amber-50 ring-amber-200' : !a.supported ? 'bg-red-50 ring-red-200' : mismatch ? 'bg-amber-50 ring-amber-200' : 'bg-white ring-slate-200'
-                    } ${lit ? 'outline outline-2 outline-indigo-400' : ''}`}
-                  >
-                    <p className="text-slate-800">{a.sentence}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-slate-500">
-                      {a.supported ? (
-                        <>
-                          <span>Supported by</span>
-                          <button
-                            onClick={() => byMarker.get(a.source_marker) && onOpenSource(byMarker.get(a.source_marker))}
-                            className="rounded bg-indigo-50 px-1 font-semibold text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-100"
-                          >
-                            [{a.source_marker}]
-                          </button>
-                          <span>{pct(a.similarity)} similar</span>
-                        </>
-                      ) : applied ? (
-                        <span className="font-medium text-amber-800" data-testid="why-applied">
-                          Not matched to a source (closest: [{a.source_marker}] at {pct(a.similarity)}). In a scenario
-                          answer this is often the law applied to your facts, so check it against the cited source.
-                        </span>
-                      ) : (
-                        <span className="font-medium text-red-700">
-                          No retrieved source supports this sentence (closest: [{a.source_marker}] at {pct(a.similarity)}, needs{' '}
-                          {pct(ex.support_threshold)})
-                        </span>
-                      )}
-                      {mismatch && (
-                        <span className="font-medium text-amber-800">
-                          but it cites {a.cited_markers.map((m) => `[${m}]`).join('')}, which does not support it
-                        </span>
-                      )}
-                    </div>
-                    {/* only for the sentence under the mouse: opening quotes while hovering a source row
-                        pushed that list down under the cursor, which then hovered another row (the list jumped) */}
-                    {hoverSentence === a.sentence_idx && a.supported && (
-                      <p className="mt-1 border-l-2 border-indigo-300 pl-2 italic text-slate-600">“{a.evidence}”</p>
-                    )}
-                  </li>
-                )
-              })}
-            </ol>
-          </section>
-        )}
+/** Every retrieved source, best match first, and which sentences it supports. */
+export function SourceMatches({ explanation: ex, sources, onOpenSource }) {
+  const byMarker = new Map((sources || []).map((s) => [s.marker, s]))
+  return (
+    <ul>
+      {ex.sources.map((s) => (
+        <li key={s.marker} data-testid="why-source" className="flex flex-wrap items-center gap-x-3 gap-y-0.5 border-b border-slate-200 py-1.5 text-[14px]">
+          <button onClick={() => byMarker.get(s.marker) && onOpenSource(byMarker.get(s.marker))} className="w-6 text-left font-semibold text-indigo-600 hover:underline">
+            [{s.marker}]
+          </button>
+          <span className="min-w-[10rem] flex-1 truncate text-slate-800" title={s.citation_path}>
+            {s.section ? `s.${s.section}` : s.citation_path.replace(/^IPC > /, '')}
+            {s.title ? ` ${s.title}` : ''}
+          </span>
+          <Bar value={s.similarity} />
+          <span className="w-9 text-right tabular-nums text-slate-600">{pct(s.similarity)}</span>
+          <span className={`w-16 ${s.cited ? 'font-medium text-emerald-700' : 'text-slate-500'}`}>{s.cited ? 'cited' : 'not cited'}</span>
+          <span className="text-slate-600">{s.supports.length ? `sentence ${s.supports.map((i) => i + 1).join(', ')}` : 'no sentence'}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
-        {ex.sources.length > 0 && (
-          <section>
-            <h4 className="mb-1 font-semibold text-slate-700">Retrieved sources, best match first</h4>
-            <ul className="space-y-1">
-              {ex.sources.map((s) => (
-                <li
-                  key={s.marker}
-                  onMouseEnter={() => setHoverSource(s.marker)}
-                  onMouseLeave={() => setHoverSource(null)}
-                  data-testid="why-source"
-                  className={`flex flex-wrap items-center gap-2 rounded-md bg-white px-2 py-1.5 ring-1 ring-slate-200 ${
-                    highlightedSource === s.marker || hoverSource === s.marker ? 'outline outline-2 outline-indigo-400' : ''
-                  }`}
-                >
-                  <button
-                    onClick={() => byMarker.get(s.marker) && onOpenSource(byMarker.get(s.marker))}
-                    className="font-semibold text-indigo-700 hover:underline"
-                  >
-                    [{s.marker}]
-                  </button>
-                  <span className="min-w-[10rem] flex-1 truncate text-slate-700" title={s.citation_path}>
-                    {s.kind === 'judgment' ? `⚖ ${s.citation_path}` : s.section ? `§${s.section}` : s.citation_path.replace(/^IPC > /, '')}
-                    {s.title ? ` · ${s.title}` : ''}
-                  </span>
-                  <Bar value={s.similarity} />
-                  <span className="w-9 text-right tabular-nums text-slate-500">{pct(s.similarity)}</span>
-                  <span className={s.cited ? 'text-emerald-700' : 'text-slate-400'}>{s.cited ? 'cited' : 'not cited'}</span>
-                  <span className="text-slate-500">
-                    {s.supports.length ? `supports sentence ${s.supports.map((i) => i + 1).join(', ')}` : 'supports no sentence'}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
+/** The same check, as one folded panel, for the case analysis. */
+export default function WhyPanel({ explanation: ex, sources, retrieval, onOpenSource }) {
+  const claims = (ex.attributions || []).filter((a) => a.kind !== 'analysis')
+  const supported = claims.filter((a) => a.supported).length
+  return (
+    <details className="group mt-3 bg-white p-3.5 text-[15px]" data-testid="why-panel">
+      <summary className="press flex cursor-pointer select-none flex-wrap items-center gap-x-3 gap-y-1">
+        <span aria-hidden="true" className="text-slate-500 transition-transform duration-200 group-open:rotate-90">›</span>
+        <span className="font-medium text-slate-900">Check this against its sources</span>
+        {!ex.refused && claims.length > 0 && (
+          <span className={supported === claims.length ? 'text-emerald-700' : 'font-medium text-amber-700'}>{supported} of {claims.length} legal statements have a source</span>
         )}
+      </summary>
+      <div className="mt-3 space-y-4">
+        <WhatToCheck explanation={ex} sources={sources} onOpenSource={onOpenSource} />
+        {ex.sources.length > 0 && <SourceMatches explanation={ex} sources={sources} onOpenSource={onOpenSource} />}
         {retrieval && <HowChosen r={retrieval} />}
       </div>
     </details>
@@ -178,9 +171,11 @@ export default function WhyPanel({ explanation: ex, sources, retrieval, onOpenSo
 }
 
 /** How the sources were chosen: floor, scope check, lay-term expansion, follow-up context. */
-function HowChosen({ r }) {
+export function HowChosen({ r }) {
   const lowered = r.floor < r.base_floor
   const lines = []
+  if (r.background_ignored?.length)
+    lines.push(`Left out of the search, because the law does not turn on it: ${r.background_ignored.join(' · ')}. The answer was still written from your whole question.`)
   if (r.translation)
     lines.push(`Your question is in Hindi; the IPC index is English, so it was searched in translation: "${r.translation.text}". The answer was asked for in Hindi with the same citations.`)
   if (r.named_sections.length) lines.push(`You named ${r.named_sections.map((s) => `s.${s}`).join(', ')}, so those sections were fetched directly.`)
@@ -209,12 +204,11 @@ function HowChosen({ r }) {
   if (!r.sources.length && r.floor <= 1) lines.push(`The best match was ${pct(r.best_similarity)}, below the ${pct(r.floor)} needed, so no sources were used.`)
   return (
     <section data-testid="why-retrieval">
-      <h4 className="mb-1 font-semibold text-slate-700">How the sources were chosen</h4>
-      <ul className="list-disc space-y-0.5 pl-5 text-slate-600">
+      <ul className="list-disc space-y-1 pl-5 text-[14px] leading-snug text-slate-600">
         {lines.length ? lines.map((l) => <li key={l}>{l}</li>) : <li>Sources with a match of at least {pct(r.floor)} were used, best first.</li>}
       </ul>
       {(new Set(r.sources.map((s) => s.weight)).size > 1 || r.sources.some((s) => s.named)) && (
-        <p className="mt-1 text-slate-500">
+        <p className="mt-1 text-[13px] text-slate-500">
           Ranking weights: {r.sources.map((s) => `[${s.marker}] ×${s.weight}${s.named ? ' (named)' : ''}`).join(' · ')} (bare-act text ×1.2;
           state amendments and Chapter I general provisions down-weighted).
         </p>

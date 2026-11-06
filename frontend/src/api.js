@@ -105,11 +105,11 @@ export const reviewApi = {
 
 export const verifyApi = {
   sections: () => fetch(`${API_BASE_URL}/api/verify/sections`).then(json),
-  verify: (caseText, citedSection) =>
+  verify: (caseText, citedSection, model) =>
     fetch(`${API_BASE_URL}/api/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ case_text: caseText, cited_section: citedSection }),
+      body: JSON.stringify({ case_text: caseText, cited_section: citedSection, model: model || null }),
     }).then(json),
 }
 
@@ -136,6 +136,21 @@ export const caseApi = {
   analyze: (body, onEvent, signal) => streamSSE('/api/case/analyze', body, onEvent, signal),
   // a follow-up question about a finished analysis (the analysis is sent back: the server keeps nothing)
   ask: (body, onEvent, signal) => streamSSE('/api/case/ask', body, onEvent, signal),
+}
+
+// Explanations of an answer, on request (app/explainability/router.py): the browser sends back the
+// question, the answer and its sources; nothing is stored on the server.
+const postJson = (path, body) =>
+  fetch(`${API_BASE_URL}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(json)
+export const explainApi = {
+  words: (body) => postJson('/api/explain/words', body),
+  reasoning: (body) => postJson('/api/explain/reasoning', body),
+  sources: (body) => postJson('/api/explain/sources', body),
+  facts: (body) => postJson('/api/explain/facts', body),
+  bias: (body) => postJson('/api/explain/bias', body),
+  sensitive: (body) => postJson('/api/explain/sensitive', body),
+  caseBias: (body) => postJson('/api/case/bias', body),
+  results: () => fetch(`${API_BASE_URL}/api/explain/results`).then(json),
 }
 
 export const systemApi = {

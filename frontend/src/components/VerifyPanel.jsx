@@ -1,8 +1,10 @@
+import { Scales, Stamp } from './LegalArt.jsx'
 import { useEffect, useRef, useState } from 'react'
-import WhereItFits from './WhereItFits.jsx'
-import { verifyApi } from '../api.js'
+import { Fold } from './AnswerRecord.jsx'
+import { caseApi, verifyApi } from '../api.js'
+import { modelLabel, modelNote } from '../modelNames.js'
+import Select from './Select.jsx'
 import { takeHandoff } from '../handoff.js'
-import { HeaderArt, ScalesArt } from './LawArt.jsx'
 import { stagger } from './motion.jsx'
 import { VerdictProof } from './ZkProof.jsx'
 
@@ -73,82 +75,67 @@ const EXAMPLE = {
 
 const MIN_CHARS = 40
 
-function Pill({ status, section }) {
-  const s = STATUS[status]
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ${s.cls}`}>
-      <StatusGlyph status={status} className="size-3" />
-      {section ? `s.${section} · ` : ''}
-      {s.label}
-    </span>
-  )
+const FIELD = {
+  CONSISTENT: 'bg-field-green text-paper',
+  INCONSISTENT: 'bg-field-red text-ink',
+  INSUFFICIENT: 'bg-field-gold text-ink',
 }
 
-/** Verdict card with a score bar, element-by-element breakdown with evidence quotes, other fitting sections. */
-export function VerificationResultView({ result: r, className = 'space-y-5 rounded-2xl bg-white p-5 shadow-[0_1px_2px_rgb(15_23_42/0.04)] ring-1 ring-slate-200 sm:p-6' }) {
+/** The finding: a field of its colour with the stamp, then the law and the facts side by side. */
+export function VerificationResultView({ result: r, compact = false }) {
   const st = STATUS[r.status]
   const satisfied = r.elements.filter((e) => e.status === 'satisfied').length
-  const [shown, setShown] = useState(0) // score bar grows in after mount
-  useEffect(() => {
-    const t = requestAnimationFrame(() => setShown(satisfied / Math.max(1, r.elements.length)))
-    return () => cancelAnimationFrame(t)
-  }, [satisfied, r.elements.length])
 
   return (
-    <section className={`animate-rise ${className}`} data-testid="verify-result">
-      <div className={`flex flex-wrap items-start gap-4 rounded-xl p-4 ring-1 ${st.card}`}>
-        <span className={`grid size-10 shrink-0 animate-pop place-items-center rounded-full text-white shadow-sm ${st.icon}`} aria-hidden="true">
-          <StatusGlyph status={r.status} className="size-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`rounded-md px-2 py-0.5 text-sm font-bold ring-1 ${st.cls}`} data-testid="verify-status">
-              {st.label}
-            </span>
-            <span className="text-sm font-medium text-slate-700">
-              s.{r.cited_section} · {r.title}
-            </span>
-          </div>
-          <p className="mt-1.5 text-sm text-slate-700">{st.text(r.cited_section)}</p>
+    <section className="animate-rise space-y-5" data-testid="verify-result">
+      <div className={`flex flex-wrap items-center justify-between gap-x-8 gap-y-4 ${FIELD[r.status]} ${compact ? 'px-4 py-3.5' : 'px-5 py-6 sm:px-7'}`}>
+        <div className="min-w-0 flex-1 basis-64">
+          <p className="text-[15px] font-medium">s.{r.cited_section} {r.title}</p>
+          <p className={`mt-1 leading-snug ${compact ? 'text-[15px]' : 'text-[17px]'}`}>{st.text(r.cited_section)}</p>
           {r.model_note && (
-            <p className="mt-1 text-xs text-slate-500" data-testid="verify-model-note">
-              Facts extracted by {r.model_id}: {r.model_note.split(';')[0]}.
-            </p>
+            <p className="mt-1 text-[14px]" data-testid="verify-model-note">Facts extracted by {r.model_id}: {r.model_note.split(';')[0]}.</p>
           )}
-          <div className="mt-3 flex items-center gap-3">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/70 ring-1 ring-slate-900/5">
-              <div className={`h-full origin-left rounded-full transition-transform duration-1000 ease-[cubic-bezier(0.2,0,0,1)] ${st.bar}`} style={{ transform: `scaleX(${shown})` }} />
-            </div>
-            <span className="shrink-0 text-xs font-medium tabular-nums text-slate-600">
-              {satisfied} of {r.elements.length} elements satisfied
-            </span>
-          </div>
+          <p className="mt-3 flex items-center gap-1.5 text-[15px] font-medium">
+            {r.elements.map((el, i) => (
+              <span
+                key={el.predicate}
+                aria-hidden="true"
+                className={`size-3.5 animate-pop border-2 border-current ${el.status === 'satisfied' ? 'bg-current' : ''}`}
+                style={stagger(i, 110, 200)}
+              />
+            ))}
+            <span className="ml-1.5">{satisfied} of {r.elements.length} elements</span>
+          </p>
         </div>
+        <Stamp className={compact ? 'text-[1.125rem]' : 'text-[clamp(1.375rem,1rem+1.4vw,2rem)]'} data-testid="verify-status">{st.label}</Stamp>
       </div>
 
       <div>
-        <h3 className="mb-2 text-xs font-medium text-slate-500">Element by element</h3>
-        <ol className="space-y-2">
+        <div className="hidden grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,1fr)] gap-x-4 pb-1.5 text-[14px] font-medium text-slate-600 sm:grid">
+          <span />
+          <span>The law requires</span>
+          <span>The facts show</span>
+        </div>
+        <ol>
           {r.elements.map((el, i) => (
             <li
               key={el.predicate}
               data-testid="verify-element"
               data-status={el.status}
-              className="flex animate-rise gap-3 rounded-xl bg-white p-3 ring-1 ring-slate-200"
+              className="grid animate-rise grid-cols-[1.75rem_minmax(0,1fr)] gap-x-4 gap-y-1 border-t border-slate-200 py-3 sm:grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,1fr)]"
               style={stagger(i, 90, 150)}
             >
-              <span className={`mt-0.5 grid size-6 shrink-0 place-items-center rounded-full ring-1 ${ELEMENT[el.status].dot}`} title={ELEMENT[el.status].label}>
+              <span className={`mt-0.5 grid size-6 place-items-center ring-1 ${ELEMENT[el.status].dot}`} title={ELEMENT[el.status].label}>
                 <StatusGlyph status={el.status} />
               </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-slate-800">
-                  {el.description}
-                  <span className={`ml-1.5 text-xs font-medium ${ELEMENT[el.status].cls}`}>{ELEMENT[el.status].label}</span>
-                </p>
-                <p className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
-                  <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-700">{el.found}</span>
-                  {el.evidence ? <span className="italic text-slate-500">“{el.evidence}”</span> : <span className="text-slate-400">no quote in the facts</span>}
-                </p>
+              <p className="text-[16px] leading-snug text-slate-900">{el.description}</p>
+              <div className="col-start-2 sm:col-start-3">
+                <p className={`text-[15px] font-semibold ${ELEMENT[el.status].cls}`}>{ELEMENT[el.status].label}</p>
+                {el.evidence ? (
+                  <p className="mt-0.5 font-serif text-[16px] italic leading-snug text-slate-700">“{el.evidence}”</p>
+                ) : (
+                  <p className="mt-0.5 text-[14px] text-slate-500">No quote in the facts</p>
+                )}
               </div>
             </li>
           ))}
@@ -156,18 +143,13 @@ export function VerificationResultView({ result: r, className = 'space-y-5 round
       </div>
 
       {r.what_if && (
-        <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm ring-1 ring-slate-200" data-testid="verify-what-if">
-          <p className="text-xs font-medium text-slate-500">What would change the verdict</p>
-          <p className="mt-1 text-slate-700">{r.what_if.summary}</p>
+        <div className="border-l-4 border-indigo-500 pl-4" data-testid="verify-what-if">
+          <p className="text-[1.125rem] font-semibold tracking-[-0.02em] text-slate-900">What would change this</p>
+          <p className="mt-1 text-[16px] leading-snug text-slate-700">{r.what_if.summary}</p>
           {r.what_if.missing.length > 0 && (
-            <ul className="mt-1.5 space-y-1 text-xs text-slate-600">
+            <ul className="mt-2 space-y-1 text-[15px] leading-snug text-slate-700">
               {r.what_if.missing.map((m) => (
-                <li key={m.predicate} className="flex gap-2">
-                  <span aria-hidden="true" className="mt-1.5 size-1 shrink-0 rounded-full bg-slate-400" />
-                  <span>
-                    {m.description}: if the facts established it, the verdict would be <b>{m.verdict_if_satisfied}</b>.
-                  </span>
-                </li>
+                <li key={m.predicate}>{m.description}: if the facts established it, the verdict would be <b className="font-semibold">{m.verdict_if_satisfied}</b>.</li>
               ))}
             </ul>
           )}
@@ -175,102 +157,102 @@ export function VerificationResultView({ result: r, className = 'space-y-5 round
       )}
 
       {r.alternatives.some((a) => a.status === 'CONSISTENT') && (
-        <p className="text-sm text-slate-700">
-          These facts also satisfy:{' '}
-          {r.alternatives
-            .filter((a) => a.status === 'CONSISTENT')
-            .map((a) => `s.${a.section} (${a.title})`)
-            .join('; ')}
+        <p className="text-[16px] leading-snug text-slate-900">
+          These facts also satisfy{' '}
+          {r.alternatives.filter((a) => a.status === 'CONSISTENT').map((a) => `s.${a.section} (${a.title})`).join('; ')}.
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-xs text-slate-500">Other encoded sections</span>
-        {r.alternatives.map((a) => (
-          <Pill key={a.section} status={a.status} section={a.section} />
-        ))}
-      </div>
 
-      {r.warnings.length > 0 && (
-        <details className="text-xs text-amber-800">
-          <summary className="cursor-pointer font-medium">{r.warnings.length} extraction note(s)</summary>
-          <ul className="mt-1 list-disc pl-5">
-            {r.warnings.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
-        </details>
-      )}
-      <details className="text-xs text-slate-600">
-        <summary className="cursor-pointer font-medium">All facts extracted by {r.model_id}</summary>
-        <ul className="mt-1.5 space-y-0.5">
-          {Object.entries(r.facts).map(([k, v]) => (
-            <li key={k}>
-              <span className="font-mono">{k}</span> = <b>{v.value}</b>
-              {v.evidence && <span className="italic"> — “{v.evidence}”</span>}
-            </li>
-          ))}
-        </ul>
-      </details>
+      <div className="space-y-2">
+        {r.alternatives.length > 0 && (
+          <Fold title="The other encoded sections">
+            <ul className="grid gap-x-8 sm:grid-cols-2">
+              {r.alternatives.map((a) => (
+                <li key={a.section} className="flex items-center justify-between gap-3 border-b border-slate-200 py-1.5 text-[15px]">
+                  <span className="font-medium text-slate-900">s.{a.section}</span>
+                  <span className="text-slate-600">{STATUS[a.status].label}</span>
+                </li>
+              ))}
+            </ul>
+          </Fold>
+        )}
+        {r.warnings.length > 0 && (
+          <Fold title={`Notes from reading the facts (${r.warnings.length})`}>
+            <ul className="space-y-1 text-[14px] leading-snug text-slate-700">
+              {r.warnings.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
+          </Fold>
+        )}
+        {r.facts && (
+          <Fold title={`All facts extracted by ${r.model_id}`}>
+            <ul className="space-y-1 text-[14px] leading-snug text-slate-700">
+              {Object.entries(r.facts).map(([k, v]) => (
+                <li key={k}>
+                  {k.replace(/_/g, ' ')}: <b className="font-semibold">{v.value}</b>
+                  {v.evidence && <span className="font-serif italic"> “{v.evidence}”</span>}
+                </li>
+              ))}
+            </ul>
+          </Fold>
+        )}
+      </div>
     </section>
   )
 }
 
-/** Shown while the server extracts and checks: an honest "working" state, not a fake progress bar. */
-function Checking({ section }) {
-  return (
-    <div className="animate-rise overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200" role="status" data-testid="verify-busy">
-      <div className="h-1 w-full overflow-hidden bg-slate-100">
-        <div className="h-full w-1/3 animate-[slide_1.4s_cubic-bezier(0.4,0,0.2,1)_infinite] rounded-full bg-indigo-500" />
-      </div>
-      <div className="flex items-center gap-4 p-5">
-        <span aria-hidden="true" className="relative grid size-10 place-items-center">
-          <span className="absolute inset-0 animate-ping-soft rounded-full bg-indigo-400" />
-          <span className="relative grid size-10 place-items-center rounded-full bg-indigo-50 font-serif text-lg font-bold text-indigo-700 ring-1 ring-indigo-200">§</span>
-        </span>
-        <div>
-          <p className="text-shimmer text-sm font-semibold">Checking the facts against s.{section}…</p>
-          <p className="mt-0.5 text-xs text-slate-500">
-            The facts are extracted twice (only what is stated consistently is kept), then the rules are applied. Usually
-            10–20 seconds.
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-export default function VerifyPanel() {
-  // sent from a chat answer ("Check the facts against s.X"): the question and the section
-  const [handoff] = useState(() => takeHandoff('verify'))
+export default function VerifyPanel({ active = true }) {
+  // sent from a chat answer ("Check the facts against s.X") or the Overview: the facts and the section
+  const [handoff, setHandoff] = useState(null)
   const [meta, setMeta] = useState(null)
-  const [text, setText] = useState(handoff?.text || '')
+  const [text, setText] = useState('')
   const [section, setSection] = useState('')
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [models, setModels] = useState([])
+  const [model, setModel] = useState('') // '': automatic, the free models in turn
   const resultRef = useRef(null)
+  // the scales: the law outweighs an empty pan, the facts bring it level, the result settles it
+  const tilt = result ? { CONSISTENT: 0, INSUFFICIENT: -3, INCONSISTENT: -5 }[result.status] ?? 0 : -5 * (1 - Math.min(1, text.trim().length / 240))
 
   useEffect(() => {
+    caseApi.models().then((list) => setModels(list)).catch(() => setModels([]))
     verifyApi
       .sections()
       .then((m) => {
         setMeta(m)
-        const sent = m.sections.find((x) => x.section === handoff?.section)?.section
-        setSection((s) => sent || s || m.sections.find((x) => x.section === '304A')?.section || m.sections[0]?.section || '')
+        setSection((s) => s || m.sections.find((x) => x.section === '304A')?.section || m.sections[0]?.section || '')
       })
       .catch((e) => setError(e.message.includes('404') ? 'Verification is not available: the server could not start SWI-Prolog.' : e.message))
   }, [])
+
+  // this page stays mounted, so work handed over is picked up each time the tab opens
+  useEffect(() => {
+    const sent = active && takeHandoff('verify')
+    if (!sent) return
+    setHandoff(sent)
+    setText(sent.text || '')
+    if (sent.section) setSection(sent.section)
+    setResult(null)
+    setError('')
+  }, [active])
+
+  useEffect(() => {
+    if (result) requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }, [result])
 
   const run = async (e) => {
     e.preventDefault()
     setBusy(true)
     setError('')
     setResult(null)
-    requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }))
     try {
-      setResult(await verifyApi.verify(text, section))
+      setResult(await verifyApi.verify(text, section, model))
     } catch (err) {
-      setError(err.message)
+      const down = err.message.includes('503')
+      setError(`${err.message.replace(/^HTTP \d+: /, '')}${down && model ? ' Choose another model and weigh again.' : ''}`)
     } finally {
       setBusy(false)
     }
@@ -280,175 +262,147 @@ export default function VerifyPanel() {
   const chars = text.trim().length
 
   return (
-    <div className="relative isolate min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:py-10">
-      <div aria-hidden="true" className="bg-dots pointer-events-none absolute inset-0 -z-10" />
-      <div className="mx-auto max-w-4xl space-y-6">
-        <header className="relative">
-          <div aria-hidden="true" className="pointer-events-none absolute -left-24 -top-24 -z-10 h-64 w-[30rem] max-w-[120%] animate-float rounded-full bg-[radial-gradient(closest-side,var(--color-indigo-200),transparent)] opacity-50 blur-2xl" />
-          <HeaderArt>
-            <ScalesArt />
-          </HeaderArt>
-          <p className="mb-3 inline-flex animate-rise items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200 backdrop-blur">
-            <span aria-hidden="true" className="size-1.5 rounded-full bg-indigo-500" />
-            Rule engine · {meta ? meta.sections.length : '…'} IPC sections encoded
-          </p>
-          <h2 className="animate-rise text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl" style={stagger(1)}>
-            Check facts against an IPC section
-          </h2>
-          <p className="mt-2 max-w-2xl animate-rise text-sm leading-relaxed text-slate-500 sm:text-[0.9375rem]" style={stagger(2)}>
-            Paste the facts of a case and choose the section it is charged under. An AI model extracts the facts the section
-            depends on, each with a quote from your text, and a rule engine checks them against the section's elements.
-          </p>
-          {meta && (
-            <p className="mt-3 flex max-w-2xl animate-rise gap-2 text-xs leading-relaxed text-slate-500" style={stagger(3)}>
-              <svg {...stroke} strokeWidth={1.5} className="mt-px size-4 shrink-0 text-slate-400">
-                <circle cx="10" cy="10" r="7.25" />
-                <path d="M10 9v4.5M10 6.6v.1" />
-              </svg>
-              {meta.disclaimer}
-            </p>
-          )}
-          <WhereItFits part="verify" className="mt-4 animate-rise" />
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <section className="min-h-full bg-field-blue px-4 py-7 text-paper sm:py-8">
+        <form onSubmit={run} className="mx-auto flex max-w-5xl flex-col items-center">
+          <h2 className="head animate-rise text-center">Weigh the facts against the law</h2>
           {handoff && (
-            <p className="mt-3 animate-rise rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-900 ring-1 ring-indigo-200" data-testid="verify-handoff">
-              Your question from the chat is filled in below{handoff.section ? `, with s.${handoff.section}` : ''}. Check it reads as the facts of a case, then run the check.
+            <p className="mt-3 animate-rise bg-field-gold px-3 py-1.5 text-[15px] font-medium text-ink" data-testid="verify-handoff">
+              The facts are filled in below{handoff.section ? `, with s.${handoff.section}` : ''}. Check they read as the facts of a case, then weigh them.
             </p>
           )}
-        </header>
 
-        <form onSubmit={run} className="grid animate-rise gap-5 lg:grid-cols-[1fr_17rem]" style={stagger(4)}>
-          <div className="space-y-5 rounded-2xl bg-white p-5 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_12px_32px_-20px_rgb(15_23_42/0.25)] ring-1 ring-slate-200 sm:p-6">
-            <fieldset>
-              <legend className="mb-2 text-sm font-semibold text-slate-800">1. Section charged</legend>
-              <div role="radiogroup" aria-label="Section charged" className="grid gap-2 sm:grid-cols-2">
-                {meta?.sections.map((s) => {
-                  const on = s.section === section
-                  return (
-                    <button
-                      key={s.section}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      onClick={() => setSection(s.section)}
-                      className={`group flex items-start gap-2.5 rounded-xl px-3 py-2.5 text-left ring-1 transition-[background-color,box-shadow,transform] duration-200 ${
-                        on ? 'bg-indigo-50 ring-2 ring-indigo-400' : 'bg-white ring-slate-200 hover:-translate-y-px hover:bg-slate-50 hover:ring-slate-300'
-                      }`}
-                      data-testid="verify-section"
-                    >
-                      <span
-                        className={`mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 font-mono text-xs font-semibold transition-colors ${
-                          on ? 'bg-accent text-on-accent' : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
-                        }`}
-                      >
-                        {s.section}
-                      </span>
-                      <span className={`text-sm leading-snug ${on ? 'font-medium text-indigo-900' : 'text-slate-700'}`}>{s.title}</span>
-                    </button>
-                  )
-                })}
-                {!meta && !error && Array.from({ length: 4 }, (_, i) => <span key={i} className="h-12 animate-pulse rounded-xl bg-slate-100" />)}
-              </div>
-            </fieldset>
+          <fieldset className="mt-5 animate-rise" style={stagger(1)}>
+            <legend className="sr-only">Section charged</legend>
+            <div role="radiogroup" aria-label="Section charged" className="flex flex-wrap justify-center gap-1.5">
+              {meta?.sections.map((s) => {
+                const on = s.section === section
+                return (
+                  <button
+                    key={s.section}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    title={s.title}
+                    onClick={() => setSection(s.section)}
+                    className={`press h-11 min-w-16 px-3 text-[17px] font-semibold tabular-nums transition-[background-color,color,transform] duration-200 ${
+                      on ? '-translate-y-0.5 bg-field-gold text-ink' : 'bg-white/10 text-paper hover:bg-white/20'
+                    }`}
+                    data-testid="verify-section"
+                  >
+                    {s.section}
+                  </button>
+                )
+              })}
+              {!meta && !error && Array.from({ length: 7 }, (_, i) => <span key={i} className="h-11 w-16 animate-pulse bg-white/10" />)}
+            </div>
+          </fieldset>
 
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <label className="text-sm font-semibold text-slate-800" htmlFor="verify-text">
-                  2. Case facts
-                </label>
+          <Scales arm={225} drop={44} base={false} busy={busy} tilt={tilt} className="mt-2 hidden w-[63.4%] text-paper md:block" />
+
+          <div className="light-scope relative grid w-full gap-4 text-ink md:grid-cols-2 md:gap-8">
+            <span aria-hidden="true" className="absolute -bottom-5 left-1/2 top-0 hidden -translate-x-1/2 bg-paper md:block" style={{ width: '13.7px' }} />
+            <div className="animate-sheet bg-white p-5" aria-live="polite" style={stagger(2, 80)}>
+              <p className="text-[15px] font-medium text-slate-600">The law requires</p>
+              {sectionDef ? (
+                <div key={sectionDef.section}>
+                  <p className="mt-0.5 animate-rise text-[1.25rem] font-semibold leading-tight tracking-[-0.02em]">s.{sectionDef.section} {sectionDef.title}</p>
+                  <ol className="mt-3 space-y-2">
+                    {sectionDef.elements.map((el, i) => {
+                      const found = result?.cited_section === sectionDef.section ? result.elements.find((x) => x.predicate === el.predicate) : null
+                      return (
+                        <li key={el.predicate} className="flex animate-rise gap-2.5 text-[15px] leading-snug" style={stagger(i, 70, 80)}>
+                          {found ? (
+                            <span className={`mt-px grid size-5 shrink-0 place-items-center rounded-full ring-1 ${ELEMENT[found.status].dot}`} title={ELEMENT[found.status].label}>
+                              <StatusGlyph status={found.status} className="size-3" />
+                            </span>
+                          ) : (
+                            <span className="w-5 shrink-0 text-center font-semibold text-indigo-600">{i + 1}</span>
+                          )}
+                          {el.description}
+                        </li>
+                      )
+                    })}
+                  </ol>
+                </div>
+              ) : (
+                <span className="mt-2 block h-24 animate-pulse bg-slate-100" />
+              )}
+            </div>
+
+            <div className="flex animate-sheet flex-col bg-white p-5" style={stagger(3, 80)}>
+              <div className="flex items-baseline justify-between gap-3">
+                <label className="text-[15px] font-medium text-slate-600" htmlFor="verify-text">The facts show</label>
                 <button
                   type="button"
                   onClick={() => {
                     setText(EXAMPLE.text)
                     setSection(EXAMPLE.section)
                   }}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                  className="press text-[15px] font-medium text-indigo-600 underline underline-offset-2"
                 >
-                  <svg {...stroke} strokeWidth={1.5} className="size-3.5">
-                    <path d="M10 3.5v2M10 14.5v2M3.5 10h2M14.5 10h2M5.4 5.4l1.4 1.4M13.2 13.2l1.4 1.4M5.4 14.6l1.4-1.4M13.2 6.8l1.4-1.4" />
-                  </svg>
                   Try an example
                 </button>
               </div>
-              <div>
-                <textarea
-                  id="verify-text"
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  rows={7}
-                  maxLength={20000}
-                  placeholder="e.g. The accused was driving a truck on the highway when…"
-                  className="block w-full resize-y rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-3 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 transition-[border-color,box-shadow,background-color] focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-100"
-                />
-                <span
-                  className={`mt-1.5 block text-right text-[11px] tabular-nums ${chars > 0 && chars < MIN_CHARS ? 'text-amber-600' : 'text-slate-400'}`}
-                >
+              <textarea
+                id="verify-text"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                rows={6}
+                maxLength={20000}
+                placeholder="The accused was driving a truck on the highway when…"
+                className="ruled mt-1 block w-full flex-1 resize-y bg-transparent font-serif text-[1.125rem] text-slate-900 placeholder:text-slate-500 focus:outline-none"
+              />
+              <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <span className="flex min-w-0 items-center gap-1 text-[14px] text-slate-600">
+                  Read by
+                  <Select
+                    up
+                    label="The model that reads the facts"
+                    value={model}
+                    onChange={setModel}
+                    disabled={busy}
+                    menuClass="w-72"
+                    testId="verify-model"
+                    options={[
+                      { value: '', label: 'Automatic', hint: 'Free models in turn, if one is down' },
+                      ...models.map((m) => ({ value: m.id, label: modelLabel(m.id), hint: m.available ? modelNote(m) : m.note || 'Not available', disabled: !m.available })),
+                    ]}
+                  />
+                </span>
+                <span className={`text-[13px] tabular-nums ${chars > 0 && chars < MIN_CHARS ? 'font-medium text-amber-700' : 'text-slate-500'}`}>
                   {chars > 0 && chars < MIN_CHARS ? `${MIN_CHARS - chars} more characters needed` : `${text.length.toLocaleString()} / 20,000`}
                 </span>
               </div>
             </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-              <p className="text-xs text-slate-500">The check runs on this server; nothing is saved.</p>
-              <button
-                type="submit"
-                disabled={busy || chars < MIN_CHARS || !section}
-                className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent shadow-sm transition-[transform,background-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md disabled:translate-y-0 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
-              >
-                {busy ? (
-                  <>
-                    <span aria-hidden="true" className="size-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
-                    Checking…
-                  </>
-                ) : (
-                  <>
-                    Check{section ? ` against s.${section}` : ''}
-                    <svg {...stroke} className="size-4">
-                      <path d="M4.5 10h11M11 5.5l4.5 4.5-4.5 4.5" />
-                    </svg>
-                  </>
-                )}
-              </button>
-            </div>
           </div>
 
-          {/* what the chosen section requires: always visible, re-animates when the section changes */}
-          <aside className="h-fit rounded-2xl bg-white/70 p-5 ring-1 ring-slate-200 backdrop-blur lg:sticky lg:top-0" aria-live="polite">
-            {sectionDef ? (
-              <div key={sectionDef.section}>
-                <p className="text-xs font-medium text-slate-500">What s.{sectionDef.section} requires</p>
-                <p className="mt-0.5 animate-rise text-sm font-semibold text-slate-900">{sectionDef.title}</p>
-                <ol className="mt-3 space-y-2.5">
-                  {sectionDef.elements.map((el, i) => (
-                    <li key={el.predicate} className="flex animate-rise gap-2.5 text-sm text-slate-700" style={stagger(i, 70, 80)}>
-                      <span className="grid size-5 shrink-0 place-items-center rounded-full bg-indigo-50 text-[11px] font-semibold text-indigo-700 ring-1 ring-indigo-200">
-                        {i + 1}
-                      </span>
-                      <span className="leading-snug">{el.description}</span>
-                    </li>
-                  ))}
-                </ol>
-                <p className="mt-4 text-xs leading-relaxed text-slate-500">
-                  All {sectionDef.elements.length} must be established by the facts for a <b>Consistent</b> result.
-                </p>
-              </div>
+          <button
+            type="submit"
+            disabled={busy || chars < MIN_CHARS || !section}
+            className="press mt-5 inline-flex h-12 items-center gap-2 bg-accent px-7 text-[17px] font-medium text-on-accent hover:bg-accent-hover disabled:bg-white/15 disabled:text-paper/60"
+          >
+            {busy ? (
+              <>
+                <span aria-hidden="true" className="size-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+                Weighing…
+              </>
             ) : (
-              <div className="space-y-2">
-                <span className="block h-3 w-24 animate-pulse rounded bg-slate-100" />
-                <span className="block h-4 w-40 animate-pulse rounded bg-slate-100" />
-                <span className="block h-16 animate-pulse rounded bg-slate-100" />
-              </div>
+              <>Weigh against{section ? ` s.${section}` : ' the section'}</>
             )}
-          </aside>
-        </form>
-
-        <div ref={resultRef} className="scroll-mt-4 space-y-4">
-          {error && (
-            <p className="flex animate-rise items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
-              <StatusGlyph status="violated" className="mt-0.5 size-4 shrink-0" />
-              {error}
+          </button>
+          {busy && (
+            <p className="mt-3 animate-rise text-center text-[15px] font-medium leading-snug" role="status" data-testid="verify-busy">
+              The facts are read twice and only what is stated both times counts, then the rules are applied.
             </p>
           )}
-          {busy && <Checking section={section} />}
+          {meta && <p className="mt-3 max-w-2xl text-center text-[15px] leading-snug">{meta.disclaimer}</p>}
+        </form>
+      </section>
+
+      <div ref={resultRef} className={result || error ? 'scroll-mt-0 bg-field-blue px-4 pb-10 pt-2' : 'hidden'}>
+        <div className="light-scope mx-auto max-w-4xl animate-sheet space-y-7 bg-white p-5 text-ink sm:p-8">
+          {error && <p className="border-l-4 border-red-500 pl-3 text-[16px] text-red-700">{error}</p>}
           {result && <VerificationResultView result={result} />}
           {result && <VerdictProof result={result} />}
         </div>

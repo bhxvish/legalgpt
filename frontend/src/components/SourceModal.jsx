@@ -16,7 +16,7 @@ export default function SourceModal({ source, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 p-4 backdrop-blur-[2px] animate-fade"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 p-4 animate-fade"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -27,10 +27,10 @@ export default function SourceModal({ source, onClose }) {
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <p className="kicker">
               Source [{source.marker}]{source.kind === 'judgment' ? ' · judgment' : ''}
             </p>
-            <h2 id="source-modal-title" className="mt-1 text-base font-semibold text-slate-900">
+            <h2 id="source-modal-title" className="mt-1 text-[1.75rem] leading-tight tracking-[-0.03em] text-slate-900">
               {source.kind === 'judgment'
                 ? `${source.title}${source.year ? ` (${source.court?.includes('Supreme') ? 'SC, ' : ''}${source.year})` : ''}`
                 : `${source.section ? `Section ${source.section}` : source.citation_path}${source.title ? ` — ${source.title}` : ''}`}
@@ -43,27 +43,27 @@ export default function SourceModal({ source, onClose }) {
                 </a>
               </p>
             )}
-            <p className="mt-1 break-words font-mono text-xs text-slate-600" data-testid="source-citation-path">
+            <p className="mt-1 break-words font-mono text-[11px] text-slate-500" data-testid="source-citation-path">
               {source.citation_path}
             </p>
             {source.doc_id === 'BNS' && source.ipc?.length > 0 && (
-              <p className="mt-2 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs text-indigo-900 ring-1 ring-indigo-200">
+              <p className="mt-3 border-l-2 border-indigo-500 pl-3 text-[13px] leading-snug text-slate-700">
                 {source.ipc[0] === 'new' ? (
                   <>A provision <b>new in the Bharatiya Nyaya Sanhita, 2023</b>: no IPC section corresponds to it.</>
                 ) : (
                   <>Replaced <b>IPC Section {source.ipc.join(', ')}</b> from 1 July 2024.</>
                 )}{' '}
-                <span className="text-indigo-700/80">From the BPRD correspondence table.</span>
+                <span className="text-slate-500">From the BPRD correspondence table.</span>
               </p>
             )}
             {source.kind !== 'judgment' && source.bns?.length > 0 && (
-              <p className="mt-2 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs text-indigo-900 ring-1 ring-indigo-200">
+              <p className="mt-3 border-l-2 border-indigo-500 pl-3 text-[13px] leading-snug text-slate-700">
                 {source.bns[0] === 'none' ? (
                   <>No direct equivalent in the <b>Bharatiya Nyaya Sanhita, 2023</b> (in force from 1 July 2024): omitted or folded into another provision.</>
                 ) : (
                   <>Now <b>Section {source.bns.join(', ')}</b> of the <b>Bharatiya Nyaya Sanhita, 2023</b> (in force from 1 July 2024).</>
                 )}{' '}
-                <span className="text-indigo-700/80">From the BPRD correspondence table; check the Sanhita's text where it matters.</span>
+                <span className="text-slate-500">From the BPRD correspondence table; check the Sanhita's text where it matters.</span>
               </p>
             )}
           </div>
@@ -77,7 +77,7 @@ export default function SourceModal({ source, onClose }) {
           </button>
         </div>
         <div className="overflow-y-auto px-5 py-4">
-          <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-slate-800" data-testid="source-text">
+          <pre className="whitespace-pre-wrap break-words font-serif text-[1.0625rem] leading-[1.6] text-slate-800" data-testid="source-text">
             {source.text}
           </pre>
         </div>

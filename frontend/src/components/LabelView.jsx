@@ -1,10 +1,10 @@
+import { CourtFront } from './LegalArt.jsx'
 import { useCallback, useEffect, useState } from 'react'
 import { annotationApi, reviewApi } from '../api.js'
-import { CaseAnnotator, Guideline, ProgressBar } from './AnnotateView.jsx'
-import { BookArt, HeaderArt } from './LawArt.jsx'
+import { CaseAnnotator, Guideline } from './AnnotateView.jsx'
 import { stagger } from './motion.jsx'
-import { CaseReview, Meter, Pill, UploadPanel } from './ReviewView.jsx'
-import WhereItFits from './WhereItFits.jsx'
+import { CaseReview, UploadPanel } from './ReviewView.jsx'
+import { Stamp } from './LegalArt.jsx'
 
 // One place to label judgments. Every uploaded judgment is labelled by InLegalBERT first; a person
 // then either checks its suggestions (the normal way) or labels it blind, suggestions hidden:
@@ -33,6 +33,89 @@ function writeStored(key, value) {
 
 const done = (p) => p && p.sentences > 0 && p.labelled === p.sentences
 
+// the colour of a volume's spine says what it needs
+const SPINE = {
+  check: 'bg-field-gold text-ink',
+  blind: 'bg-field-blue text-paper',
+  sent: 'bg-field-red text-ink',
+  corpus: 'bg-field-green text-paper',
+  hand: 'bg-field-bone text-ink',
+  unlabelled: 'bg-field-panel-2 text-paper',
+}
+const ACTION = { check: 'Check the suggestions', blind: 'Label it blind', sent: 'Label it by hand', corpus: 'Read the signed-off file', hand: 'Open and label', unlabelled: 'Start labelling' }
+
+/** What fits on a spine: no date, no shouting, the first party against the second. */
+function spineTitle(title) {
+  const t = title.replace(/\s*\(.*$/, '').replace(/^\d+\s+/, '').trim()
+  const calm = t === t.toUpperCase() ? t.toLowerCase().replace(/\b[a-z]/g, (m) => m.toUpperCase()).replace(/\b(Versus|Vs|V)\b/g, 'v') : t
+  return calm.replace(/\s*@.*?(?=\s+(v|vs|versus)\b)/i, '').replace(/\s+(versus|vs\.?)\s+/i, ' v ').replace(/\s*&\s*Ors\.?/i, '').slice(0, 30)
+}
+
+/** One judgment as a volume on the shelf: taller for a longer judgment, lifted when pulled out. */
+function Volume({ c, on, onPick, i }) {
+  const size = c.queue?.sentences || c.progress?.sentences || 90
+  const height = 10.5 + Math.min(1, size / 260) * 5
+  return (
+    <li className="relative flex min-w-[1.65rem] max-w-12 flex-1 animate-rise items-end" style={stagger(Math.min(i, 30), 18, 120)}>
+      <button
+        type="button"
+        onClick={() => onPick(c.case_id)}
+        aria-pressed={on}
+        title={c.title || c.case_id}
+        aria-label={`${c.title || c.case_id}. ${c.state.text}`}
+        className={`group flex w-full flex-col items-center justify-between overflow-hidden px-0.5 pb-1.5 pt-2.5 outline-offset-2 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${SPINE[c.state.key]} ${on ? '-translate-y-5' : 'hover:-translate-y-2.5'}`}
+        style={{ height: `${height}rem` }}
+      >
+        <span aria-hidden="true" className="h-[3px] w-full shrink-0 bg-current opacity-50" />
+        <span className="min-h-0 flex-1 overflow-hidden whitespace-nowrap py-1.5 text-[13px] font-medium leading-none [writing-mode:vertical-rl]">{spineTitle(c.title || c.case_id)}</span>
+        <span className="shrink-0 text-[11px] font-semibold tabular-nums">{String(c.decision_year || '').slice(-2)}</span>
+      </button>
+    </li>
+  )
+}
+
+/** The volume pulled from the shelf, open on paper. */
+function OpenVolume({ c, onOpen, onBlind }) {
+  const qd = c.queue
+  const parts = qd?.flagged ? [qd.reviewed, qd.flagged, 'checked'] : c.progress?.sentences ? [c.progress.labelled, c.progress.sentences, 'labelled by you'] : null
+  const by = (c.labelled_by || []).map((n) => (n.startsWith('model:') ? 'InLegalBERT' : n)).filter((n, i, a) => a.indexOf(n) === i)
+  return (
+    <article key={c.case_id} className="light-scope grid animate-sheet items-center gap-x-8 gap-y-4 bg-white p-5 text-ink sm:p-7 lg:grid-cols-[minmax(0,1fr)_auto]" data-testid="open-volume" style={{ animationDuration: '380ms' }}>
+      <div className="min-w-0">
+        <h3 className="text-[clamp(1.5rem,1.2rem+1.3vw,2.25rem)] leading-[1.05] tracking-[-0.035em]">{c.title || c.case_id}</h3>
+        <p className="mt-2 text-[16px] leading-snug text-slate-700">
+          {[c.court, c.decision_year, c.sections_cited?.length ? `ss. ${c.sections_cited.slice(0, 6).join(', ')}` : ''].filter(Boolean).join(', ') || c.case_id}
+        </p>
+        {by.length > 0 && <p className="mt-0.5 text-[15px] text-slate-600">Labelled by {by.join(', ')}</p>}
+        {parts && (
+          <p className="mt-3 flex items-center gap-3 text-[15px] font-medium">
+            <span aria-hidden="true" className="block h-2 w-40 bg-slate-200">
+              <span className="block h-full origin-left bg-ink transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]" style={{ transform: `scaleX(${parts[1] ? parts[0] / parts[1] : 0})` }} />
+            </span>
+            {parts[0]} of {parts[1]} {parts[2]}
+          </p>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 lg:flex-col lg:items-end">
+        <Stamp className={{ check: 'text-amber-700', blind: 'text-indigo-700', sent: 'text-red-700', corpus: 'text-emerald-700', hand: 'text-slate-700', unlabelled: 'text-slate-700' }[c.state.key]}>{c.state.text}</Stamp>
+        <button type="button" onClick={onOpen} className="press h-12 bg-ink px-6 text-[17px] font-medium text-paper hover:bg-field-red hover:text-ink" data-testid="open-judgment">
+          {ACTION[c.state.key]} <span aria-hidden="true">→</span>
+        </button>
+        {c.state.mode === 'review' && (
+          <button
+            type="button"
+            onClick={onBlind}
+            title="Label this judgment yourself with the suggestions hidden: for agreement between two people"
+            className="press text-[15px] font-medium text-slate-700 underline underline-offset-2 hover:text-slate-950"
+          >
+            Label it blind instead
+          </button>
+        )}
+      </div>
+    </article>
+  )
+}
+
 /** What a judgment needs from this person, and how it opens. */
 function stateOf(c) {
   const q = c.queue
@@ -57,17 +140,14 @@ function HowItWorks() {
     ['Corpus', 'Checked judgments join the training data and the judgment library the chat cites.'],
   ]
   return (
-    <ol className="grid gap-2 sm:grid-cols-4" aria-label="How labelling works">
+    <span className="inline-flex flex-wrap items-center justify-center gap-x-2 font-medium" aria-label="How labelling works">
       {steps.map(([title, text], i) => (
-        <li key={title} className="relative animate-rise rounded-2xl bg-white px-3.5 py-3 ring-1 ring-slate-200" style={stagger(i, 60, 120)}>
-          <p className="flex items-center gap-2 text-xs font-semibold text-slate-800">
-            <span className="grid size-5 place-items-center rounded-full bg-indigo-50 font-mono text-[10px] text-indigo-700 ring-1 ring-indigo-200">{i + 1}</span>
-            {title}
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-slate-500">{text}</p>
-        </li>
+        <span key={title} title={text} className="flex items-center gap-2">
+          {i > 0 && <span aria-hidden="true" className="text-paper/50">→</span>}
+          {title}
+        </span>
       ))}
-    </ol>
+    </span>
   )
 }
 
@@ -80,6 +160,7 @@ export default function LabelView() {
   const [open, setOpen] = useState(null) // { id, mode: 'review' | 'blind' }
   const [filter, setFilter] = useState('all')
   const [query, setQuery] = useState('')
+  const [picked, setPicked] = useState(null) // the volume pulled from the shelf
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -98,10 +179,10 @@ export default function LabelView() {
 
   if (!name) {
     return (
-      <div className="relative isolate flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-4 pt-16">
-        <div aria-hidden="true" className="bg-dots pointer-events-none absolute inset-0 -z-10" />
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto bg-field-black px-4 py-8 text-paper">
+        <CourtFront className="mb-6 h-20 w-auto animate-rise text-field-gold" columns={8} />
         <form
-          className="w-full max-w-sm animate-rise rounded-2xl bg-white p-6 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_16px_40px_-20px_rgb(15_23_42/0.3)] ring-1 ring-slate-200"
+          className="light-scope w-full max-w-sm animate-sheet bg-white p-6 text-ink"
           onSubmit={(e) => {
             e.preventDefault()
             if (!draft.trim()) return
@@ -109,14 +190,8 @@ export default function LabelView() {
             setName(draft.trim())
           }}
         >
-          <span className="grid size-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200">
-            <svg {...stroke} className="size-5">
-              <circle cx="10" cy="7" r="3.25" />
-              <path d="M3.75 16.5a6.25 6.25 0 0 1 12.5 0" />
-            </svg>
-          </span>
-          <h2 className="mt-4 text-lg font-semibold tracking-tight text-slate-900">Who is labelling?</h2>
-          <p className="mt-1 text-sm text-slate-500">Your name is saved with every label and check, so two people's work can be compared.</p>
+          <h2 className="head">Who is labelling?</h2>
+          <p className="mt-2 text-[15px] leading-snug text-slate-600">Your name is saved with every label and check, so two people's work can be compared.</p>
           <input
             autoFocus
             value={draft}
@@ -124,12 +199,12 @@ export default function LabelView() {
             maxLength={40}
             aria-label="Your name"
             placeholder="e.g. priya"
-            className="mt-5 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-sm text-slate-900 transition-[border-color,box-shadow,background-color] focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-100"
+            className="mt-5 h-12 w-full bg-slate-100 px-3.5 text-[17px] text-slate-900 placeholder:text-slate-500 focus:outline-none"
           />
           <button
             type="submit"
             disabled={!draft.trim()}
-            className="mt-3 w-full rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-on-accent shadow-sm transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-accent-hover disabled:translate-y-0 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+            className="press mt-2 h-12 w-full bg-ink text-[17px] font-medium text-paper hover:bg-field-red hover:text-ink disabled:bg-slate-200 disabled:text-slate-500"
           >
             Start labelling
           </button>
@@ -173,92 +248,62 @@ export default function LabelView() {
     .filter((c) => !q || [c.title, c.case_id, c.court, String(c.decision_year), ...(c.sections_cited || [])].some((x) => x && String(x).toLowerCase().includes(q)))
   const loading = review === null || collected === null
 
+  const chosen = shown.find((c) => c.case_id === picked) || shown.find((c) => ['check', 'blind', 'sent'].includes(c.state.key)) || shown[0]
+
   return (
-    <div className="relative isolate min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:py-10">
-      <div aria-hidden="true" className="bg-dots pointer-events-none absolute inset-0 -z-10" />
-      <div className="mx-auto max-w-4xl space-y-5">
-        <header className="relative flex flex-wrap items-end justify-between gap-4">
-          <div aria-hidden="true" className="pointer-events-none absolute -left-24 -top-24 -z-10 h-64 w-[30rem] max-w-[120%] animate-float rounded-full bg-[radial-gradient(closest-side,var(--color-indigo-200),transparent)] opacity-50 blur-2xl" />
-          <HeaderArt>
-            <BookArt />
-          </HeaderArt>
-          <div>
-            <p className="mb-3 inline-flex animate-rise items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200 backdrop-blur">
-              <span aria-hidden="true" className="size-1.5 rounded-full bg-indigo-500" />
-              Sentence roles · InLegalBERT suggests, people decide
-            </p>
-            <h2 className="animate-rise text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl" style={stagger(1)}>
-              Label judgments
-            </h2>
-            <p className="mt-1.5 max-w-xl animate-rise text-sm text-slate-500" style={stagger(2)}>
-              Upload a judgment and InLegalBERT labels every sentence. You check what it is unsure about; a few judgments are
-              labelled blind to keep measuring it.
-            </p>
-          </div>
-          <div className="flex animate-rise items-center gap-2 rounded-xl bg-white/80 py-1.5 pl-1.5 pr-3 ring-1 ring-slate-200 backdrop-blur" style={stagger(2)}>
-            <span className="grid size-7 place-items-center rounded-lg bg-accent text-xs font-bold uppercase text-on-accent">{name.slice(0, 1)}</span>
-            <span className="text-sm">
-              <span className="block text-[11px] leading-tight text-slate-500">Labelling as</span>
-              <span className="block font-medium leading-tight text-slate-900">{name}</span>
+    <div className="min-h-0 flex-1 overflow-y-auto bg-field-black text-paper">
+      <div className="mx-auto max-w-[84rem] px-4 py-7 sm:px-8 sm:py-8">
+        <header className="text-center">
+          <CourtFront className="mx-auto h-14 w-auto animate-rise text-field-gold sm:h-16" columns={8} />
+          <h2 className="head mt-3 animate-rise" style={stagger(1)}>The cause list</h2>
+          <p className="standfirst mx-auto mt-2 animate-rise" style={stagger(2)}>
+            Every judgment on the shelf. InLegalBERT suggests a role for each sentence; you decide.
+          </p>
+          <p className="mt-2 flex animate-rise flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[15px]" style={stagger(3)}>
+            <HowItWorks />
+            <span>
+              Labelling as <b className="font-semibold">{name}</b>{' '}
+              <button
+                className="press font-medium text-field-gold underline underline-offset-4"
+                onClick={() => {
+                  writeStored('legalgpt.annotator', '')
+                  setDraft('')
+                  setName('')
+                }}
+              >
+                Change
+              </button>
             </span>
-            <button
-              className="ml-2 rounded-md px-1.5 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
-              onClick={() => {
-                writeStored('legalgpt.annotator', '')
-                setDraft('')
-                setName('')
-              }}
-            >
-              Change
-            </button>
-          </div>
-          <WhereItFits part="label" className="mt-4 animate-rise" />
+          </p>
         </header>
 
-        <HowItWorks />
-
-        <div className="animate-rise" style={stagger(4)}>
-          <UploadPanel uploader={name} onFinished={load} onOpen={openCase} />
-        </div>
-        {scheme.length > 0 && (
-          <div className="animate-rise" style={stagger(5)}>
-            <Guideline scheme={scheme} />
-          </div>
-        )}
-        {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{error}</p>}
+        {error && <p className="mt-5 text-center text-[16px] text-field-gold">{error}</p>}
 
         {loading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 4 }, (_, i) => (
-              <span key={i} className="block h-16 animate-pulse rounded-2xl bg-slate-100" />
-            ))}
-          </div>
+          <p className="text-shimmer mt-10 text-center text-lg font-medium">Taking the volumes down…</p>
         ) : cases.length === 0 ? (
-          <div className="rounded-2xl bg-white px-5 py-8 text-center text-sm text-slate-600 ring-1 ring-slate-200">
-            <p className="font-medium text-slate-800">No judgments yet</p>
-            <p className="mt-1">Upload one above to get started.</p>
-          </div>
+          <p className="mt-10 text-center text-[17px]">The shelf is empty. File a judgment below to get started.</p>
         ) : (
-          <section className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Show">
+          <section className="mt-6" aria-label="Judgments">
+            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+              <div className="flex flex-wrap gap-x-1 gap-y-1" role="tablist" aria-label="Show">
                 {FILTERS.filter(([k, , n]) => k === 'all' || n > 0).map(([k, label, n]) => (
                   <button
                     key={k}
                     role="tab"
                     aria-selected={filter === k}
                     onClick={() => setFilter(k)}
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition ${
-                      filter === k ? 'bg-accent text-on-accent ring-transparent' : 'bg-white text-slate-600 ring-slate-200 hover:text-slate-900'
-                    }`}
+                    className={`press flex h-10 items-center gap-2 border-b-2 px-2.5 text-[15px] font-medium transition-colors duration-150 ${filter === k ? 'border-field-gold text-paper' : 'border-transparent text-paper/70 hover:text-paper'}`}
                   >
-                    {label} <span className="tabular-nums opacity-70">{n}</span>
+                    {k !== 'all' && <span aria-hidden="true" className={`size-3 ${SPINE[k].split(' ')[0]}`} />}
+                    {label}
+                    <span className="tabular-nums text-paper/60">{n}</span>
                   </button>
                 ))}
               </div>
-              <label className="relative w-full sm:w-56">
+              <label className="relative w-full sm:w-72">
                 <span className="sr-only">Search judgments</span>
-                <svg {...stroke} className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400">
+                <svg {...stroke} className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-paper/60">
                   <circle cx="8.75" cy="8.75" r="5" />
                   <path d="m12.5 12.5 4 4" />
                 </svg>
@@ -267,66 +312,43 @@ export default function LabelView() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search name, court, year, section"
-                  className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                  style={{ backgroundColor: 'var(--color-field-panel)', color: 'var(--color-paper)' }}
+                  className="h-10 w-full pl-9 pr-2 text-[15px] placeholder:text-paper/60 focus:outline-none"
                 />
               </label>
             </div>
-            <ul className="space-y-2" data-testid="label-case-list">
-              {shown.map((c, i) => {
-                const qd = c.queue
-                const frac = qd?.flagged ? qd.reviewed / qd.flagged : 1
-                return (
-                  <li key={c.case_id} className="group/row relative animate-rise" style={stagger(Math.min(i, 12), 40, 200)}>
-                    <button
-                      onClick={() => setOpen({ id: c.case_id, mode: c.state.mode })}
-                      className="group flex w-full flex-wrap items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3.5 text-left ring-1 ring-slate-200 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_-14px_rgb(15_23_42/0.35)] hover:ring-indigo-300"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-slate-100 font-serif text-sm font-bold text-slate-500 transition-colors group-hover:bg-indigo-50 group-hover:text-indigo-600">§</span>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-slate-900">{c.title || qd?.title || c.case_id}</p>
-                          <p className="mt-0.5 text-xs text-slate-500">
-                            {c.state.mode === 'review' && qd
-                              ? `${qd.reviewed} of ${qd.flagged} highlighted sentences checked · ${qd.sentences} sentences`
-                              : [c.court, c.decision_year, c.sections_cited?.length ? `ss. ${c.sections_cited.slice(0, 4).join(', ')}` : '',
-                                  c.labelled_by?.length ? `labelled by ${c.labelled_by.map((n) => (n.startsWith('model:') ? 'InLegalBERT' : n)).filter((n, i, a) => a.indexOf(n) === i).join(', ')}` : '']
-                                  .filter(Boolean).join(' · ') || c.case_id}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {c.state.mode === 'review' && qd ? (
-                          <Meter value={frac} tone={frac === 1 ? 'bg-emerald-500' : 'bg-indigo-500'} className="hidden w-20 sm:block" />
-                        ) : (
-                          c.progress?.labelled > 0 && (
-                            <span className="hidden sm:block" title="Your own labels on this judgment">
-                              <ProgressBar progress={c.progress} />
-                            </span>
-                          )
-                        )}
-                        <Pill label={c.state.text} colour={c.state.tone} />
-                        <svg {...stroke} className="size-4 text-slate-300 transition-[transform,color] duration-200 group-hover:translate-x-0.5 group-hover:text-indigo-500">
-                          <path d="m7.5 5 5 5-5 5" />
-                        </svg>
-                      </div>
-                    </button>
-                    {c.state.mode === 'review' && (
-                      // a second, independent labelling of the same judgment (agreement between people)
-                      <button
-                        onClick={() => setOpen({ id: c.case_id, mode: 'blind' })}
-                        title="Label this judgment yourself with the suggestions hidden: for agreement between two people"
-                        className="absolute -bottom-2 right-12 rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500 opacity-0 ring-1 ring-slate-200 transition hover:text-indigo-700 focus-visible:opacity-100 group-hover/row:opacity-100"
-                      >
-                        Label blind instead
-                      </button>
-                    )}
-                  </li>
-                )
-              })}
-              {shown.length === 0 && <li className="px-1 py-4 text-sm text-slate-500">Nothing here{q ? ` matches "${query}"` : ''}.</li>}
-            </ul>
+
+            <div className="mt-3 overflow-x-auto pt-5">
+              <ol className="flex min-h-[16rem] items-end gap-[3px]" data-testid="label-case-list">
+                {shown.map((c, i) => (
+                  <Volume key={c.case_id} c={c} i={i} on={chosen?.case_id === c.case_id} onPick={setPicked} />
+                ))}
+                {shown.length === 0 && <li className="w-full self-center text-center text-[17px]">Nothing here{q ? ` matches "${query}"` : ''}.</li>}
+              </ol>
+              <div aria-hidden="true" className="h-2.5 min-w-full bg-field-gold" />
+              <div aria-hidden="true" className="h-1.5 min-w-full bg-[#b98a2c]" />
+            </div>
+
+            {chosen && (
+              <div className="mt-5">
+                <OpenVolume c={chosen} onOpen={() => setOpen({ id: chosen.case_id, mode: chosen.state.mode })} onBlind={() => setOpen({ id: chosen.case_id, mode: 'blind' })} />
+              </div>
+            )}
           </section>
         )}
+
+        <div className="mt-5 space-y-3">
+          <UploadPanel uploader={name} onFinished={load} onOpen={openCase} />
+          {scheme.length > 0 && (
+            <details className="group light-scope bg-white p-4 text-ink sm:px-6">
+              <summary className="press inline-flex cursor-pointer select-none items-center gap-2 text-[16px] font-medium">
+                <span aria-hidden="true" className="text-slate-500 transition-transform duration-200 group-open:rotate-90">›</span>
+                What the five labels mean
+              </summary>
+              <div className="mt-3"><Guideline scheme={scheme} /></div>
+            </details>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -25,14 +25,12 @@ function Checks({ result, label = 'Proof' }) {
   return (
     <div className="space-y-1" data-testid="zk-checks">
       <span
-        className={`inline-block rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ${
-          result.valid ? 'bg-emerald-50 text-emerald-800 ring-emerald-200' : 'bg-red-50 text-red-700 ring-red-200'
-        }`}
+        className={`inline-block text-[15px] font-semibold ${result.valid ? 'text-emerald-700' : 'text-red-700'}`}
         data-testid="zk-badge"
       >
         {result.valid ? `${label} verified ✓` : 'Verification failed ✗'}
       </span>
-      <ul className="space-y-0.5 text-xs">
+      <ul className="space-y-0.5 text-[14px]">
         {result.checks.map((c) => (
           <li key={c.name} className={c.ok ? 'text-slate-600' : 'text-red-700'}>
             {c.ok ? '✓' : '✗'} {c.name}
@@ -88,12 +86,9 @@ export function VerdictProof({ result }) {
   const proven = check?.cited
 
   return (
-    <section className="space-y-2 rounded-xl bg-white p-4 text-sm ring-1 ring-slate-200" data-testid="zk-verdict">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="font-semibold text-slate-800">Zero-knowledge proof</h3>
-        <span className="text-xs text-slate-500">Halo2 via EZKL</span>
-      </div>
-      <p className="text-xs text-slate-600">
+    <section className="space-y-3 border-t-2 border-ink pt-4 text-[15px]" data-testid="zk-verdict">
+      <h3 className="text-[1.375rem] leading-tight tracking-[-0.03em] text-slate-900">Seal this finding</h3>
+      <p className="max-w-2xl leading-snug text-slate-700">
         Proves that this verdict is what the published rules give for the extracted facts, without revealing the facts:
         the proof contains only a hash of them. It does <b>not</b> prove the facts were extracted correctly.
       </p>
@@ -102,7 +97,7 @@ export function VerdictProof({ result }) {
           type="button"
           onClick={prove}
           disabled={!!busy}
-          className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-50 hover:bg-slate-900 disabled:opacity-50"
+          className="press h-10 bg-accent px-4 text-[15px] font-medium text-on-accent hover:bg-accent-hover disabled:opacity-50"
           data-testid="zk-prove"
         >
           {busy === 'prove' ? 'Generating proof…' : bundle ? 'Generate again' : 'Generate proof'}
@@ -113,7 +108,7 @@ export function VerdictProof({ result }) {
               type="button"
               onClick={verify}
               disabled={!!busy}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:opacity-50"
+              className="press h-10 bg-slate-100 px-4 text-[15px] font-medium text-slate-900 hover:bg-slate-200 disabled:opacity-50"
               data-testid="zk-verify"
             >
               {busy === 'verify' ? 'Verifying…' : 'Verify proof'}
@@ -121,20 +116,20 @@ export function VerdictProof({ result }) {
             <button
               type="button"
               onClick={() => download(`verdict-proof-s${result.cited_section}.json`, bundle)}
-              className="text-xs text-indigo-600 hover:underline"
+              className="text-[15px] font-medium text-indigo-600 underline underline-offset-2"
             >
               Download proof
             </button>
-            <span className="text-xs text-slate-500">
+            <span className="text-[14px] text-slate-500">
               made in {bundle.prove_seconds}s · {kb(bundle.proof)}
             </span>
           </>
         )}
       </div>
-      {error && <p className="text-xs text-red-700">{error}</p>}
+      {error && <p className="text-[15px] text-red-700">{error}</p>}
       {check && <Checks result={check} />}
       {proven && (
-        <p className="text-xs text-slate-700">
+        <p className="text-[15px] text-slate-700">
           The proof says s.{proven.section} is <b>{proven.status}</b>: {proven.elements.filter((e) => e.status === 'satisfied').length} of{' '}
           {proven.elements.length} elements satisfied.
           {proven.status !== result.status && <b className="text-red-700"> This differs from the result shown above.</b>}
@@ -145,7 +140,7 @@ export function VerdictProof({ result }) {
 }
 
 /** Chat answer: signature check of the signed record, and a proof that the sources were not cherry-picked. */
-export function AnswerProof({ msg }) {
+export function AnswerProof({ msg, embedded = false }) {
   const manifest = useZkManifest()
   const [sig, setSig] = useState(null)
   const [retr, setRetr] = useState(null)
@@ -172,7 +167,7 @@ export function AnswerProof({ msg }) {
     setBusy('retr')
     setError('')
     try {
-      const bundle = await zkApi.proveRetrieval(msg.retrieval?.translation?.text || msg.question, att.record?.retrieval_rewrite)
+      const bundle = await zkApi.proveRetrieval(msg.retrieval?.translation?.text || msg.retrieval?.searched || msg.question, att.record?.retrieval_rewrite)
       const check = await zkApi.verify(bundle)
       // the proof covers the IPC index; judgment passages come from a separate collection
       const shown = (msg.sources || []).filter((s) => s.kind !== 'judgment').map((s) => s.chunk_id)
@@ -185,11 +180,11 @@ export function AnswerProof({ msg }) {
   }
 
   return (
-    <details className="mt-2 text-xs text-slate-600" data-testid="answer-proof">
-      <summary className="cursor-pointer select-none">
+    <details className="mt-2 text-[14px] text-slate-600" data-testid="answer-proof" open={embedded || undefined}>
+      <summary className={embedded ? 'hidden' : 'cursor-pointer select-none'}>
         <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-700">Signed</span> verifiable answer
       </summary>
-      <div className="mt-2 space-y-2 rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+      <div className="mt-2 space-y-2">
         <p>
           This server signed a record of the question, the exact prompt, the cited sections and this answer (Ed25519). That
           proves where the answer came from and that it was not changed — not that it is legally right.
@@ -203,7 +198,7 @@ export function AnswerProof({ msg }) {
               type="button"
               onClick={proveSources}
               disabled={!!busy}
-              className="rounded-md bg-slate-800 px-2 py-1 font-medium text-slate-50 hover:bg-slate-900 disabled:opacity-50"
+              className="press bg-accent px-3 py-1.5 font-medium text-on-accent hover:bg-accent-hover disabled:opacity-50"
               data-testid="zk-prove-retrieval"
             >
               {busy === 'retr' ? 'Proving (about 10 s)…' : 'Prove the sources'}

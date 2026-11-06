@@ -1,18 +1,6 @@
-import { useEffect, useState } from 'react'
-import { ruleSectionsOnce } from '../api.js'
-import { sendTo } from '../handoff.js'
-
-// The stages one answer went through, in order, each tagged with its module (System overview):
-// translation, retrieval, judgment passages, the model, the source check, BNS, the signature.
-// A stage opens its detail (the Why panel, a source, the proof); "Check the facts" hands the
-// question to the rule engine in the Verify tab.
-
-function open(container, testid) {
-  const el = container?.querySelector(`[data-testid="${testid}"]`)
-  if (!el) return
-  el.open = true
-  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-}
+// The stages one answer went through, in order, each tagged with its module (Overview): translation,
+// retrieval, judgment passages, the model, the source check, BNS, the signature. A stage opens its
+// detail in the record under the answer.
 
 function Step({ module, children, onClick, title, tone = 'default' }) {
   const tones = {
@@ -25,9 +13,9 @@ function Step({ module, children, onClick, title, tone = 'default' }) {
     <Tag
       {...(onClick ? { type: 'button', onClick } : {})}
       title={title}
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] ring-1 transition ${tones[tone]}`}
+      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] ring-1 transition ${tones[tone]}`}
     >
-      {module && <span className="font-mono text-[9.5px] font-semibold text-indigo-600/80">{module}</span>}
+      {module && <span className="text-[11px] font-semibold text-indigo-600">{module}</span>}
       {children}
     </Tag>
   )
@@ -39,15 +27,7 @@ const Arrow = () => (
   </span>
 )
 
-export default function AnswerTrace({ msg, containerRef, onCite }) {
-  const [rules, setRules] = useState([])
-  useEffect(() => {
-    let alive = true
-    ruleSectionsOnce().then((r) => alive && setRules(r))
-    return () => {
-      alive = false
-    }
-  }, [])
+export default function AnswerTrace({ msg, onCite, goTo }) {
   if (msg.mode !== 'legal' || msg.error || !msg.retrieval || (!msg.explanation && !msg.refused)) return null
 
   const r = msg.retrieval
@@ -57,21 +37,22 @@ export default function AnswerTrace({ msg, containerRef, onCite }) {
   const ex = msg.explanation
   const claims = (ex?.attributions || []).filter((a) => a.kind !== 'analysis')
   const supported = claims.filter((a) => a.supported).length
-  const why = () => open(containerRef.current, 'why-panel')
-  // the first cited IPC section the rule engine encodes: its facts can be checked there
-  const ruleSection = (s) => (s.doc_id === 'BNS' ? s.ipc?.find((x) => rules.includes(x)) : rules.includes(s.section) ? s.section : null)
-  const checkable = statutes.find((s) => cited.has(s.marker) && ruleSection(s))
-  const checkSection = checkable && ruleSection(checkable)
+  const why = () => goTo('check')
   const steps = []
 
   if (r.translation?.failed)
     return (
       <div className="mt-3 flex flex-wrap items-center gap-1.5" data-testid="answer-trace">
-        <span className="mr-0.5 text-[11px] font-medium text-slate-400">Pipeline</span>
         <Step tone="warn" title="No model could translate the question (usage limits), so the IPC was not searched">
           Hindi → English failed · not searched
         </Step>
       </div>
+    )
+  if (r.background_ignored?.length)
+    steps.push(
+      <Step key="bg" onClick={why} title="Searched on the facts only">
+        Left out of the search, because the law does not turn on it: {r.background_ignored.join(' · ')}
+      </Step>,
     )
   if (r.translation)
     steps.push(
@@ -124,25 +105,14 @@ export default function AnswerTrace({ msg, containerRef, onCite }) {
   }
   if (msg.attestation)
     steps.push(
-      <Step key="sig" onClick={() => open(containerRef.current, 'answer-proof')} title="A signed record of this answer; the sources can be proved in zero knowledge">
+      <Step key="sig" title="A signed record of this answer; the sources can be proved in zero knowledge">
         signed
       </Step>,
     )
 
   return (
     <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1.5" data-testid="answer-trace" aria-label="How this answer was produced">
-      <span className="mr-0.5 text-[11px] font-medium text-slate-400">Pipeline</span>
       {steps.flatMap((s, i) => (i ? [<Arrow key={`a${i}`} />, s] : [s]))}
-      {checkable && (
-        <button
-          type="button"
-          onClick={() => sendTo('verify', { text: msg.question, section: checkSection })}
-          className="ml-auto inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-medium text-indigo-700 ring-1 ring-indigo-200 transition hover:bg-indigo-100"
-          title={`Open the Verify tab with your question and IPC s.${checkSection}: the facts are tested against its elements, written as Prolog rules`}
-        >
-          <span className="font-mono text-[9.5px] font-semibold">M5</span> Check the facts against s.{checkSection}{checkable.doc_id === 'BNS' ? ' IPC' : ''} →
-        </button>
-      )}
     </div>
   )
 }

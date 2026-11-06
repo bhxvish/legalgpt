@@ -1,30 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { API_BASE_URL, streamChat, verifyApi } from '../api.js'
+import { modelLabel } from '../modelNames.js'
 import { chatTitle, loadChats, newId, relativeTime, saveChats } from '../chatStore.js'
 import { CloseIcon, NewChatIcon, SearchIcon, SendIcon, SidebarIcon, StopIcon, TrashIcon } from './icons.jsx'
-import { ChakraBackdrop } from './Chakra.jsx'
 import { LogoMark } from './LawArt.jsx'
 import { SlidingPill, stagger } from './motion.jsx'
+import { Lines } from './Chapter.jsx'
+import { Scales, Stamp } from './LegalArt.jsx'
+import Select from './Select.jsx'
 import SourceModal from './SourceModal.jsx'
 import { VerificationResultView } from './VerifyPanel.jsx'
-import WhyPanel from './WhyPanel.jsx'
-import { AnswerProof } from './ZkProof.jsx'
-import AnswerTrace from './AnswerTrace.jsx'
+import AnswerRecord from './AnswerRecord.jsx'
 
 const HISTORY_MESSAGES = 6
-
-const PROVIDER_NAMES = { gemini: 'Gemini', openai: 'OpenAI', openrouter: 'OpenRouter' }
-
-/** Short name for the model switch: "gemini:gemini-2.5-flash" -> "Gemini 2.5 flash". */
-function modelLabel(id) {
-  if (id === 'adapter') return 'Local (LoRA)'
-  if (id === 'local-heavy') return 'Local heavy (7B)'
-  if (id === 'groq') return 'Base (Groq)'
-  const [provider, model = ''] = id.split(/:(.*)/s)
-  if (provider === 'openai') return model.replace(/^gpt/, 'GPT').replace(/-(mini|nano|pro)$/, ' $1') // "GPT-5.4 mini"
-  const name = model.split('/').pop().replace(/^gemini-/, '').replace(/-/g, ' ')
-  return `${PROVIDER_NAMES[provider] || provider} ${name}`.trim()
-}
 
 const EXAMPLES = [
   'What is the punishment for causing death by negligence?',
@@ -37,9 +25,9 @@ const SIDEBAR_KEY = 'legalgpt.sidebar'
 
 function readSidebar() {
   try {
-    return localStorage.getItem(SIDEBAR_KEY) !== '0' // open unless the user closed it
+    return localStorage.getItem(SIDEBAR_KEY) === '1' // closed unless the user opened it
   } catch {
-    return true
+    return false
   }
 }
 
@@ -53,7 +41,7 @@ function Inline({ text, byMarker, onCite }) {
         <button
           key={pi}
           onClick={() => onCite(source)}
-          className="mx-0.5 rounded bg-indigo-50 px-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-100"
+          className="relative -top-[0.42em] mx-px rounded-sm px-px font-sans text-[0.68em] font-semibold leading-none text-indigo-600 hover:bg-indigo-100 hover:text-indigo-800"
           title={source.citation_path}
           aria-label={`Source ${source.marker}: ${source.citation_path}`}
           data-testid="citation-marker"
@@ -94,10 +82,10 @@ export function AnswerText({ text, sources, onCite, caret = false }) {
       const body = rows.filter((r) => !isTableRule(r)).map(cells)
       const head = hasHeader ? body.shift() : null
       blocks.push(
-        <div key={i} className="my-3 overflow-x-auto rounded-xl ring-1 ring-slate-200" data-testid="answer-table">
-          <table className="w-full border-collapse text-left text-sm">
+        <div key={i} className="my-4 overflow-x-auto border-y border-rule" data-testid="answer-table">
+          <table className="w-full border-collapse text-left font-sans text-sm">
             {head && (
-              <thead className="bg-slate-50 text-slate-700">
+              <thead className="text-slate-900">
                 <tr>
                   {head.map((c, ci) => (
                     <th key={ci} scope="col" className="border-b border-slate-200 px-3 py-2 font-semibold">
@@ -130,7 +118,7 @@ export function AnswerText({ text, sources, onCite, caret = false }) {
     const heading = /^\s*#{1,6}\s+(.*)$/.exec(line)
     if (heading) {
       blocks.push(
-        <p key={i} className="mb-1 mt-3 font-semibold text-slate-900" role="heading" aria-level={3}>
+        <p key={i} className="mb-1 mt-6 font-sans text-[1.3rem] font-semibold leading-snug tracking-[-0.025em] text-slate-900 first:mt-0" role="heading" aria-level={3}>
           <Inline text={heading[1]} byMarker={byMarker} onCite={onCite} />
         </p>,
       )
@@ -139,7 +127,7 @@ export function AnswerText({ text, sources, onCite, caret = false }) {
     const bullet = /^\s*[*-]\s+/.exec(line)
     const body = bullet ? line.slice(bullet[0].length) : line
     blocks.push(
-      <p key={i} className={`min-h-[1em] break-words ${bullet ? 'relative my-1 pl-5 before:absolute before:left-1.5 before:top-[0.7em] before:size-1.5 before:rounded-full before:bg-slate-400' : ''}`}>
+      <p key={i} className={`min-h-[0.75em] break-words ${bullet ? 'relative my-1.5 pl-5 before:absolute before:left-0.5 before:top-[0.8em] before:h-px before:w-2.5 before:bg-indigo-500' : ''}`}>
         <Inline text={body} byMarker={byMarker} onCite={onCite} />
         {caret && i === lines.length - 1 && (
           <span aria-hidden="true" className="ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[0.18em] animate-caret rounded-full bg-indigo-500" />
@@ -157,8 +145,8 @@ function ModeToggle({ mode, setMode, disabled }) {
   ]
   const ref = useRef(null)
   return (
-    <div ref={ref} role="radiogroup" aria-label="Answer mode" className="relative inline-flex rounded-lg bg-slate-100 p-0.5">
-      <SlidingPill containerRef={ref} selector='[aria-checked="true"]' deps={[mode]} className="rounded-md bg-white shadow-sm ring-1 ring-slate-900/5" />
+    <div ref={ref} role="radiogroup" aria-label="Answer mode" className="relative inline-flex">
+      <SlidingPill containerRef={ref} selector='[aria-checked="true"]' deps={[mode]} className="border-b-2 border-indigo-500" />
       {options.map((o) => (
         <button
           key={o.value}
@@ -167,7 +155,7 @@ function ModeToggle({ mode, setMode, disabled }) {
           title={o.hint}
           disabled={disabled}
           onClick={() => setMode(o.value)}
-          className={`relative rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${
+          className={`relative px-2 py-1 text-sm font-medium disabled:opacity-50 ${
             mode === o.value ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'
           }`}
         >
@@ -188,8 +176,8 @@ function LawToggle({ law, setLaw, disabled }) {
   ]
   const ref = useRef(null)
   return (
-    <div ref={ref} role="radiogroup" aria-label="Law" className="relative inline-flex rounded-lg bg-slate-100 p-0.5" data-testid="law-toggle">
-      <SlidingPill containerRef={ref} selector='[aria-checked="true"]' deps={[law]} className="rounded-md bg-white shadow-sm ring-1 ring-slate-900/5" />
+    <div ref={ref} role="radiogroup" aria-label="Law" className="relative inline-flex" data-testid="law-toggle">
+      <SlidingPill containerRef={ref} selector='[aria-checked="true"]' deps={[law]} className="border-b-2 border-indigo-500" />
       {options.map((o) => (
         <button
           key={o.value}
@@ -198,7 +186,7 @@ function LawToggle({ law, setLaw, disabled }) {
           title={o.hint}
           disabled={disabled}
           onClick={() => setLaw(o.value)}
-          className={`relative rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${
+          className={`relative px-2 py-1 text-sm font-medium disabled:opacity-50 ${
             law === o.value ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'
           }`}
         >
@@ -209,38 +197,34 @@ function LawToggle({ law, setLaw, disabled }) {
   )
 }
 
-const ScalesMini = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="size-3.5 shrink-0">
-    <path d="M12 3.5v16M8 20.5h8M4.5 6.5h15M4.5 6.5 2 13M4.5 6.5 7 13M1.8 13a2.7 2.7 0 0 0 5.4 0ZM19.5 6.5 17 13M19.5 6.5 22 13M16.8 13a2.7 2.7 0 0 0 5.4 0Z" />
-  </svg>
-)
-
-function AssistantMessage({ msg, onCite, live = false }) {
-  const box = useRef(null)
+function AssistantMessage({ msg, onCite, live = false, onUpdate }) {
   const cited = new Set([...(msg.content || '').matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])))
   const tone = msg.error
-    ? 'bg-red-50 ring-red-200'
+    ? 'rounded-2xl bg-red-50 px-4 py-3.5 ring-1 ring-red-200 sm:px-5 sm:py-4'
     : msg.refused
-      ? 'bg-amber-50 ring-amber-200'
-      : 'bg-white ring-slate-200'
+      ? 'rounded-2xl bg-amber-50 px-4 py-3.5 ring-1 ring-amber-200 sm:px-5 sm:py-4'
+      : ''
   return (
-    <div ref={box} className={`w-full min-w-0 rounded-2xl px-4 py-3.5 text-[0.9375rem] leading-relaxed text-slate-800 shadow-[0_1px_2px_rgb(15_23_42/0.04)] ring-1 sm:px-5 sm:py-4 ${tone}`} data-testid="assistant-message">
-      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-        <LogoMark className="size-6 rounded-md" />
-        <span className="font-medium text-slate-700">{msg.mode === 'general' ? 'General answer' : 'Legal answer'}</span>
-        {msg.model && <span className="max-w-full truncate rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px]" data-testid="answer-model">{msg.model}</span>}
+    <div className={`w-full min-w-0 text-[0.9375rem] leading-relaxed text-slate-800 ${tone}`} data-testid="assistant-message">
+      <div className="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-slate-500">
+        <LogoMark className="size-5" />
+        <span className="font-medium text-slate-800">{msg.mode === 'general' ? 'General answer' : 'Legal answer'}</span>
         {msg.retrieval?.law && (
-          <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 font-medium text-indigo-700 ring-1 ring-indigo-200" title={`Answered under the ${msg.retrieval.law === 'bns' ? 'Bharatiya Nyaya Sanhita, 2023' : 'Indian Penal Code, 1860'}: ${msg.retrieval.law_reason}`}>
+          <span className="font-medium text-indigo-600" title={`Answered under the ${msg.retrieval.law === 'bns' ? 'Bharatiya Nyaya Sanhita, 2023' : 'Indian Penal Code, 1860'}: ${msg.retrieval.law_reason}`}>
             {msg.retrieval.law.toUpperCase()}
           </span>
         )}
-        {msg.refused && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">Out of scope</span>}
+        {msg.model && <span className="max-w-full truncate font-mono text-[11px] text-slate-400" data-testid="answer-model">{msg.model}</span>}
+        {msg.refused && <span className="font-medium text-amber-800">Out of scope</span>}
+        {!live && !msg.error && !msg.refused && cited.size > 0 && <Stamp className="ml-auto text-indigo-600">Cited</Stamp>}
       </div>
       {msg.content ? (
-        <AnswerText text={msg.content} sources={msg.sources} onCite={onCite} caret={live} />
+        <div className="reading">
+          <AnswerText text={msg.content} sources={msg.sources} onCite={onCite} caret={live} />
+        </div>
       ) : (
         !msg.error && (
-          <p className="text-shimmer font-medium">
+          <p className="text-shimmer text-lg font-medium">
             {msg.mode === 'legal' && !msg.sources?.length && !msg.model ? 'Searching the IPC…' : 'Writing the answer…'}
             {msg.model?.includes('+lora') && (
               <span className="mt-1 block text-xs">
@@ -252,92 +236,7 @@ function AssistantMessage({ msg, onCite, live = false }) {
         )
       )}
       {msg.error && <p className="mt-1 text-red-700">Error: {msg.error}</p>}
-      {(() => {
-        // IPC sections cited in the answer, with their BNS equivalent (BPRD correspondence table)
-        const cited = new Set([...(msg.content || '').matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])))
-        const seen = new Set()
-        const bnsRows = (msg.sources || []).filter((s) => s.doc_id === 'BNS' && s.ipc?.length && cited.has(s.marker) && !seen.has(s.section) && seen.add(s.section))
-        if (bnsRows.length > 0 && !msg.refused)
-          return (
-            <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200" data-testid="ipc-line">
-              <span className="font-medium text-slate-700">Answered under the BNS; before 1 July 2024:</span>
-              {bnsRows.map((s) => (
-                <span key={s.section} className="whitespace-nowrap">
-                  s.{s.section} BNS ← {s.ipc[0] === 'new' ? <i>new provision</i> : <b className="font-semibold text-slate-800">s.{s.ipc.slice(0, 4).join(', ')} IPC</b>}
-                </span>
-              ))}
-            </p>
-          )
-        const rows = (msg.sources || []).filter((s) => s.kind !== 'judgment' && s.section && s.bns?.length && cited.has(s.marker) && !seen.has(s.section) && seen.add(s.section))
-        return rows.length > 0 && !msg.refused ? (
-          <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200" data-testid="bns-line">
-            <span className="font-medium text-slate-700">Under the BNS (since 1 July 2024):</span>
-            {rows.map((s) => (
-              <span key={s.section} className="whitespace-nowrap">
-                s.{s.section} IPC → {s.bns[0] === 'none' ? <i>no direct equivalent</i> : <b className="font-semibold text-slate-800">s.{s.bns.join(', ')} BNS</b>}
-              </span>
-            ))}
-          </p>
-        ) : null
-      })()}
-      {msg.sources?.length > 0 && (
-        <div className="mt-3 border-t border-slate-100 pt-2">
-          <p className="mb-1 text-xs font-medium text-slate-500">
-            Sources
-            {cited.size > 0 && <span className="font-normal text-slate-400"> · highlighted = cited in the answer</span>}
-          </p>
-          <ul className="flex flex-wrap gap-1.5">
-            {msg.sources.map((s, si) => (
-              <li key={s.chunk_id} className="animate-rise" style={stagger(si, 45)}>
-                <button
-                  onClick={() => onCite(s)}
-                  title={`${cited.has(s.marker) ? 'Cited in the answer' : 'Retrieved but not cited'}: open the ${s.kind === 'judgment' ? 'judgment passage' : 'IPC text'}`}
-                  className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-left text-xs ring-1 hover:brightness-95 ${
-                    s.kind === 'judgment'
-                      ? cited.has(s.marker)
-                        ? 'bg-amber-50 font-medium text-amber-900 ring-amber-200'
-                        : 'bg-white text-slate-500 ring-slate-200'
-                      : cited.has(s.marker)
-                        ? 'bg-indigo-50 font-medium text-indigo-900 ring-indigo-200'
-                        : 'bg-white text-slate-500 ring-slate-200'
-                  }`}
-                  data-testid="source-chip"
-                  data-kind={s.kind || 'statute'}
-                  data-cited={cited.has(s.marker)}
-                >
-                  <span className="font-semibold">[{s.marker}]</span>
-                  {s.kind === 'judgment' ? (
-                    <>
-                      <ScalesMini />
-                      <span className="max-w-[18rem] truncate">{s.title}</span>
-                      <span className="opacity-70">({[s.court?.includes('Supreme') ? 'SC' : '', s.year].filter(Boolean).join(', ')})</span>
-                    </>
-                  ) : (
-                    <span>
-                      {s.doc_id === 'BNS' && <span className="mr-1 font-semibold">BNS</span>}
-                      {s.section ? `§${s.section}` : s.citation_path}
-                      {s.title ? ` ${s.title}` : ''}
-                      {s.ipc?.length > 0 && (
-                        <span className="ml-1.5 rounded bg-white/70 px-1 py-px font-mono text-[10px] font-medium text-slate-500 ring-1 ring-slate-200" title="The IPC section this BNS section replaced">
-                          {s.ipc[0] === 'new' ? 'new in BNS' : `IPC ${s.ipc.slice(0, 4).join(', ')}`}
-                        </span>
-                      )}
-                      {s.bns?.length > 0 && (
-                        <span className="ml-1.5 rounded bg-white/70 px-1 py-px font-mono text-[10px] font-medium text-slate-500 ring-1 ring-slate-200" title="Bharatiya Nyaya Sanhita, 2023 equivalent">
-                          {s.bns[0] === 'none' ? 'no BNS' : `BNS ${s.bns.join(', ')}`}
-                        </span>
-                      )}
-                    </span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <AnswerTrace msg={msg} containerRef={box} onCite={onCite} />
-      {msg.explanation && <WhyPanel explanation={msg.explanation} sources={msg.sources} retrieval={msg.retrieval} onOpenSource={onCite} />}
-      <AnswerProof msg={msg} />
+      <AnswerRecord msg={msg} live={live} onCite={onCite} onUpdate={onUpdate} />
       {msg.verifySection && !msg.verification && !msg.error && (
         <p className="text-shimmer mt-3 text-xs font-medium">Checking the facts against s.{msg.verifySection}…</p>
       )}
@@ -349,7 +248,7 @@ function AssistantMessage({ msg, onCite, live = false }) {
         ) : (
           <div className="mt-3">
             <p className="mb-1 text-xs font-medium text-slate-500">Rule check of the facts in your question</p>
-            <VerificationResultView result={msg.verification} className="space-y-3 rounded-lg bg-slate-50 p-3 text-xs ring-1 ring-slate-200" />
+            <VerificationResultView result={msg.verification} compact />
           </div>
         ))}
     </div>
@@ -380,7 +279,7 @@ function ChatHistory({ chats, activeId, streamingChatId, onSelect, onNew, onDele
     groups.at(-1).chats.push(c)
   }
   return (
-    <aside className={`flex h-full min-h-0 flex-col bg-white ${className}`} aria-label="Chat history" data-testid="chat-history">
+    <aside className={`flex h-full min-h-0 flex-col bg-slate-50 ${className}`} aria-label="Chat history" data-testid="chat-history">
       <div className="flex items-center gap-1 px-3 pb-2 pt-3">
         <button
           type="button"
@@ -391,11 +290,11 @@ function ChatHistory({ chats, activeId, streamingChatId, onSelect, onNew, onDele
         >
           <SidebarIcon />
         </button>
-        <span className="flex-1 pl-1 text-sm font-semibold text-slate-900">Chats</span>
+        <span className="flex-1 pl-1 text-lg font-semibold tracking-[-0.02em] text-slate-900">Chats</span>
         <button
           type="button"
           onClick={onNew}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-on-accent shadow-sm hover:bg-accent-hover"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-slate-800 ring-1 ring-slate-300 hover:text-slate-950 hover:ring-slate-900"
           data-testid="new-chat"
         >
           <NewChatIcon className="size-4" />
@@ -411,7 +310,7 @@ function ChatHistory({ chats, activeId, streamingChatId, onSelect, onNew, onDele
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search chats"
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:outline-none"
+            className="w-full rounded-lg border border-slate-200 bg-transparent py-1.5 pl-8 pr-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-rule focus:outline-none"
             data-testid="chat-search"
           />
         </label>
@@ -425,7 +324,7 @@ function ChatHistory({ chats, activeId, streamingChatId, onSelect, onNew, onDele
         {chats.length > 0 && shown.length === 0 && <p className="px-3 py-4 text-sm text-slate-500">No chat matches "{query}".</p>}
         {groups.map((g) => (
           <section key={g.label} className="mt-2 first:mt-0">
-            <h3 className="px-2.5 pb-1 pt-2 text-xs font-medium text-slate-400">{g.label}</h3>
+            <h3 className="px-2.5 pb-1 pt-2 text-[13px] font-medium text-slate-500">{g.label}</h3>
             <ul className="space-y-0.5">
               {g.chats.map((c) => (
                 <li key={c.id} className="group relative">
@@ -434,7 +333,7 @@ function ChatHistory({ chats, activeId, streamingChatId, onSelect, onNew, onDele
                     onClick={() => onSelect(c.id)}
                     aria-current={c.id === activeId ? 'true' : undefined}
                     className={`w-full rounded-lg py-2 pl-2.5 pr-9 text-left text-sm ${
-                      c.id === activeId ? 'bg-indigo-50 text-indigo-900' : 'text-slate-700 hover:bg-slate-100'
+                      c.id === activeId ? 'bg-slate-100 text-slate-950 shadow-[inset_2px_0_0_var(--color-indigo-600)]' : 'text-slate-700 hover:bg-slate-100'
                     }`}
                     title={c.title}
                     data-testid="chat-history-item"
@@ -511,13 +410,12 @@ export default function ChatWindow() {
   const abortRef = useRef(null)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
-  const modelRef = useRef(null)
 
   const streaming = streamingChatId !== null
   const messages = chats.find((c) => c.id === activeId)?.messages || []
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: 'end' })
+    if (messages.length) bottomRef.current?.scrollIntoView({ block: 'end' }) // an empty chat stays at its title
   }, [messages])
 
   // the question box grows with its text (up to max-h-52, then scrolls)
@@ -564,7 +462,7 @@ export default function ChatWindow() {
       const verify = mode === 'legal' && verifySection ? verifySection : null
       const added = [
         { id: newId(), role: 'user', content: question, mode },
-        { id: botId, role: 'assistant', content: '', mode, question, sources: [], verifySection: verify },
+        { id: botId, role: 'assistant', content: '', mode, question, sources: [], verifySection: verify, modelKey: model, law },
       ]
       const chatId = activeId || newId()
       const now = Date.now()
@@ -591,6 +489,7 @@ export default function ChatWindow() {
             else if (event === 'verification') upd((m) => ({ ...m, verification: data }))
             else if (event === 'attestation') upd((m) => ({ ...m, attestation: data }))
             else if (event === 'retrieval') upd((m) => ({ ...m, retrieval: data }))
+            else if (event === 'cut_off') upd((m) => ({ ...m, cutOff: true }))
             else if (event === 'error') upd((m) => ({ ...m, error: data.message }))
           },
           controller.signal,
@@ -603,8 +502,17 @@ export default function ChatWindow() {
         abortRef.current = null
       }
     },
-    [messages, mode, streaming, model, verifySection, activeId],
+    [messages, mode, streaming, model, verifySection, activeId, law],
   )
+
+  // the question box on the Overview hands its question to the chat
+  const sendRef = useRef(send)
+  sendRef.current = send
+  useEffect(() => {
+    const onAsk = (e) => sendRef.current(e.detail)
+    window.addEventListener('legalgpt:ask', onAsk)
+    return () => window.removeEventListener('legalgpt:ask', onAsk)
+  }, [])
 
   useEffect(() => {
     try {
@@ -735,14 +643,12 @@ export default function ChatWindow() {
         </div>
       </div>
 
-      <div className="relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <div aria-hidden="true" className="bg-dots pointer-events-none absolute inset-0 -z-10" />
-        <ChakraBackdrop chatting={messages.length > 0} busy={streaming && streamingChatId === activeId} />
+      <div className={`relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-colors duration-500 ${messages.length ? '' : 'bg-field-gold text-ink'}`}>
         <div className="flex h-12 shrink-0 items-center gap-1 px-2 sm:px-3">
           <button
             type="button"
             onClick={toggleHistory}
-            className={`grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 ${sidebarOpen ? 'md:hidden' : ''}`}
+            className={`press grid size-9 place-items-center rounded-lg ${messages.length ? 'text-slate-500 hover:bg-slate-100 hover:text-slate-900' : 'text-ink hover:bg-ink/10'} ${sidebarOpen ? 'md:hidden' : ''}`}
             aria-label="Open chat list"
             aria-expanded={sidebarOpen}
             title="Open chat list (Ctrl+B)"
@@ -754,14 +660,14 @@ export default function ChatWindow() {
             <button
               type="button"
               onClick={newChat}
-              className="hidden size-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 md:grid"
+              className={`press hidden size-9 place-items-center rounded-lg md:grid ${messages.length ? 'text-slate-500 hover:bg-slate-100 hover:text-slate-900' : 'text-ink hover:bg-ink/10'}`}
               aria-label="New chat"
               title="New chat"
             >
               <NewChatIcon />
             </button>
           )}
-          <h2 className="min-w-0 flex-1 truncate px-1 text-sm font-medium text-slate-700" data-testid="chat-title">
+          <h2 className={`min-w-0 flex-1 truncate px-1 text-[15px] font-medium text-slate-500 ${messages.length ? '' : 'invisible'}`} data-testid="chat-title">
             {activeTitle || 'New chat'}
           </h2>
           {messages.length > 0 && (
@@ -776,47 +682,48 @@ export default function ChatWindow() {
             </button>
           )}
         </div>
-        <div className="fade-edges min-h-0 flex-1 overflow-y-auto px-3 py-6 sm:px-4 sm:py-8" data-testid="message-list">
-          <div className="mx-auto flex max-w-3xl flex-col gap-5">
+        <div className={`min-h-0 flex-1 overflow-y-auto ${messages.length ? 'fade-edges px-3 py-6 sm:px-4 sm:py-8' : 'px-4 pb-4 sm:px-8'}`} data-testid="message-list">
+          <div className={`mx-auto flex flex-col ${messages.length ? 'max-w-[44rem]' : 'h-full max-w-none'}`}>
             {messages.length === 0 && (
-              <div className="relative mt-6 sm:mt-14">
-                <div aria-hidden="true" className="pointer-events-none absolute -left-24 -top-28 h-72 w-[34rem] max-w-[120%] animate-float rounded-full bg-[radial-gradient(closest-side,var(--color-indigo-200),transparent)] opacity-50 blur-2xl" />
-                <p className="relative mb-3 inline-flex animate-rise items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200 backdrop-blur">
-                  <span aria-hidden="true" className="size-1.5 rounded-full bg-emerald-500" />
-                  Grounded in the IPC text, with a source for every claim
-                </p>
-                <h2 className="relative animate-rise text-2xl font-semibold tracking-tight text-slate-900 sm:text-4xl" style={stagger(1)}>Ask about the Indian Penal Code</h2>
-                <p className="relative mt-3 max-w-xl animate-rise text-sm leading-relaxed text-slate-500 sm:text-[0.9375rem]" style={stagger(2)}>
-                  Legal mode answers only from IPC text and cites each source, so you can open the section it relied on.
-                  General mode skips retrieval. Describe what happened in plain words; you do not need section numbers.
-                </p>
-                <p className="relative mt-8 animate-rise text-xs font-medium text-slate-500" style={stagger(3)}>Try one of these</p>
-                <div className="relative mt-2 grid gap-2 sm:grid-cols-2">
-                  {EXAMPLES.map((q, qi) => (
-                    <button
-                      key={q}
-                      style={stagger(qi, 70, 240)}
-                      onClick={() => send(q)}
-                      disabled={streaming}
-                      className="group flex animate-rise items-start justify-between gap-3 rounded-xl bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-[0_1px_2px_rgb(15_23_42/0.04)] ring-1 ring-slate-200 transition-[transform,box-shadow,background-color] duration-200 hover:-translate-y-0.5 hover:bg-indigo-50/40 hover:shadow-[0_10px_24px_-14px_rgb(15_23_42/0.35)] hover:ring-indigo-300 disabled:opacity-50"
-                    >
-                      <span>{q}</span>
-                      <span aria-hidden="true" className="text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-indigo-600">→</span>
-                    </button>
-                  ))}
+              <div className="flex min-h-full flex-col justify-between gap-8">
+                <div className="relative">
+                  <Scales tilt={-4} className="pointer-events-none absolute -top-2 right-0 hidden h-[17rem] text-[#e0a22b] lg:block" />
+                  <Lines lines={['Ask the', 'Penal Code']} className="chapter-title relative pt-2" />
+                </div>
+                <div>
+                  <p className="standfirst animate-rise font-medium" style={{ animationDelay: '300ms' }}>
+                    Describe what happened in plain words. Legal mode answers only from IPC text and cites each source. General mode skips retrieval.
+                  </p>
+                  <ul className="mt-5 grid gap-x-8 lg:grid-cols-2" aria-label="Example questions">
+                    {EXAMPLES.map((q, qi) => (
+                      <li key={q} className="animate-rise" style={stagger(qi, 70, 360)}>
+                        <button
+                          onClick={() => send(q)}
+                          disabled={streaming}
+                          className="press group flex w-full items-baseline justify-between gap-4 py-2 text-left text-[clamp(1.0625rem,1rem+0.3vw,1.25rem)] font-medium leading-snug disabled:opacity-50"
+                        >
+                          <span className="underline decoration-transparent decoration-2 underline-offset-4 transition-[text-decoration-color] duration-200 group-hover:decoration-current">{q}</span>
+                          <span aria-hidden="true" className="transition-transform duration-200 group-hover:translate-x-1">→</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             )}
             {messages.map((m) =>
               m.role === 'user' ? (
-                <div key={m.id} className="flex justify-end">
-                  <div className="max-w-[85%] animate-rise whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent px-4 py-2.5 text-[0.9375rem] leading-relaxed text-on-accent shadow-sm" data-testid="user-message">
+                <div key={m.id} className="mt-10 animate-rise border-t border-slate-300 pt-8 first:mt-2 first:border-0 first:pt-0">
+                  <div
+                    className={`whitespace-pre-wrap break-words font-semibold text-slate-900 ${m.content.length > 200 ? 'text-[1.125rem] leading-relaxed' : 'text-[clamp(1.75rem,1.3rem+1.6vw,2.5rem)] leading-[1.05] tracking-[-0.035em]'}`}
+                    data-testid="user-message"
+                  >
                     {m.content}
                   </div>
                 </div>
               ) : (
-                <div key={m.id} className="flex animate-rise justify-start">
-                  <AssistantMessage msg={m} onCite={setOpenSource} live={streamingChatId === activeId && m === messages.at(-1)} />
+                <div key={m.id} className="mt-5 flex animate-rise justify-start">
+                  <AssistantMessage msg={m} onCite={setOpenSource} live={streamingChatId === activeId && m === messages.at(-1)} onUpdate={(fn) => update(activeId, m.id, fn)} />
                 </div>
               ),
             )}
@@ -824,10 +731,10 @@ export default function ChatWindow() {
           </div>
         </div>
 
-        <div className="px-3 pb-3 pt-2 sm:px-4 sm:pb-4">
-          <div className="mx-auto max-w-3xl">
+        <div className={messages.length ? 'px-3 pb-3 pt-2 sm:px-4 sm:pb-4' : 'px-4 pb-4 pt-2 sm:px-8 sm:pb-6'}>
+          <div className={`mx-auto ${messages.length ? 'max-w-[44rem]' : 'max-w-none'}`}>
             <form
-              className="rounded-2xl bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04),0_8px_24px_-12px_rgb(15_23_42/0.18)] ring-1 ring-slate-200 transition-shadow focus-within:ring-2 focus-within:ring-indigo-300"
+              className={`bg-white text-slate-900 transition-shadow ${messages.length ? 'ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-slate-400' : ''}`}
               onSubmit={(e) => {
                 e.preventDefault()
                 send(input)
@@ -842,58 +749,41 @@ export default function ChatWindow() {
                 maxLength={4000}
                 placeholder={mode === 'legal' ? 'Describe what happened, or ask about an IPC section…' : 'Ask anything (no sources)…'}
                 aria-label="Your question"
-                className="block max-h-52 min-h-[3.25rem] w-full resize-none rounded-t-2xl border-0 bg-transparent px-4 pb-1 pt-3.5 text-[0.9375rem] leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none focus-visible:outline-none"
+                className="block max-h-52 min-h-[4.5rem] w-full sm:min-h-[3.25rem] resize-none border-0 bg-transparent px-4 pb-1 pt-3.5 text-[1.0625rem] leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none focus-visible:outline-none"
               />
               <div className="flex flex-wrap items-center gap-2 px-2.5 pb-2.5 pt-1">
                 <ModeToggle mode={mode} setMode={setMode} disabled={streaming} />
                 {mode === 'legal' && <LawToggle law={law} setLaw={setLaw} disabled={streaming} />}
               {models.length > 1 && (
-                <div ref={modelRef} role="radiogroup" aria-label="Answer model" className="relative inline-flex max-w-full overflow-x-auto rounded-lg bg-slate-100 p-0.5" data-testid="model-toggle">
-                  <SlidingPill containerRef={modelRef} selector='[aria-checked="true"]' deps={[model, models.length]} className="rounded-md bg-white shadow-sm ring-1 ring-slate-900/5" />
-                  {models.map((m) => (
-                    <button
-                      key={m.id}
-                      role="radio"
-                      aria-checked={model === m.id}
-                      disabled={streaming || !m.available}
-                      title={`${m.model_id || m.id}${m.note ? ` — ${m.note}` : ''}`}
-                      onClick={() => setModel(m.id)}
-                      className={`relative shrink-0 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-40 ${
-                        model === m.id ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'
-                      }`}
-                    >
-                      {modelLabel(m.id)}
-                    </button>
-                  ))}
-                </div>
+                <Select
+                  up
+                  label="Answer model"
+                  value={model}
+                  onChange={setModel}
+                  disabled={streaming}
+                  menuClass="w-72"
+                  testId="model-toggle"
+                  options={models.map((m) => ({ value: m.id, label: modelLabel(m.id), hint: m.available ? m.model_id : m.note || 'Not available', disabled: !m.available }))}
+                />
               )}
               {mode === 'legal' && sections.length > 0 && (
-                <label className="flex items-center gap-1 text-xs text-slate-600" title="After the answer, check the facts in your question against an encoded IPC section">
-                  <span className="hidden sm:inline">Also verify facts against</span>
-                  <span className="sm:hidden">Verify facts</span>
-                  <select
-                    value={verifySection}
-                    onChange={(e) => setVerifySection(e.target.value)}
-                    disabled={streaming}
-                    aria-label="Also verify facts against section"
-                    className="rounded-md border border-slate-300 bg-white px-1 py-0.5 text-xs text-slate-800"
-                    data-testid="verify-select"
-                  >
-                    <option value="">—</option>
-                    {sections.map((s) => (
-                      <option key={s.section} value={s.section}>
-                        s.{s.section}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <Select
+                  up
+                  label="Also verify facts against section"
+                  value={verifySection}
+                  onChange={setVerifySection}
+                  disabled={streaming}
+                  menuClass="w-72"
+                  testId="verify-select"
+                  options={[{ value: '', label: 'Verify facts: off', hint: 'No rule check after the answer' }, ...sections.map((s) => ({ value: s.section, label: `Verify against s.${s.section}`, hint: s.title }))]}
+                />
               )}
                 <div className="ml-auto">
                   {streaming ? (
                     <button
                       type="button"
                       onClick={() => abortRef.current?.abort()}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-slate-200 px-3 text-sm font-medium text-slate-800 hover:bg-slate-300"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-slate-200 px-3 text-sm font-medium text-slate-800 hover:bg-slate-300"
                       aria-label="Stop the answer"
                     >
                       <StopIcon />
@@ -903,7 +793,7 @@ export default function ChatWindow() {
                     <button
                       type="submit"
                       disabled={!input.trim()}
-                      className="grid size-9 place-items-center rounded-xl bg-accent text-on-accent shadow-sm transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-accent-hover disabled:translate-y-0 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+                      className="press grid size-10 place-items-center bg-accent text-on-accent hover:bg-accent-hover disabled:bg-slate-200 disabled:text-slate-400"
                       aria-label="Send"
                       title="Send (Enter)"
                     >
@@ -913,7 +803,7 @@ export default function ChatWindow() {
                 </div>
               </div>
             </form>
-            <p className="mt-2 px-2 text-center text-[11px] leading-snug text-slate-400">
+            <p className={`mt-2 text-[13px] leading-snug ${messages.length ? 'px-2 text-center text-slate-500' : 'text-ink'}`}>
               Legal information, not legal advice. Check answers against the cited sections.
               <span className="hidden lg:inline"> · Enter to send, Shift+Enter for a new line, Ctrl+B for the chat list</span>
             </p>
@@ -925,14 +815,14 @@ export default function ChatWindow() {
           <div
             key={undo.label + undo.removed.length}
             role="status"
-            className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 animate-rise items-center md:left-4 md:translate-x-0 gap-1 rounded-xl bg-slate-900 py-1.5 pl-4 pr-1.5 text-sm text-slate-50 shadow-2xl ring-1 ring-slate-900/10"
+            className="absolute left-1/2 top-2 z-30 flex w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2 animate-menu items-center gap-1 bg-field-panel-2 py-1 pl-4 pr-1 text-[15px] text-paper shadow-[0_14px_40px_-12px_rgb(0_0_0/0.6)]"
             data-testid="undo-toast"
           >
-            <span className="pr-2">{undo.label}</span>
+            <span className="truncate pr-2">{undo.label}</span>
             <button
               type="button"
               onClick={undoDelete}
-              className="rounded-lg px-2.5 py-1 font-semibold text-indigo-300 hover:bg-white/10"
+              className="press shrink-0 px-2.5 py-1.5 font-semibold text-field-gold hover:bg-white/10"
               data-testid="undo-delete"
             >
               Undo
@@ -940,7 +830,7 @@ export default function ChatWindow() {
             <button
               type="button"
               onClick={() => setUndo(null)}
-              className="grid size-7 place-items-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-slate-50"
+              className="press grid size-8 shrink-0 place-items-center text-paper/70 hover:bg-white/10 hover:text-paper"
               aria-label="Dismiss"
             >
               <CloseIcon />

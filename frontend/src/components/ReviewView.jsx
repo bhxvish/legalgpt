@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { annotationApi, reviewApi } from '../api.js'
+import { Desk, JudgmentMap, Keys, Line, Pads, Saving, Stamp, Tally, marksOf } from './LabelDesk.jsx'
 import RoleExplanation from './RoleExplanation.jsx'
 
 const PALETTE = [
@@ -24,28 +25,6 @@ export const STATUS = {
 const pct = (x) => `${Math.round(x * 100)}%`
 
 const stroke = { viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }
-
-export function Pill({ label, colour }) {
-  return <span className={`inline-block rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ${colour}`}>{label}</span>
-}
-
-/** A bar that grows to `value` (0..1) after mounting. */
-export function Meter({ value, tone = 'bg-indigo-500', className = 'w-24' }) {
-  const [shown, setShown] = useState(0)
-  useEffect(() => {
-    const t = requestAnimationFrame(() => setShown(value))
-    return () => cancelAnimationFrame(t)
-  }, [value])
-  return (
-    <div className={`h-1.5 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-900/5 ${className}`}>
-      <div className={`h-full origin-left rounded-full transition-transform duration-700 ease-[cubic-bezier(0.2,0,0,1)] ${tone}`} style={{ transform: `scaleX(${shown})` }} />
-    </div>
-  )
-}
-
-const Kbd = ({ children }) => (
-  <kbd className="mx-0.5 inline-grid min-w-[1.25rem] place-items-center rounded border border-slate-200 bg-slate-50 px-1 font-mono text-[11px] text-slate-600">{children}</kbd>
-)
 
 const UPLOAD = {
   queued: { text: 'Waiting', cls: 'bg-slate-50 text-slate-600 ring-slate-200', busy: true },
@@ -108,7 +87,7 @@ export function UploadPanel({ uploader, onFinished, onOpen }) {
 
   const shown = [...local, ...jobs].slice(0, 8)
   return (
-    <section className="rounded-2xl bg-white p-4 ring-1 ring-slate-200 sm:p-5" data-testid="upload-panel">
+    <section data-testid="upload-panel">
       <div
         onDragOver={(e) => {
           e.preventDefault()
@@ -120,27 +99,13 @@ export function UploadPanel({ uploader, onFinished, onOpen }) {
           setDragging(false)
           send([...e.dataTransfer.files])
         }}
-        className={`flex flex-wrap items-center gap-4 rounded-xl border-2 border-dashed px-4 py-4 transition-[border-color,background-color,transform] duration-200 ${
-          dragging ? 'scale-[1.01] border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'
-        }`}
+        className={`flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 transition-colors duration-200 ${dragging ? 'bg-field-gold text-ink' : 'bg-field-panel text-paper'}`}
       >
-        <span className={`grid size-11 shrink-0 place-items-center rounded-xl ring-1 transition-colors ${dragging ? 'bg-indigo-100 text-indigo-600 ring-indigo-200' : 'bg-slate-50 text-slate-500 ring-slate-200'}`}>
-          <svg {...stroke} className={`size-5 transition-transform duration-300 ${dragging ? '-translate-y-0.5' : ''}`}>
-            <path d="M10 13V3.75M6.25 7.5 10 3.75l3.75 3.75" />
-            <path d="M3.75 12.5v1.75a2 2 0 0 0 2 2h8.5a2 2 0 0 0 2-2V12.5" />
-          </svg>
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-slate-800">{dragging ? 'Drop to add these judgments' : 'Add judgments'}</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-            Drop .txt or .pdf files here. Each one is checked, annotated by the computer, and added below for you to
-            review; nothing enters the corpus until someone signs it off.
-          </p>
-        </div>
-        <button
-          onClick={() => inputRef.current?.click()}
-          className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-on-accent shadow-sm transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-accent-hover"
-        >
+        <p className="min-w-0 flex-1 basis-64 text-[15px] leading-snug">
+          <b className="font-semibold">{dragging ? 'Drop to file these judgments' : 'File a new judgment'}</b>
+          <span className={dragging ? '' : 'text-paper/75'}>. Drop a .txt or .pdf here. InLegalBERT marks it up first; nothing joins the corpus until someone signs it off.</span>
+        </p>
+        <button onClick={() => inputRef.current?.click()} className="press h-11 shrink-0 bg-accent px-5 text-[15px] font-medium text-on-accent hover:bg-accent-hover">
           Choose files
         </button>
         <input
@@ -157,24 +122,16 @@ export function UploadPanel({ uploader, onFinished, onOpen }) {
         />
       </div>
       {shown.length > 0 && (
-        <ul className="mt-3 space-y-1.5" data-testid="upload-list">
+        <ul className="mt-2 space-y-1" data-testid="upload-list">
           {shown.map((j) => {
             const st = UPLOAD[j.status] || UPLOAD.failed
             return (
-              <li
-                key={j.job_id}
-                className="flex animate-rise flex-wrap items-center gap-2 rounded-xl bg-slate-50/70 px-3 py-2 text-sm ring-1 ring-slate-200/70"
-                data-testid="upload-job"
-                data-status={j.status}
-              >
-                {st.busy && <span aria-hidden="true" className="size-3.5 animate-spin rounded-full border-2 border-indigo-500 border-r-transparent" />}
-                <Pill label={st.text} colour={st.cls} />
-                <span className="font-medium text-slate-800">{j.filename}</span>
-                <span className={`min-w-0 flex-1 text-xs ${st.busy ? 'text-shimmer' : 'text-slate-600'}`}>{j.message}</span>
+              <li key={j.job_id} className="flex animate-rise flex-wrap items-baseline gap-x-3 bg-field-panel px-4 py-2 text-[15px] text-paper" data-testid="upload-job" data-status={j.status}>
+                <span className="font-medium">{j.filename}</span>
+                <span className={st.busy ? 'text-field-gold' : 'text-paper/75'}>{st.text}</span>
+                <span className="min-w-0 flex-1 text-[14px] text-paper/70">{j.message}</span>
                 {j.status === 'done' && (
-                  <button onClick={() => onOpen(j.case_id)} className="rounded-md px-2 py-0.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50">
-                    Open →
-                  </button>
+                  <button onClick={() => onOpen(j.case_id)} className="press font-medium text-field-gold underline underline-offset-2">Open</button>
                 )}
               </li>
             )
@@ -194,6 +151,7 @@ export function CaseReview({ caseId, reviewer, scheme, onBack }) {
   const [explainFor, setExplainFor] = useState(null) // sentence_id whose explanation is open
   const rowRefs = useRef({})
   const colour = useMemo(() => Object.fromEntries(scheme.map((l, i) => [l.name, PALETTE[i % PALETTE.length]])), [scheme])
+  const marks = useMemo(() => marksOf(scheme), [scheme])
   const byShortcut = useMemo(() => Object.fromEntries(scheme.map((l) => [l.shortcut, l.name])), [scheme])
 
   const load = useCallback(() => reviewApi.getCase(caseId).then(setDetail), [caseId])
@@ -213,7 +171,7 @@ export function CaseReview({ caseId, reviewer, scheme, onBack }) {
   }, [detail, cursor, flagged])
 
   useEffect(() => {
-    if (cursor) rowRefs.current[cursor]?.scrollIntoView({ block: 'nearest' })
+    if (cursor) rowRefs.current[cursor]?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [cursor])
 
   const readOnly = detail?.status !== 'open'
@@ -313,12 +271,8 @@ export function CaseReview({ caseId, reviewer, scheme, onBack }) {
 
   if (!detail) {
     return (
-      <div className="mx-auto w-full max-w-4xl space-y-2 px-4 py-8">
-        {status.state === 'error' ? (
-          <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{status.text}</p>
-        ) : (
-          Array.from({ length: 6 }, (_, i) => <span key={i} className="block h-16 animate-pulse rounded-xl bg-slate-100" style={{ opacity: 1 - i * 0.12 }} />)
-        )}
+      <div className="grid min-h-0 flex-1 place-items-center bg-field-black px-4 text-paper">
+        {status.state === 'error' ? <p className="text-[17px]">{status.text}</p> : <p className="text-shimmer text-lg font-medium">Opening the judgment…</p>}
       </div>
     )
   }
@@ -327,205 +281,130 @@ export function CaseReview({ caseId, reviewer, scheme, onBack }) {
   const overLimit = detail.audit_error_rate > detail.max_audit_error
   const current = detail.items.find((it) => it.sentence_id === cursor)
 
+  const counts = detail.items.reduce((t, it) => {
+    const l = it.final_label || it.predicted
+    return { ...t, [l]: (t[l] || 0) + 1 }
+  }, {})
+  const settled = (it) => it.status === 'accepted' || it.status === 'corrected' || it.kind === 'auto'
+  const finished = detail.status !== 'open'
+
   return (
-    <div className="flex min-h-0 flex-1 animate-rise flex-col">
-      <div className="border-b border-slate-200/70 bg-white/80 px-4 py-3 backdrop-blur">
-        <div className="mx-auto max-w-4xl">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <button
-                onClick={onBack}
-                className="grid size-9 shrink-0 place-items-center rounded-lg text-slate-500 ring-1 ring-slate-200 hover:bg-slate-100 hover:text-slate-900"
-                aria-label="Back to all judgments"
-                title="All judgments"
-              >
-                <svg {...stroke} className="size-4">
-                  <path d="M15.5 10h-11M9 4.5 3.5 10 9 15.5" />
-                </svg>
-              </button>
-              <h2 className="truncate text-sm font-semibold text-slate-900">{detail.title || detail.case_id}</h2>
-            </div>
-            <Pill label={STATUS[detail.status].text} colour={STATUS[detail.status].cls} />
-          </div>
-          {detail.status === 'open' && (
-            <details className="group mt-3 rounded-xl bg-slate-50/80 ring-1 ring-slate-200" open={detail.reviewed === 0}>
-              <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600">
-                <svg {...stroke} className="size-4 text-indigo-500">
-                  <circle cx="10" cy="10" r="7.25" />
-                  <path d="M10 9v4.5M10 6.6v.1" />
-                </svg>
-                How to review this judgment
-                <svg {...stroke} className="ml-auto size-4 text-slate-400 transition-transform duration-300 group-open:rotate-180">
-                  <path d="m5 7.5 5 5 5-5" />
-                </svg>
-              </summary>
-              <p className="px-3 pb-3 text-sm leading-relaxed text-slate-600">
-                The computer has suggested a role for every sentence. Please check the{' '}
-                <span className="font-medium text-red-700">Needs review</span> sentences (it wasn't sure) and the{' '}
-                <span className="font-medium text-amber-800">Spot check</span> sentences (it was sure — we check a few to make
-                sure it isn't confidently wrong). Press <Kbd>Enter</Kbd> if the suggestion is right, or a number key to pick the
-                correct role. When every highlighted sentence is checked, click <b>Sign off</b>.
-              </p>
-            </details>
+    <Desk
+      title={detail.title || detail.case_id}
+      meta={finished ? STATUS[detail.status].text : `${detail.flagged} sentences to check. The rest were marked with confidence.`}
+      onBack={onBack}
+      backLabel="Back to all judgments"
+      paper={
+        <>
+          {(result || detail.decision_note) && (
+            <p role="status" data-testid="signoff-result" className="mt-4 flex animate-rise flex-wrap items-center gap-x-4 gap-y-2 text-[16px] leading-snug">
+              <Stamp className={detail.status === 'promoted' ? 'text-emerald-700' : 'text-amber-700'}>{detail.status === 'promoted' ? 'Signed off' : 'Sent back'}</Stamp>
+              <span className="min-w-0 flex-1 basis-64">{result?.reason || detail.decision_note}</span>
+            </p>
           )}
-        </div>
-      </div>
-
-      {(result || detail.decision_note) && (
-        <div className="px-4 pt-3">
-          <div
-            role="status"
-            data-testid="signoff-result"
-            className={`mx-auto flex max-w-4xl animate-rise items-start gap-3 rounded-2xl px-4 py-3 text-sm ring-1 ${
-              detail.status === 'promoted' ? 'bg-emerald-50 text-emerald-800 ring-emerald-200' : 'bg-amber-50 text-amber-900 ring-amber-200'
-            }`}
-          >
-            <span className={`grid size-7 shrink-0 animate-pop place-items-center rounded-full text-white ${detail.status === 'promoted' ? 'bg-emerald-500' : 'bg-amber-500'}`}>
-              <svg {...stroke} strokeWidth={2} className="size-4">
-                {detail.status === 'promoted' ? <path d="m4.5 10.5 3.5 3.5 7.5-8" /> : <path d="M10 5.5v5M10 14v.1" />}
-              </svg>
-            </span>
-            <span className="pt-1">{result?.reason || detail.decision_note}</span>
-          </div>
-        </div>
-      )}
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <div className="mx-auto max-w-4xl">
-          <label className="mb-3 flex w-fit cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-slate-100">
-            <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} className="size-3.5 accent-[var(--color-accent)]" />
-            Also show the {detail.sentences - detail.flagged} sentences the computer labelled confidently (for context)
+          <label className="mt-4 flex w-fit cursor-pointer items-center gap-2 text-[15px] text-slate-700">
+            <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} className="size-4 accent-[var(--color-ink)]" />
+            Also show the {detail.sentences - detail.flagged} sentences marked with confidence
           </label>
-          <ol className="space-y-1.5" data-testid="review-list">
+          <ol className="mt-3" data-testid="review-list">
             {rows.map((it) => {
               const active = it.sentence_id === cursor
               const label = it.final_label || it.predicted
               const kind = KIND[it.kind]
               return (
-                <li
+                <Line
                   key={it.sentence_id}
-                  ref={(el) => (rowRefs.current[it.sentence_id] = el)}
+                  n={it.index != null ? it.index + 1 : rows.indexOf(it) + 1}
+                  active={active}
+                  mark={settled(it) ? marks[label] : null}
+                  dashed={settled(it) ? null : marks[it.predicted]}
                   onClick={() => setCursor(it.sentence_id)}
-                  data-testid="review-row"
-                  className={`cursor-pointer rounded-xl px-3.5 py-2.5 text-sm ring-1 transition-[background-color,box-shadow] duration-200 ${
-                    active
-                      ? 'bg-indigo-50 shadow-sm ring-2 ring-indigo-300'
-                      : it.kind === 'auto'
-                        ? 'bg-slate-50 text-slate-500 ring-slate-200/60'
-                        : 'bg-white ring-slate-200/70 hover:bg-slate-50'
-                  }`}
+                  innerRef={(el) => (rowRefs.current[it.sentence_id] = el)}
+                  testId="review-row"
+                  tag={
+                    <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2.5 text-[13px] text-slate-600">
+                      {kind && <span className={`font-semibold ${it.kind === 'mandatory' ? 'text-red-700' : 'text-amber-800'}`} title={kind.hint}>{kind.text}</span>}
+                      <span>Suggested <b className={`font-semibold ${marks[it.predicted]?.ink || ''}`}>{it.predicted}</b>, {pct(it.confidence)} sure</span>
+                      {it.status === 'accepted' && <span className="animate-stamp font-semibold text-emerald-700">Accepted</span>}
+                      {it.status === 'corrected' && <span className="animate-stamp font-semibold text-indigo-700">Corrected to {label}</span>}
+                    </p>
+                  }
+                  below={
+                    <>
+                      {active && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setExplainFor((cur) => (cur === it.sentence_id ? null : it.sentence_id))
+                          }}
+                          className="press mt-1 text-[14px] font-medium text-indigo-600 underline underline-offset-2"
+                          data-testid="explain-toggle"
+                        >
+                          {explainFor === it.sentence_id ? 'Hide the explanation' : 'Why this suggestion?'}
+                        </button>
+                      )}
+                      {explainFor === it.sentence_id && <RoleExplanation caseId={caseId} item={it} labels={scheme.map((l) => l.name)} colour={colour} />}
+                    </>
+                  }
                 >
-                  <div className="flex flex-wrap items-center gap-2">
-                    {kind && <Pill label={kind.text} colour={kind.cls} />}
-                    <span className="text-xs text-slate-500">
-                      Suggested <Pill label={it.predicted} colour={colour[it.predicted]} /> · {pct(it.confidence)} sure
-                    </span>
-                    {it.status === 'accepted' && <span className="inline-flex animate-pop items-center gap-1 text-xs font-medium text-emerald-700">✓ Accepted</span>}
-                    {it.status === 'corrected' && (
-                      <span className="text-xs font-medium text-indigo-700">
-                        → Corrected to <Pill label={label} colour={colour[label]} />
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1 break-words leading-relaxed text-slate-800">{it.text}</p>
-                  {active && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setExplainFor((cur) => (cur === it.sentence_id ? null : it.sentence_id))
-                      }}
-                      className="mt-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-100/60"
-                      data-testid="explain-toggle"
-                    >
-                      {explainFor === it.sentence_id ? 'Hide explanation' : 'Why this suggestion? (w)'}
-                    </button>
-                  )}
-                  {explainFor === it.sentence_id && (
-                    <RoleExplanation caseId={caseId} item={it} labels={scheme.map((l) => l.name)} colour={colour} />
-                  )}
-                </li>
+                  {it.text}
+                </Line>
               )
             })}
           </ol>
-        </div>
-      </div>
-
-      <div className="px-4 pb-4 pt-2">
-        <div className="mx-auto max-w-4xl space-y-3 rounded-2xl bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_8px_24px_-12px_rgb(15_23_42/0.18)] ring-1 ring-slate-200">
-          {current && current.kind !== 'auto' && !readOnly && (
-            <div className="flex flex-wrap gap-1.5" role="toolbar" aria-label="Choose the role for the selected sentence">
-              {scheme.map((l) => (
-                <button
-                  key={l.name}
-                  title={l.description}
-                  aria-label={`${l.name}${l.name === current.predicted ? " (suggested)" : ""}, key ${l.shortcut}`}
-                  onClick={() => {
-                    choose(current.sentence_id, l.name)
-                  }}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium ring-1 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-sm ${colour[l.name]} ${
-                    l.name === current.predicted ? 'outline outline-2 outline-offset-2 outline-indigo-500' : ''
-                  }`}
-                >
-                  <kbd className="grid size-5 place-items-center rounded bg-white/60 font-mono text-[11px] ring-1 ring-current/20">{l.shortcut}</kbd>
-                  {l.name}
-                  {l.name === current.predicted && <span className="text-xs opacity-80">· suggested</span>}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0 flex-1 space-y-1.5 text-xs text-slate-600">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="font-semibold text-slate-800" data-testid="review-progress">
-                  {detail.reviewed} of {detail.flagged} checked
-                </span>
-                <Meter value={detail.flagged ? detail.reviewed / detail.flagged : 0} tone={done ? 'bg-emerald-500' : 'bg-indigo-500'} className="w-32" />
-                <span className={`inline-flex items-center gap-1.5 ${status.state === 'error' ? 'text-red-600' : status.state === 'saved' ? 'text-emerald-600' : 'text-slate-400'}`}>
-                  {status.state === 'saving' && <span aria-hidden="true" className="size-3 animate-spin rounded-full border-2 border-current border-r-transparent" />}
-                  {status.text}
-                </span>
-              </div>
-              <p className={overLimit ? 'font-medium text-red-700' : ''}>
-                Spot checks needing correction: {pct(detail.audit_error_rate)} (limit {pct(detail.max_audit_error)})
-                {overLimit && <span className="block">Over the limit: signing off will send this judgment back for full manual annotation.</span>}
-              </p>
-            </div>
-            {!readOnly && (
-              <button
-                onClick={signOff}
-                disabled={!done}
-                title={done ? 'Finish this judgment' : 'Check every highlighted sentence first'}
-                aria-label="Sign off"
-                className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent shadow-sm transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-accent-hover disabled:translate-y-0 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
-              >
-                <svg {...stroke} strokeWidth={2} className="size-4">
-                  <path d="m4.5 10.5 3.5 3.5 7.5-8" />
-                </svg>
-                Sign off
-              </button>
-            )}
+        </>
+      }
+      bench={
+        <>
+          <div>
+            <p className="text-[2.25rem] font-semibold leading-none tracking-[-0.04em] [font-variant-numeric:tabular-nums]" data-testid="review-progress">
+              {detail.reviewed}
+              <span className="text-[1.125rem] font-medium tracking-normal text-paper/70"> of {detail.flagged} checked</span>
+            </p>
+            <p className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 text-[14px] text-paper/75">
+              {finished ? STATUS[detail.status].text : 'Accept it, or pick the right role'}
+              <Saving status={status} />
+            </p>
           </div>
-          <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-            <span>
-              <Kbd>Enter</Kbd> accept
-            </span>
-            <span>
-              <Kbd>1</Kbd>–<Kbd>{scheme.length}</Kbd> choose a role
-            </span>
-            <span>
-              <Kbd>↑</Kbd>
-              <Kbd>↓</Kbd> move
-            </span>
-            <span>
-              <Kbd>n</Kbd> next unchecked
-            </span>
-            <span>
-              <Kbd>w</Kbd> why this suggestion
-            </span>
+          {current && current.kind !== 'auto' && !readOnly && (
+            <>
+              <button
+                type="button"
+                onClick={() => choose(current.sentence_id, current.predicted)}
+                className="press flex h-12 items-center justify-between bg-accent px-4 text-[17px] font-medium text-on-accent hover:bg-accent-hover"
+              >
+                Accept {current.predicted}
+                <kbd className="bg-ink/15 px-1.5 font-sans text-[13px]">Enter</kbd>
+              </button>
+              <Pads scheme={scheme} chosen={current.status === 'pending' ? null : current.final_label || current.predicted} suggested={current.predicted} onPick={(name) => choose(current.sentence_id, name)} label="Choose the role for the selected sentence" />
+            </>
+          )}
+          <JudgmentMap
+            title="Sentences to check"
+            current={cursor}
+            onJump={setCursor}
+            cells={flagged.map((it, i) => ({ id: it.sentence_id, cell: settled(it) ? marks[it.final_label || it.predicted]?.cell : '', title: `To check ${i + 1}: ${it.status === 'pending' ? 'not checked yet' : it.final_label || it.predicted}` }))}
+          />
+          <Tally scheme={scheme} counts={counts} />
+          <p className={`text-[14px] leading-snug ${overLimit ? 'font-medium text-field-gold' : 'text-paper/75'}`}>
+            Spot checks needing correction: {pct(detail.audit_error_rate)}, limit {pct(detail.max_audit_error)}.
+            {overLimit && ' Over the limit: signing off will send this judgment back for full manual labelling.'}
           </p>
-        </div>
-      </div>
-    </div>
+          {!readOnly && (
+            <button
+              onClick={signOff}
+              disabled={!done}
+              title={done ? 'Finish this judgment' : 'Check every highlighted sentence first'}
+              aria-label="Sign off"
+              className="press h-12 shrink-0 bg-paper text-[17px] font-medium text-ink hover:bg-field-gold disabled:bg-field-panel disabled:text-paper/50"
+            >
+              Sign off
+            </button>
+          )}
+          <Keys items={[['Enter', 'accept'], [`1–${scheme.length}`, 'choose a role'], ['↑ ↓', 'move'], ['n', 'next unchecked'], ['w', 'why']]} />
+        </>
+      }
+    />
   )
 }

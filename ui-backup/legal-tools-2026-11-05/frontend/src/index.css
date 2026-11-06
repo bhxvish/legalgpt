@@ -1,0 +1,586 @@
+@import "tailwindcss";
+
+/* LegalGPT's look: chapters. The Indian Penal Code is written in chapters, so the app is too: every
+   part has its own flat field of colour, floor to ceiling, taken from the world of an Indian court
+   file (red tape, marigold, the green of the court lawns, chakra blue, bone paper, the advocate's
+   black). Type is one tight grotesk; only the law itself is set in a reading serif.
+
+   Theme: <html data-theme="light|dark">, set before first paint by index.html and by the theme menu
+   (System follows the operating system setting). The components use the slate and indigo names:
+   here slate is the neutral scale and indigo is the red-tape scale. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@theme {
+  --font-sans: "Switzer", "Noto Sans Devanagari", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-serif: "Newsreader", "Noto Serif Devanagari", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  --radius-sm: 0.125rem;
+  --radius-md: 0.1875rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.3125rem;
+  --radius-2xl: 0.375rem;
+
+  /* the chapter fields: the same in both themes */
+  --color-field-red: #e8432e;
+  --color-field-red-deep: #cf3620;
+  --color-field-gold: #f5b83d;
+  --color-field-green: #0e5a47;
+  --color-field-blue: #17378f;
+  --color-field-bone: #e7e7e5;
+  --color-field-black: #0b0b0c;
+  --color-field-panel: #17171a;
+  --color-field-panel-2: #232327;
+  --color-paper: #ffffff;
+  --color-ink: #0b0b0c;
+
+  /* neutrals */
+  --color-white: oklch(99.4% 0.001 90);
+  --color-slate-50: oklch(96.6% 0.003 90);
+  --color-slate-100: oklch(93.4% 0.004 90);
+  --color-slate-200: oklch(88% 0.005 90);
+  --color-slate-300: oklch(78% 0.006 90);
+  --color-slate-400: oklch(56% 0.006 90);
+  --color-slate-500: oklch(47% 0.006 90);
+  --color-slate-600: oklch(39% 0.006 90);
+  --color-slate-700: oklch(31% 0.005 90);
+  --color-slate-800: oklch(24% 0.004 90);
+  --color-slate-900: oklch(17% 0.003 90);
+  --color-slate-950: oklch(13% 0.003 90);
+
+  /* red tape */
+  --color-indigo-50: oklch(96% 0.02 32);
+  --color-indigo-100: oklch(92.5% 0.04 32);
+  --color-indigo-200: oklch(86% 0.08 32);
+  --color-indigo-300: oklch(77% 0.13 32);
+  --color-indigo-400: oklch(68% 0.17 32);
+  --color-indigo-500: oklch(60% 0.2 32);
+  --color-indigo-600: oklch(52% 0.19 32);
+  --color-indigo-700: oklch(45% 0.165 32);
+  --color-indigo-800: oklch(38% 0.13 32);
+  --color-indigo-900: oklch(31% 0.095 32);
+  --color-indigo-950: oklch(23% 0.06 32);
+
+  /* status colours */
+  --color-emerald-50: oklch(96% 0.02 165);
+  --color-emerald-100: oklch(93% 0.035 165);
+  --color-emerald-200: oklch(87% 0.06 165);
+  --color-emerald-300: oklch(78% 0.085 165);
+  --color-emerald-400: oklch(66% 0.105 165);
+  --color-emerald-500: oklch(55% 0.11 165);
+  --color-emerald-600: oklch(46% 0.1 165);
+  --color-emerald-700: oklch(39% 0.085 165);
+  --color-emerald-800: oklch(33% 0.07 165);
+  --color-emerald-900: oklch(28% 0.055 165);
+  --color-amber-50: oklch(96.5% 0.03 88);
+  --color-amber-100: oklch(93% 0.05 86);
+  --color-amber-200: oklch(87% 0.08 84);
+  --color-amber-300: oklch(79% 0.11 80);
+  --color-amber-400: oklch(71% 0.13 75);
+  --color-amber-500: oklch(63% 0.135 70);
+  --color-amber-600: oklch(52% 0.12 62);
+  --color-amber-700: oklch(44% 0.1 58);
+  --color-amber-800: oklch(37% 0.08 55);
+  --color-amber-900: oklch(31% 0.06 52);
+
+  /* the main action: marigold with black ink, in both themes */
+  --color-rule: var(--color-slate-300);
+  --color-accent: var(--color-field-gold);
+  --color-accent-hover: #ffc95a;
+  --color-on-accent: #0b0b0c;
+  --color-scrim: #0b0b0c;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
+
+  --animate-rise: rise 480ms cubic-bezier(0.2, 0, 0, 1) backwards; /* not "both": a kept transform would trap position:fixed children */
+  --animate-caret: caret 1s steps(1) infinite;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-ping-soft: ping-soft 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+  --animate-pop: pop 180ms cubic-bezier(0.2, 0, 0, 1);
+  --animate-fade: fade 180ms ease-out;
+  --animate-wipe: wipe 760ms cubic-bezier(0.76, 0, 0.24, 1) both;
+  --animate-line-up: line-up 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-menu: menu 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-stamp: stamp 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-sheet: sheet 620ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+  }
+  @keyframes caret {
+    50% { opacity: 0; }
+  }
+  @keyframes shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+  }
+  @keyframes ping-soft {
+    0% { transform: scale(1); opacity: 0.55; }
+    70%, 100% { transform: scale(2.6); opacity: 0; }
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  }
+  @keyframes slide {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(300%); }
+  }
+  @keyframes fade {
+    from { opacity: 0; }
+  }
+  @keyframes wipe {
+    0% { transform: translateY(100%); }
+    46%, 54% { transform: translateY(0); }
+    100% { transform: translateY(-100%); }
+  }
+  @keyframes line-up {
+    from { transform: translateY(108%); }
+    to { transform: none; }
+  }
+  @keyframes fill {
+    from { transform: scaleX(0); }
+  }
+  @keyframes stamp {
+    from { opacity: 0; transform: rotate(-6deg) scale(1.9); }
+  }
+  @keyframes sheet {
+    from { opacity: 0; transform: translateY(26px); }
+  }
+  @keyframes menu {
+    from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  }
+}
+
+/* Dark: ink and lamp-lit paper. Every scale is mirrored (50 <-> 950), so bg-*-50 tints become deep
+   tints and text-*-800 becomes light text. "white" is the raised surface. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-white: #17171a;
+  --color-slate-50: #0f0f11;
+  --color-slate-100: #1d1d21;
+  --color-slate-200: #29292e;
+  --color-slate-300: #3c3c42;
+  --color-slate-400: oklch(64% 0.004 90);
+  --color-slate-500: oklch(72% 0.004 90);
+  --color-slate-600: oklch(80% 0.004 90);
+  --color-slate-700: oklch(87% 0.004 90);
+  --color-slate-800: oklch(92.5% 0.003 90);
+  --color-slate-900: oklch(96% 0.003 90);
+  --color-slate-950: oklch(98.5% 0.002 90);
+  --color-indigo-50: oklch(25% 0.05 32);
+  --color-indigo-100: oklch(30% 0.075 32);
+  --color-indigo-200: oklch(37% 0.11 32);
+  --color-indigo-300: oklch(46% 0.15 32);
+  --color-indigo-400: oklch(56% 0.18 32);
+  --color-indigo-500: oklch(65% 0.18 33);
+  --color-indigo-600: oklch(73% 0.15 34);
+  --color-indigo-700: oklch(81% 0.1 35);
+  --color-indigo-800: oklch(88% 0.06 35);
+  --color-indigo-900: oklch(93% 0.03 35);
+  --color-indigo-950: oklch(96% 0.015 35);
+  --color-red-50: oklch(23% 0.041 26.042);
+  --color-red-100: oklch(28% 0.063 25.723);
+  --color-red-200: oklch(35% 0.097 26.899);
+  --color-red-300: oklch(50.5% 0.213 27.518);
+  --color-red-400: oklch(57.7% 0.245 27.325);
+  --color-red-500: oklch(63.7% 0.237 25.331);
+  --color-red-600: oklch(70.4% 0.191 22.216);
+  --color-red-700: oklch(80.8% 0.114 19.571);
+  --color-red-800: oklch(88.5% 0.062 18.334);
+  --color-red-900: oklch(93.6% 0.032 17.717);
+  --color-red-950: oklch(97.1% 0.013 17.38);
+  --color-amber-50: oklch(24% 0.03 70);
+  --color-amber-100: oklch(29% 0.045 70);
+  --color-amber-200: oklch(36% 0.065 70);
+  --color-amber-300: oklch(52% 0.1 72);
+  --color-amber-400: oklch(63% 0.115 74);
+  --color-amber-500: oklch(72% 0.12 76);
+  --color-amber-600: oklch(79% 0.115 80);
+  --color-amber-700: oklch(85% 0.095 84);
+  --color-amber-800: oklch(90.5% 0.07 88);
+  --color-amber-900: oklch(95% 0.04 90);
+  --color-amber-950: oklch(98% 0.02 92);
+  --color-emerald-50: oklch(24% 0.025 165);
+  --color-emerald-100: oklch(29% 0.035 165);
+  --color-emerald-200: oklch(36% 0.05 165);
+  --color-emerald-300: oklch(50% 0.08 165);
+  --color-emerald-400: oklch(60% 0.095 165);
+  --color-emerald-500: oklch(69% 0.105 165);
+  --color-emerald-600: oklch(76% 0.1 165);
+  --color-emerald-700: oklch(84% 0.08 165);
+  --color-emerald-800: oklch(90% 0.055 165);
+  --color-emerald-900: oklch(95% 0.03 165);
+  --color-emerald-950: oklch(98% 0.015 165);
+  --color-violet-50: oklch(23% 0.063 291.089);
+  --color-violet-100: oklch(28% 0.085 293.745);
+  --color-violet-200: oklch(35% 0.128 292.759);
+  --color-violet-300: oklch(49.1% 0.27 292.581);
+  --color-violet-400: oklch(54.1% 0.281 293.009);
+  --color-violet-500: oklch(60.6% 0.25 292.717);
+  --color-violet-600: oklch(70.2% 0.183 293.541);
+  --color-violet-700: oklch(81.1% 0.111 293.571);
+  --color-violet-800: oklch(89.4% 0.057 293.283);
+  --color-violet-900: oklch(94.3% 0.029 294.588);
+  --color-violet-950: oklch(96.9% 0.016 293.756);
+  --color-sky-50: oklch(23% 0.030 243.157);
+  --color-sky-100: oklch(28% 0.041 240.876);
+  --color-sky-200: oklch(35% 0.061 240.79);
+  --color-sky-300: oklch(50% 0.134 242.749);
+  --color-sky-400: oklch(58.8% 0.158 241.966);
+  --color-sky-500: oklch(68.5% 0.169 237.323);
+  --color-sky-600: oklch(74.6% 0.16 232.661);
+  --color-sky-700: oklch(82.8% 0.111 230.318);
+  --color-sky-800: oklch(90.1% 0.058 230.902);
+  --color-sky-900: oklch(95.1% 0.026 236.824);
+  --color-sky-950: oklch(97.7% 0.013 236.62);
+  --color-rose-50: oklch(23% 0.047 12.094);
+  --color-rose-100: oklch(28% 0.072 10.272);
+  --color-rose-200: oklch(35% 0.103 13.697);
+  --color-rose-300: oklch(51.4% 0.222 16.935);
+  --color-rose-400: oklch(58.6% 0.253 17.585);
+  --color-rose-500: oklch(64.5% 0.246 16.439);
+  --color-rose-600: oklch(71.2% 0.194 13.428);
+  --color-rose-700: oklch(81% 0.117 11.638);
+  --color-rose-800: oklch(89.2% 0.058 10.001);
+  --color-rose-900: oklch(94.1% 0.03 12.58);
+  --color-rose-950: oklch(96.9% 0.015 12.422);
+  --color-rule: var(--color-slate-300);
+}
+
+/* Other dark papers (ThemeMenu "Dark style"; <html data-dark>). Only the neutral scale changes. */
+:root[data-theme="dark"][data-dark="graphite"] {
+  --color-white: oklch(22.5% 0.004 264);
+  --color-slate-50: oklch(17.6% 0.003 264);
+  --color-slate-100: oklch(25.5% 0.005 264);
+  --color-slate-200: oklch(31% 0.006 264);
+  --color-slate-300: oklch(39% 0.007 264);
+  --color-slate-400: oklch(62% 0.008 264);
+  --color-slate-500: oklch(70% 0.009 264);
+  --color-slate-600: oklch(78% 0.008 264);
+  --color-slate-700: oklch(87.5% 0.006 264);
+  --color-slate-800: oklch(93% 0.004 264);
+  --color-slate-900: oklch(96.5% 0.003 264);
+  --color-slate-950: oklch(98.5% 0.002 264);
+}
+:root[data-theme="dark"][data-dark="midnight"] {
+  --color-white: oklch(21% 0.028 262);
+  --color-slate-50: oklch(15.5% 0.03 264);
+  --color-slate-100: oklch(23.5% 0.034 264);
+  --color-slate-200: oklch(29% 0.036 262);
+  --color-slate-300: oklch(38% 0.038 258);
+  --color-slate-400: oklch(62% 0.034 257);
+  --color-slate-500: oklch(70% 0.03 257);
+  --color-slate-600: oklch(78% 0.026 256);
+  --color-slate-700: oklch(87% 0.02 253);
+  --color-slate-800: oklch(93% 0.013 255);
+  --color-slate-900: oklch(96.8% 0.007 248);
+  --color-slate-950: oklch(98.4% 0.003 248);
+}
+
+/* scrolled content fades out under the chat toolbar and above the message box, instead of
+   being cut off at a hard edge */
+@utility fade-edges {
+  mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 calc(100% - 16px), transparent 100%);
+}
+
+/* text that shimmers while the app is working ("Searching the IPC…") */
+@utility text-shimmer {
+  color: transparent;
+  background: linear-gradient(90deg, var(--color-slate-400) 0%, var(--color-slate-400) 35%, var(--color-slate-800) 50%, var(--color-slate-400) 65%, var(--color-slate-400) 100%);
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: var(--animate-shimmer);
+}
+
+/* the whole app, minus the navigation rail: giant type is sized from this */
+:root { --rail: 0px; }
+@media (min-width: 768px) { :root { --rail: 96px; } }
+
+/* a chapter title: two lines, set very large */
+@utility chapter-title {
+  font-family: var(--font-sans);
+  font-size: clamp(3.25rem, calc((100vw - var(--rail)) * 0.098), 9.5rem);
+  font-weight: 600;
+  line-height: 0.93;
+  letter-spacing: -0.045em;
+}
+
+/* a heading inside a chapter */
+@utility head {
+  font-size: clamp(2rem, 1.3rem + 3.2vw, 4rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+@utility kicker {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--color-slate-500);
+}
+
+@utility standfirst {
+  font-size: clamp(1.125rem, 1rem + 0.4vw, 1.375rem);
+  line-height: 1.4;
+  letter-spacing: -0.012em;
+  max-width: 38rem;
+}
+
+/* long-form reading: the answers and the statute text */
+@utility reading {
+  font-family: var(--font-serif);
+  font-size: 1.1875rem;
+  line-height: 1.6;
+  color: var(--color-slate-800);
+}
+
+/* paper is paper in both themes: documents keep their light colours in dark mode */
+.light-scope {
+  color-scheme: light;
+  --color-white: oklch(99.4% 0.001 90);
+  --color-slate-50: oklch(96.6% 0.003 90);
+  --color-slate-100: oklch(93.4% 0.004 90);
+  --color-slate-200: oklch(88% 0.005 90);
+  --color-slate-300: oklch(78% 0.006 90);
+  --color-slate-400: oklch(56% 0.006 90);
+  --color-slate-500: oklch(47% 0.006 90);
+  --color-slate-600: oklch(39% 0.006 90);
+  --color-slate-700: oklch(31% 0.005 90);
+  --color-slate-800: oklch(24% 0.004 90);
+  --color-slate-900: oklch(17% 0.003 90);
+  --color-slate-950: oklch(13% 0.003 90);
+  --color-indigo-50: oklch(96% 0.02 32);
+  --color-indigo-100: oklch(92.5% 0.04 32);
+  --color-indigo-200: oklch(86% 0.08 32);
+  --color-indigo-300: oklch(77% 0.13 32);
+  --color-indigo-400: oklch(68% 0.17 32);
+  --color-indigo-500: oklch(60% 0.2 32);
+  --color-indigo-600: oklch(52% 0.19 32);
+  --color-indigo-700: oklch(45% 0.165 32);
+  --color-indigo-800: oklch(38% 0.13 32);
+  --color-indigo-900: oklch(31% 0.095 32);
+  --color-indigo-950: oklch(23% 0.06 32);
+  --color-emerald-50: oklch(96% 0.02 165);
+  --color-emerald-100: oklch(93% 0.035 165);
+  --color-emerald-200: oklch(87% 0.06 165);
+  --color-emerald-300: oklch(78% 0.085 165);
+  --color-emerald-400: oklch(66% 0.105 165);
+  --color-emerald-500: oklch(55% 0.11 165);
+  --color-emerald-600: oklch(46% 0.1 165);
+  --color-emerald-700: oklch(39% 0.085 165);
+  --color-emerald-800: oklch(33% 0.07 165);
+  --color-emerald-900: oklch(28% 0.055 165);
+  --color-amber-50: oklch(96.5% 0.03 88);
+  --color-amber-100: oklch(93% 0.05 86);
+  --color-amber-200: oklch(87% 0.08 84);
+  --color-amber-300: oklch(79% 0.11 80);
+  --color-amber-400: oklch(71% 0.13 75);
+  --color-amber-500: oklch(63% 0.135 70);
+  --color-amber-600: oklch(52% 0.12 62);
+  --color-amber-700: oklch(44% 0.1 58);
+  --color-amber-800: oklch(37% 0.08 55);
+  --color-amber-900: oklch(31% 0.06 52);
+  --color-red-50: oklch(97.1% 0.013 17.38);
+  --color-red-100: oklch(93.6% 0.032 17.717);
+  --color-red-200: oklch(88.5% 0.062 18.334);
+  --color-red-300: oklch(80.8% 0.114 19.571);
+  --color-red-400: oklch(70.4% 0.191 22.216);
+  --color-red-500: oklch(63.7% 0.237 25.331);
+  --color-red-600: oklch(57.7% 0.245 27.325);
+  --color-red-700: oklch(50.5% 0.213 27.518);
+  --color-red-800: oklch(44.4% 0.177 26.899);
+  --color-red-900: oklch(39.6% 0.141 25.723);
+  --color-red-950: oklch(25.8% 0.092 26.042);
+  --color-sky-50: oklch(97.7% 0.013 236.62);
+  --color-sky-100: oklch(95.1% 0.026 236.824);
+  --color-sky-200: oklch(90.1% 0.058 230.902);
+  --color-sky-300: oklch(82.8% 0.111 230.318);
+  --color-sky-400: oklch(74.6% 0.16 232.661);
+  --color-sky-500: oklch(68.5% 0.169 237.323);
+  --color-sky-600: oklch(58.8% 0.158 241.966);
+  --color-sky-700: oklch(50% 0.134 242.749);
+  --color-sky-800: oklch(44.3% 0.11 240.79);
+  --color-sky-900: oklch(39.1% 0.09 240.876);
+  --color-sky-950: oklch(29.3% 0.066 243.157);
+  --color-violet-50: oklch(96.9% 0.016 293.756);
+  --color-violet-100: oklch(94.3% 0.029 294.588);
+  --color-violet-200: oklch(89.4% 0.057 293.283);
+  --color-violet-300: oklch(81.1% 0.111 293.571);
+  --color-violet-400: oklch(70.2% 0.183 293.541);
+  --color-violet-500: oklch(60.6% 0.25 292.717);
+  --color-violet-600: oklch(54.1% 0.281 293.009);
+  --color-violet-700: oklch(49.1% 0.27 292.581);
+  --color-violet-800: oklch(43.2% 0.232 292.759);
+  --color-violet-900: oklch(38% 0.189 293.745);
+  --color-violet-950: oklch(28.3% 0.141 291.089);
+  --color-rose-50: oklch(96.9% 0.015 12.422);
+  --color-rose-100: oklch(94.1% 0.03 12.58);
+  --color-rose-200: oklch(89.2% 0.058 10.001);
+  --color-rose-300: oklch(81% 0.117 11.638);
+  --color-rose-400: oklch(71.2% 0.194 13.428);
+  --color-rose-500: oklch(64.5% 0.246 16.439);
+  --color-rose-600: oklch(58.6% 0.253 17.585);
+  --color-rose-700: oklch(51.4% 0.222 16.935);
+  --color-rose-800: oklch(45.5% 0.188 13.697);
+  --color-rose-900: oklch(41% 0.159 10.272);
+  --color-rose-950: oklch(27.1% 0.105 12.094);
+  --color-amber-950: oklch(27.9% 0.077 45.635);
+  --color-emerald-950: oklch(26.2% 0.051 172.552);
+  --color-rule: var(--color-slate-300);
+}
+
+/* the lines of a ruled sheet */
+.ruled {
+  background-image: repeating-linear-gradient(transparent 0 calc(2rem - 1px), var(--color-slate-200) calc(2rem - 1px) 2rem); /* taste-skill-ignore: ruled paper */
+  background-attachment: local;
+  line-height: 2rem;
+}
+
+@keyframes weigh-beam { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
+@keyframes weigh-left { from { transform: translateY(12px); } to { transform: translateY(-12px); } }
+@keyframes weigh-right { from { transform: translateY(-12px); } to { transform: translateY(12px); } }
+
+/* a masked line of a chapter title rises from behind its own baseline */
+.mask-line { display: block; overflow: hidden; padding-bottom: 0.1em; margin-bottom: -0.1em; }
+.mask-line > span { display: block; }
+
+/* parts of a section arrive as they scroll in (motion.jsx: Reveal) */
+.reveal { opacity: 0; transform: translateY(26px); transition: opacity 700ms var(--ease-out), transform 900ms var(--ease-out); }
+.reveal.is-in { opacity: 1; transform: none; }
+.reveal-clip { clip-path: inset(0 0 100% 0); transition: clip-path 1000ms var(--ease-in-out); }
+.reveal-clip.is-in { clip-path: inset(0 0 -2% 0); }
+
+/* the architecture map: lines draw themselves, then data keeps moving along them */
+.map-line { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1900ms var(--ease-in-out); }
+.map-in .map-line { stroke-dashoffset: 0; }
+.map-flow { stroke-dasharray: 2 12; animation: map-flow 900ms linear infinite; opacity: 0; transition: opacity 600ms ease 1500ms; }
+.map-in .map-flow { opacity: 1; }
+@keyframes map-flow { to { stroke-dashoffset: -14; } }
+.map-node { opacity: 0; transform: translateY(16px) scale(0.96); transition: opacity 500ms var(--ease-out), transform 700ms var(--ease-out), background-color 260ms ease, color 260ms ease; }
+.map-in .map-node { opacity: 1; transform: none; }
+@keyframes flow-y { to { background-position: 0 14px; } }
+@utility flow-y {
+  background-image: linear-gradient(180deg, currentColor 50%, transparent 0); /* taste-skill-ignore: a dashed line */
+  background-size: 2px 7px;
+  background-repeat: repeat-y;
+  animation: flow-y 0.9s linear infinite;
+}
+
+/* names running off both edges */
+@keyframes marquee { to { transform: translateX(-50%); } }
+.marquee { animation: marquee 46s linear infinite; }
+
+/* the giant section mark drifts as the page scrolls */
+@supports (animation-timeline: scroll()) {
+  .drift { animation: drift linear both; animation-timeline: scroll(nearest); animation-range: 0 90vh; }
+  @keyframes drift { to { transform: translateY(16%) rotate(7deg); } }
+}
+
+/* hover answers the pointer, press gives */
+.press { transition: transform 140ms var(--ease-out), background-color 180ms ease, color 180ms ease; }
+.press:active { transform: scale(0.97); }
+
+/* <details> panels open smoothly where the browser supports it (Chrome/Edge 131+) */
+@supports selector(::details-content) {
+  :root { interpolate-size: allow-keywords; }
+  details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition: block-size 300ms cubic-bezier(0.2, 0, 0, 1), content-visibility 300ms allow-discrete;
+  }
+  details[open]::details-content {
+    block-size: auto;
+  }
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: var(--color-slate-50);
+    color: var(--color-slate-900);
+    font-optical-sizing: auto;
+    letter-spacing: -0.005em;
+  }
+  p, li {
+    text-wrap: pretty;
+  }
+  h1, h2, h3 {
+    font-weight: 600;
+    text-wrap: balance;
+    letter-spacing: -0.025em;
+  }
+  /* visible keyboard focus everywhere; mouse clicks do not show it */
+  :focus-visible {
+    outline: 2px solid var(--color-field-gold);
+    outline-offset: 2px;
+  }
+  a, button, select, input, textarea, summary {
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  button:not(:disabled):active {
+    transform: translateY(1px);
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  /* form fields get the surface colour, so they follow the theme; :where keeps utilities stronger */
+  :where(select, textarea, input:not([type=checkbox], [type=radio], [type=range], [type=file])) {
+    background-color: var(--color-white);
+    color: var(--color-slate-900);
+  }
+  /* scrollbars: thin, in the theme's colours (Chromium/Brave/Edge via ::-webkit-scrollbar,
+     Firefox via scrollbar-color) */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+    background-color: color-mix(in oklab, var(--color-slate-400) 45%, transparent);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-slate-400);
+  }
+  ::-webkit-scrollbar-button {
+    display: none;
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in oklab, var(--color-slate-400) 45%, transparent) transparent;
+    }
+  }
+  /* the browser draws native dropdown lists itself: give the options the theme's colours */
+  option {
+    background-color: var(--color-white);
+    color: var(--color-slate-900);
+  }
+  ::selection {
+    background-color: var(--color-field-gold);
+    color: var(--color-ink);
+  }
+  .theme-switching *, .theme-switching *::before, .theme-switching *::after {
+    transition: none !important;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .reveal, .reveal-clip, .map-node { opacity: 1; transform: none; clip-path: none; }
+    .map-line { stroke-dashoffset: 0; }
+    .map-flow, .marquee, .drift { animation: none; }
+    *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; }
+  }
+}
