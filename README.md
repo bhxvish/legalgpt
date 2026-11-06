@@ -14,7 +14,7 @@ analysis: never a verdict.
 > procedure (CrPC/BNSS) and special Acts such as the UAPA or NDPS Act, and it never says whether
 > anyone is guilty.
 
-![The Overview tab: how the knowledge is built and what every question runs through, with the headline results](docs/images/overview.jpg)
+![The Overview page, with the headline The law, checked. and a pair of scales](docs/images/overview.jpg)
 
 ---
 
@@ -42,8 +42,8 @@ analysis: never a verdict.
 | **Real judgments** | 349 judgments (312 Supreme Court criminal judgments, 2020–2023, plus 37 annotated) split into 28,055 passages labelled by role. The chat cites rulings and precedents next to the statute; the citation check warns when a sentence names a different case than the one it cites. |
 | **Case analysis** | Upload an FIR, charge sheet or case note: facts (each checked against a quote from the file), the offences they may engage, an element-by-element check (Prolog rules where encoded), similar past judgments, and a cited analysis. An output guard (patterns plus a small classifier) removes any sentence that states a verdict; prompt-injection defences treat the file as untrusted data. Follow-up questions about the finished analysis are answered from its sources, under the same guard. |
 | **"Why this answer?" and the pipeline trace** | Each answer shows the stages it went through (translation, sections retrieved, judgments, model, statements backed, BNS, signature), how closely each sentence is supported by a source, and any warnings. |
-| **Understand this answer** | Under every legal answer, in plain language: the model's **reasoning** (issue, rule, application, conclusion) with a **faithfulness test** that removes each key fact it names and checks the conclusion really changes; a **key-word heat map** (which words tied the question to each section); **source influence** (which sections were decisive); and a **bias check** that changes only the gender, religion, caste, income level, region or age of the people and explains every difference. It runs by itself for dowry, cruelty and other gender-sensitive cases and when caste is mentioned, in Chat and in Case analysis. |
-| **Explainability tab** | How each explanation works and how faithful it measured, plus what LoRA fine-tuning changed inside the local model (layer by layer, and which sources its answers depend on). |
+| **How it decided** | Under every legal answer, in plain language: the model's **reasoning** (issue, rule, application, conclusion) with a **faithfulness test** that removes each key fact it names and checks the conclusion really changes; a **key-word heat map** (which words tied the question to each section); **source influence** (which sections were decisive); and a **bias check** that changes only the gender, religion, caste, income level, region or age of the people and explains every difference. It runs by itself for dowry, cruelty and other gender-sensitive cases and when caste is mentioned, in Chat and in Case analysis. |
+| **Explain tab** | How each explanation works and how faithful it measured, plus what LoRA fine-tuning changed inside the local model (layer by layer, and which sources its answers depend on). |
 | **Fact check with rules** | Describe a case and pick a section: an AI extracts the facts, each with a quote, and a Prolog engine checks them against the section's elements. Opens pre-filled from a chat answer. |
 | **Labelling with InLegalBERT** | Upload judgments; an InLegalBERT ensemble suggests a role for every sentence (Facts, Law Applied, Precedent, Argument, Ruling). People check only the uncertain ones; 1 judgment in 10 is labelled blind to keep measuring the model. |
 | **Verifiable results** | Every answer is signed (Ed25519); zero-knowledge proofs (EZKL) show that a fact-check verdict follows from the published rules and that an answer's IPC sources are exactly what retrieval picks. [How it works](docs/zk/README.md) |
@@ -51,11 +51,11 @@ analysis: never a verdict.
 
 ## Screenshots
 
-**A cited answer.** Every claim cites its source, the line under the answer gives the BNS equivalent,
-judgments are cited next to the statute, and the pipeline trace shows each stage the answer went
-through.
+**A cited answer.** Every claim cites its source, and one plain line under the answer says how well it
+is sourced. Tabs open the sources with their BNS equivalents, what to check, how it decided and how it
+was made.
 
-![A legal answer about causing death by negligence, with citations, the BNS mapping, sources and the pipeline trace](docs/images/chat.jpg)
+![A legal answer about causing death by negligence, with its citation, a plain line on how well it is sourced, the BNS mapping and the sources](docs/images/chat.jpg)
 
 **A question in Hindi.** The question is searched in English translation and answered in Hindi with
 the same citations; the trace starts with the translation step.
@@ -66,25 +66,25 @@ the same citations; the trace starts with the translation step.
 offences they may engage are listed with their BNS numbers, followed by element checks, similar
 judgments and a cited analysis.
 
-![Case analysis of a house-theft FIR: verified facts and the offences with BNS equivalents](docs/images/case-analysis.jpg)
+![The case report for a house-theft FIR: each fact with the quote it rests on, and the offences with their BNS numbers](docs/images/case-analysis.jpg)
 
-**Understand this answer: bias check.** A dowry question is gender-sensitive, so the bias check runs by
-itself: the same question with the genders swapped, and the unchanged question asked again as a
-control. Each difference is labelled: required by law (dowry death is defined for a woman), run-to-run
+**How it decided: bias check.** A dowry question is gender-sensitive, so the bias check runs by itself:
+the same question with the genders swapped, and if the two differ, each is run again so that normal
+variation is not counted. Each difference is labelled: required by law (dowry death is defined for a woman), run-to-run
 variation, or unexplained.
 
 ![The bias check on a dowry question: the swapped question, the sections each version relied on, and every difference explained](docs/images/explain-bias.jpg)
 
-**Understand this answer: how it decided.** The model sets out its reasoning as issue, rule (each section and
+**How it decided: the reasoning.** The model sets out its reasoning as issue, rule (each section and
 why it applies or not), application (each fact against each element) and conclusion. The faithfulness
 test then removes each key fact it named and checks that the conclusion really changes.
 
 ![The reasoning trace for the dowry question in IRAC form](docs/images/explain-reasoning.jpg)
 
-**The Explainability tab.** What each explanation is and how faithful it measured, and inside the
+**The Explain tab.** Five questions to put to an answer: what each explanation is and how faithful it measured, and inside the
 fine-tuned model: where LoRA changed the weights, and which sources its answers depend on.
 
-![The Explainability tab: the LoRA weight-change heat map and inside-model measurements](docs/images/explainability-lora.jpg)
+![The Explain tab: the LoRA weight-change heat map and inside-model measurements](docs/images/explainability-lora.jpg)
 
 **Rule-based fact check.** The facts are tested element by element against a section encoded in
 Prolog; each element shows the quote it rests on, and the panel says what would change the verdict.
@@ -94,11 +94,12 @@ Prolog; each element shows the quote it rests on, and the panel says what would 
 **Labelling.** Judgments are labelled with InLegalBERT's help; the list shows what each judgment still
 needs and who labelled it.
 
-![The Label tab listing judgments by status](docs/images/label.jpg)
+![The cause list: every judgment as a volume on a shelf, coloured by status, with one open below](docs/images/label.jpg)
 
-The interface has light and dark themes, with three dark styles.
+**How an answer gets made.** The Overview walks through the whole system, from labelled judgments to a
+cited, checked and signed answer, with live figures on each step.
 
-![The Overview tab in the dark theme](docs/images/overview-dark.jpg)
+![The architecture map on the Overview page: how the knowledge is built and what every question runs through](docs/images/overview-architecture.jpg)
 
 ## How it works
 
