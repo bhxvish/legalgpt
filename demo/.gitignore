@@ -1,0 +1,4 @@
+# large local copies: the video, the deck and the PDF stay out of the public repo
+*.mp4
+*.pptx
+*.pdf

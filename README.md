@@ -42,6 +42,8 @@ analysis: never a verdict.
 | **Real judgments** | 349 judgments (312 Supreme Court criminal judgments, 2020–2023, plus 37 annotated) split into 28,055 passages labelled by role. The chat cites rulings and precedents next to the statute; the citation check warns when a sentence names a different case than the one it cites. |
 | **Case analysis** | Upload an FIR, charge sheet or case note: facts (each checked against a quote from the file), the offences they may engage, an element-by-element check (Prolog rules where encoded), similar past judgments, and a cited analysis. An output guard (patterns plus a small classifier) removes any sentence that states a verdict; prompt-injection defences treat the file as untrusted data. Follow-up questions about the finished analysis are answered from its sources, under the same guard. |
 | **"Why this answer?" and the pipeline trace** | Each answer shows the stages it went through (translation, sections retrieved, judgments, model, statements backed, BNS, signature), how closely each sentence is supported by a source, and any warnings. |
+| **Understand this answer** | Under every legal answer, in plain language: the model's **reasoning** (issue, rule, application, conclusion) with a **faithfulness test** that removes each key fact it names and checks the conclusion really changes; a **key-word heat map** (which words tied the question to each section); **source influence** (which sections were decisive); and a **bias check** that changes only the gender, religion, caste, income level, region or age of the people and explains every difference. It runs by itself for dowry, cruelty and other gender-sensitive cases and when caste is mentioned, in Chat and in Case analysis. |
+| **Explainability tab** | How each explanation works and how faithful it measured, plus what LoRA fine-tuning changed inside the local model (layer by layer, and which sources its answers depend on). |
 | **Fact check with rules** | Describe a case and pick a section: an AI extracts the facts, each with a quote, and a Prolog engine checks them against the section's elements. Opens pre-filled from a chat answer. |
 | **Labelling with InLegalBERT** | Upload judgments; an InLegalBERT ensemble suggests a role for every sentence (Facts, Law Applied, Precedent, Argument, Ruling). People check only the uncertain ones; 1 judgment in 10 is labelled blind to keep measuring the model. |
 | **Verifiable results** | Every answer is signed (Ed25519); zero-knowledge proofs (EZKL) show that a fact-check verdict follows from the published rules and that an answer's IPC sources are exactly what retrieval picks. [How it works](docs/zk/README.md) |
@@ -65,6 +67,24 @@ offences they may engage are listed with their BNS numbers, followed by element 
 judgments and a cited analysis.
 
 ![Case analysis of a house-theft FIR: verified facts and the offences with BNS equivalents](docs/images/case-analysis.jpg)
+
+**Understand this answer: bias check.** A dowry question is gender-sensitive, so the bias check runs by
+itself: the same question with the genders swapped, and the unchanged question asked again as a
+control. Each difference is labelled: required by law (dowry death is defined for a woman), run-to-run
+variation, or unexplained.
+
+![The bias check on a dowry question: the swapped question, the sections each version relied on, and every difference explained](docs/images/explain-bias.jpg)
+
+**Understand this answer: how it decided.** The model sets out its reasoning as issue, rule (each section and
+why it applies or not), application (each fact against each element) and conclusion. The faithfulness
+test then removes each key fact it named and checks that the conclusion really changes.
+
+![The reasoning trace for the dowry question in IRAC form](docs/images/explain-reasoning.jpg)
+
+**The Explainability tab.** What each explanation is and how faithful it measured, and inside the
+fine-tuned model: where LoRA changed the weights, and which sources its answers depend on.
+
+![The Explainability tab: the LoRA weight-change heat map and inside-model measurements](docs/images/explainability-lora.jpg)
 
 **Rule-based fact check.** The facts are tested element by element against a section encoded in
 Prolog; each element shows the quote it rests on, and the panel says what would change the verdict.
@@ -129,6 +149,11 @@ free tiers (Groq, Gemini); paired comparisons are each model against itself answ
 | **Prompt injection** (24 attack files) | Attacks that worked: 1/24 without the defences, **0/24** with them. Worst case (a model obeying every attack): the output guard removes **192/192** verdict and **144/144** fake-law sentences, and no genuine one. |
 | **Verdict guard** | Paraphrased verdicts caught **93%** (patterns alone 18%), on sentences from a different model family than training; 0/100 real analysis sentences removed. |
 | **Judgment-citation faithfulness** | Two independent AI judges: both say SUPPORTED for 14/19 judgment citations, none UNSUPPORTED; κ = 0.72. A blind human spot-check found **0 unsupported** of 38 and showed the judges to be stricter than the human. |
+| **Bias check** (40 gender-swapped scenario pairs, both versions run twice) | Possible bias (an unexplained difference after swapping only gender, holding in both runs): model alone **5/40** vs LegalGPT **4/40** (gpt-oss-120b), **9/40** vs **8/40** (Gemini 3.5 flash-lite). Neither difference is significant (p = 1.0), so we do not claim LegalGPT changes gender sensitivity. Most differences in dowry, cruelty and sexual-offence cases are explained by the law itself (16–17 pairs with gpt-oss-120b). A first run with one control flagged 12 and 9, and 20 and 13; most of those did not hold when run again. |
+| **Bias check** (caste, income level, region, age: 10 scenarios each where none should matter, both versions run twice) | Possible bias over the 40 pairs, on wordings the search filter was not built around: model alone **10/40** vs LegalGPT **4/40** (gpt-oss-120b, p = 0.15), **17/40** vs **11/40** (Gemini 3.5 flash-lite, p = 0.21). Neither difference is significant. With the filter off, LegalGPT was at 17/40 and 15/40. The filter removed the new caste and age wordings and missed the income and region ones, so only half of this tests it. No stereotyped wording or changed refusal. Too few scenarios to conclude a system is or is not biased; [every stage is in the report](docs/reports/explainability.md). |
+| **Key-word explanations** (57 scenarios, no model calls) | Removing the top-ranked word lowers the match with the law **0.173** vs **0.019** for a random word; better than random in every question. |
+| **Reasoning faithfulness** (18 scenarios, Gemini 3.5 flash-lite) | **26 of 38** key facts the reasoning named really changed the conclusion when removed; **86%** of the sections it said apply were decisive. |
+| **LoRA, inside the model** (3B adapter) | Largest change in the MLP gate/up layers and the first layers; in **16/16** answers the source the answer depends on most (measured in the model) is one it cites (log-probability drop 0.54 cited vs 0.0007 uncited). |
 | **IPC → BNS map** | 527 IPC sections mapped from the official BPRD table; all 47 entries of the earlier unverified map agree. |
 
 **Provenance of the data:** several ground truths were made with AI help and are labelled as such:
@@ -174,6 +199,7 @@ Try asking:
 | **Chat** | *Legal* mode answers only from the law with citations; *General* mode is an ordinary chatbot answer. **Law:** Auto / IPC / BNS. Pick the model under the box. History is kept in your browser. |
 | **Case analysis** | Upload or paste a case file. Facts with quotes, offences (with BNS numbers), element checks, similar judgments and a cited analysis; *Keep the file on this computer* runs everything on the local model. Afterwards, *Ask about this analysis* takes follow-up questions (never a verdict); the analysis stays when you switch tabs. |
 | **Verify** | Check stated facts against one of 7 IPC sections encoded as Prolog rules (279, 304A, 304B, 323, 337, 338, 379). |
+| **Explainability** | What each explanation is (reasoning, key words, sources, bias check, inside the local model) and the measured results behind them. |
 
 ## Reproduce the results
 

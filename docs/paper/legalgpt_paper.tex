@@ -59,12 +59,17 @@ punishments and civil questions treated as offences, which the models alone prod
 90 percent of cases, and raises statute-section accuracy from 41 to 81 percent to 98 to 100 percent.
 The sentence-role ensemble reaches a macro-F1 of 0.807. We further evaluate Hindi questions, answering
 under the new code, prompt injection, citation faithfulness with independent model judges and a blind
-human check, and release a one-command reproduction of every result.
+human check. Beyond citations, the system explains each decision: a reasoning trace whose key facts
+are tested by removing them, word- and source-level perturbation, a counterfactual
+bias check (gender, religion, caste, income, region, age) that separates differences the law requires
+from unexplained ones, and an analysis of what
+LoRA fine-tuning changed inside the local model. We release a one-command reproduction of every result.
 \end{abstract}
 
 \begin{IEEEkeywords}
 legal question answering, retrieval-augmented generation, Indian Penal Code, Bharatiya Nyaya Sanhita,
-rhetorical role labelling, neuro-symbolic verification, citation faithfulness
+rhetorical role labelling, neuro-symbolic verification, citation faithfulness, explainability,
+counterfactual fairness
 \end{IEEEkeywords}
 
 \section{Introduction}
@@ -98,6 +103,9 @@ transfer (macro-F1 0.807), used to build a 28,055-passage judgment library cited
 \item Safety and faithfulness evaluations: element checks in Prolog, a verdict guard against
 prompt injection, citation faithfulness judged by two independent models, and a blind human
 spot-check of those judges.
+\item Explanations of the decision itself, each tested for faithfulness: an IRAC reasoning trace
+checked by fact and source perturbation, word-level importance, a counterfactual bias check aware of
+the offences Indian law defines by gender, and an analysis of the LoRA update (Section~\ref{sec:xai}).
 \item Verifiability (signed answers and zero-knowledge proofs) and a single command that rebuilds
 every reported result from cached outputs.
 \end{itemize}
@@ -232,6 +240,48 @@ sources or sentences that cite one judgment while naming another. Seven IPC sect
 LLM extracts the facts each element depends on, each with a quote from the user's text that must
 appear verbatim, and the engine returns consistent, inconsistent or insufficient, naming the facts
 that would change the verdict.
+
+\subsection{Explaining the decision}\label{sec:xai}
+
+Citations show where an answer came from, not why the model concluded it. LegalGPT therefore explains
+the decision itself, and tests every explanation, since post-hoc explanations can be unfaithful
+\cite{turpin2023unfaithful,jacovi2020faithfulness}. Hosted models are black boxes, so their decisions
+are explained by perturbation: the input is changed and the output observed. Our own fine-tuned model
+is open, so it is also explained from its weights.
+
+\textbf{Reasoning trace.} After an answer, the model sets out its reasoning in the IRAC form used in
+legal writing: the issue, each retrieved section with whether and why it applies, each fact matched to
+an element, and the conclusion with the facts it depends on (key facts, quoted from the question). The
+server removes any section or source number not among the sources.
+
+\textbf{Perturbation tests.} \emph{Fact influence}: each key fact, and each other clause of the
+question, is removed in turn and the answer is written again from the same sources; a fact the model
+relied on changes the sections the answer relies on. The agreement between ``named as key'' and
+``changes the conclusion'' is the trace's faithfulness. \emph{Source influence}: each section is left
+out in turn; a section is decisive if the conclusion changes. \emph{Key words}: each word of the
+question is removed and the similarity to each retrieved section and the scope classifier's crime
+probability are recomputed, without any model call, giving a word-level heat map. Every model-based
+test first answers the unchanged input again; changes this control also shows are run-to-run variation
+and are not counted.
+
+\textbf{Bias check.} A counterfactual fairness test \cite{kusner2017counterfactual}: the question or
+case file is rewritten with only the people's gender swapped (husband and wife, pronouns, names), or
+their religion (names, places), caste, income level, region or age, and both versions run through the
+same pipeline together with a control run. When the text names none of the last four, one sentence
+about the accused is added to two otherwise identical copies. Indian criminal law is itself gender-specific in places: dowry death (IPC 304B) is the
+death of a woman, cruelty under 498A is by a husband or his relatives, rape under 375 is by a man. A
+curated list of 27 such IPC offences, mapped to the BNS through the official table, separates
+differences the law requires from unexplained ones; when a gender-specific offence stops applying,
+the general offences that replace it (hurt, culpable homicide) are attributed to it too. Sections an
+answer names only to rule them out are not counted, and stereotyped or victim-blaming wording is
+flagged. The check runs automatically when a question or case file is gender-sensitive.
+
+\textbf{Inside the local model.} Following the analysis of low-rank updates in the LoRA paper
+\cite{hu2022lora}, the adapter's update $\Delta W = BA$ is examined per layer and module: its size
+relative to the base weight, its effective rank, and the amplification factor
+$\lVert\Delta W\rVert_F / \lVert U^\top W V\rVert_F$. Running locally, the tuned model's answer is also
+scored token by token under the tuned and the base weights, and with each source removed from the
+prompt, which measures inside the model which sources the answer depends on.
 
 \subsection{Case analysis}
 
@@ -471,6 +521,83 @@ Cohen's kappa (supported vs. not) & 0.47 & 0.42 \\
 \end{tabular}
 \end{table}
 
+\subsection{Explaining the decision: are the explanations faithful?}\label{sec:xai-results}
+
+\textbf{Key words.} On 57 held-out scenarios (no model calls), removing the single word the explanation
+ranks highest lowers the similarity to the top retrieved section by 0.173 on average, against 0.019 for
+a random content word, and by more than a random word in every question; for the scope classifier's
+crime probability the drops are 0.074 and 0.010. The deletion test follows ERASER
+\cite{deyoung2020eraser}: the ranking reflects what retrieval actually uses.
+
+\textbf{Reasoning traces.} On 18 held-out scenarios answered by Gemini 3.5 flash-lite (two others were
+declined), 97 percent of the key facts named in the traces were quoted verbatim from the question, and
+0.9 invalid sections or source numbers per trace were removed. Of 38 key facts, 26 (68 percent) changed
+the conclusion when removed; the mean agreement between ``named as key'' and ``changes the conclusion''
+was 0.70. Of the 36 sections a trace said apply, 31 were decisive when left out (precision 0.86;
+recall 0.65 of the 48 decisive sections). The control run changed the result in a third to a half of
+the cases, so without it a large share of ``influence'' would have been run-to-run variation. The
+traces are thus largely but not fully faithful, which is why the app shows the test next to the trace.
+
+\textbf{Bias check.} On 40 scenario pairs (24 gender-sensitive, 16 where gender should not matter), both
+versions were run twice, and a section counts only if it holds in both runs of one version and neither run
+of the other, with the definition and the punishment of one offence counted once. With gpt-oss-120b the
+check attributed most differences in the sensitive cases to the law itself (17 pairs for the model alone,
+16 inside LegalGPT). Possible bias remained in 5 of 40 pairs for the model alone and 4 inside LegalGPT, and
+in 9 and 8 with Gemini 3.5 flash-lite. Neither difference is significant (exact McNemar $p=1.0$ for both),
+so we do not claim that LegalGPT changes gender sensitivity. A first run with one control flagged 12 and 9,
+and 20 and 13; most of those pairs did not hold when run again, which is why the stricter rule is used. A
+gender-specific offence was still relied on after the genders were reversed, and so probably misapplied, in
+10 pairs for the model alone and 7 inside LegalGPT, and in 17 and 15 with Gemini. No stereotyped wording was
+found. The check makes the remaining cases visible to the user.
+
+\textbf{Caste, income, region and age.} We also ran 10 scenarios per attribute where none of these
+should matter. The two versions differ in one sentence about the accused (an upper-caste or a Dalit
+family; a wealthy businessman or a poor daily-wage labourer; a local resident or a migrant worker from
+Bihar; aged 30 or 70), except in 3 age scenarios, where an age word in the text is swapped instead. As for gender, both versions run twice and a section counts
+only if it holds in both runs of one version and neither run of the other; this cut the flagged pairs
+for the model alone from 26 to 13 (gpt-oss-120b) and from 32 to 21 (Gemini). Over the 40 pairs, possible bias was first found
+in 13 for the model alone and 18 inside LegalGPT with gpt-oss-120b, and in 21 and 13 with Gemini. Some of
+these differences were the definition and the punishment of one offence (s.441 and s.447); counted once,
+they fall to 10 and 14, and 21 and 10. LegalGPT's search then returned different sections in all 24 of
+its flagged pairs and in 36 of the 56 others, so the added sentence was entering through retrieval. Since
+LegalGPT cites only what it retrieves, this locates where the sentence enters, not why the result changed.
+
+We therefore added a filter that keeps a sentence about who someone is out of the search text, while the
+model still reads the whole question and the app shows what was left out. It keeps anything that can carry
+legal weight, such as anyone under 18, public servants, relatives, and sentences saying what someone did.
+On the wordings it was built around, LegalGPT's flagged pairs fell to 6 and 3 of 40. Because those figures
+are not independent of the filter, we froze it and tested one new wording per attribute on the same
+scenarios. There the model alone was flagged in 10 pairs (gpt-oss-120b) and 17 (Gemini); LegalGPT in 17 and
+15 with the filter off and 4 and 11 with it on. LegalGPT with the filter is below the model alone, but
+neither difference is significant (exact McNemar $p=0.15$ and $p=0.21$). The filter removed the new caste
+and age wordings but missed the income and region ones, which describe a person through what they do or
+have. Where it removed the sentence, flagged pairs went from 9 to 0 of 20 ($p=0.004$) and from 8 to 3
+($p=0.18$). Where it missed the sentence, the search received the same text both times and the counts were
+8 and 4, and 7 and 8: that gap is run-to-run noise, and it is large beside the effect. We did not change the
+filter after seeing these results. Case analysis does not use the filter. No stereotyped wording or changed
+refusal was found. With 10 scenarios per attribute, one held-out wording each and several comparisons, these
+are signals to investigate, not evidence that a system is or is not biased.
+
+During these runs some answers stopped mid-sentence with no error: 61 of the Gemini answers inside
+LegalGPT and 5 from gpt-oss-120b alone. A missing section would read as a difference between versions, so
+all 66 were asked again, the figures above use the complete answers, and the evaluation now repeats any
+answer that stops early.
+
+\textbf{Inside the fine-tuned model.} For the 3B adapter (rank 16, 252 matrices) the update is largest
+in the MLP gate and up projections (1.3 percent of the base weight's norm; attention 0.7 percent) and in
+the first layers (1 to 5). Its effective rank is 13.0 of 16, and 90 percent of its energy lies in 8.7
+directions. The amplification factor is above 1 in the MLP (2.6 to 3.0) and below 1 in the attention
+keys and values: the update mostly adds directions the base weights barely use (their projection on
+the update's directions is 1.1 times a random subspace and 3 percent of their own top directions),
+consistent with the LoRA paper's observation \cite{hu2022lora}. Two successive 1.5B adapters share
+little of their subspace (top-direction similarity 0.03, against 0.0006 for random directions). On the
+tuned model's own answers to 16 held-out scenarios, the adapter made its answers 1.74 nats per token
+more likely than the base model would (citation markers 1.27, section numbers 0.23): it changed the
+style of the whole answer rather than singling out citations. Leaving each source out of the prompt, the answer's mean
+log-probability dropped by 0.54 for sources it cites and by 0.0007 for those it does not, and the most
+influential source was a cited one in all 16 answers: inside the model, the citations reflect what
+the answer relied on.
+
 \subsection{Verifiability and reproducibility}
 
 A verdict proof takes about 1~s to generate (33~KB, verified in 0.03~s), and a retrieval proof over
@@ -497,6 +624,13 @@ procedure, evidence or special statutes, which it declines. Several samples are 
 names a correct offence for 65 percent of real judgments and is an assistive draft, not a decision.
 Sentence-level support is measured with an English embedding model, so it is not computed for Hindi
 answers. The retrieval proofs cover the IPC index, and the Prolog rules encode IPC sections only.
+
+\textbf{Explanations.} The reasoning trace is the model's own account and was faithful for 68 percent
+of the key facts it named; it is shown with its test, not as ground truth. Perturbation explains
+behaviour, not mechanism, and is noisy for sampled models, which is why every test runs a control.
+The bias check swaps words and common names; it cannot see gender stated in other ways, and the
+scenario set is small and written by us. Surnames are only a rough signal of caste. LegalGPT does not
+cover the SC/ST (Prevention of Atrocities) Act, 1989, so differences arising from it cannot be judged.
 
 \section{Conclusion}
 
@@ -543,6 +677,10 @@ CC-BY-4.0 Supreme Court judgment collection, and the authors of InLegalBERT and 
 \bibitem{mcnemar1947} Q. McNemar, ``Note on the sampling error of the difference between correlated proportions or percentages,'' \textit{Psychometrika}, vol. 12, no. 2, pp. 153--157, 1947.
 \bibitem{efron1993bootstrap} B. Efron and R. J. Tibshirani, \textit{An Introduction to the Bootstrap}. New York: Chapman \& Hall, 1993.
 \bibitem{cohen1960kappa} J. Cohen, ``A coefficient of agreement for nominal scales,'' \textit{Educ. Psychol. Meas.}, vol. 20, no. 1, pp. 37--46, 1960.
+\bibitem{turpin2023unfaithful} M. Turpin, J. Michael, E. Perez, and S. R. Bowman, ``Language models don't always say what they think: Unfaithful explanations in chain-of-thought prompting,'' in \textit{Proc. NeurIPS}, 2023.
+\bibitem{jacovi2020faithfulness} A. Jacovi and Y. Goldberg, ``Towards faithfully interpretable NLP systems: How should we define and evaluate faithfulness?'' in \textit{Proc. ACL}, 2020.
+\bibitem{kusner2017counterfactual} M. J. Kusner, J. Loftus, C. Russell, and R. Silva, ``Counterfactual fairness,'' in \textit{Proc. NeurIPS}, 2017.
+\bibitem{deyoung2020eraser} J. DeYoung \textit{et al.}, ``ERASER: A benchmark to evaluate rationalized NLP models,'' in \textit{Proc. ACL}, 2020.
 \end{thebibliography}
 
 \end{document}

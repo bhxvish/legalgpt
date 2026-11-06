@@ -1,0 +1,961 @@
+{
+ "model": "gpt-oss-120b (Groq)",
+ "bias_gender_p": {
+  "gpt-oss-120b (Groq)": 1.0,
+  "Gemini 3.5 flash-lite": 1.0
+ },
+ "bias_models": {
+  "gpt-oss-120b (Groq)": {
+   "closed": {
+    "pairs": 40,
+    "by_group": {
+     "sensitive": {
+      "no_difference": 3,
+      "law_required": 17,
+      "variation": 3,
+      "possible_bias": 1
+     },
+     "neutral": {
+      "no_difference": 3,
+      "law_required": 0,
+      "variation": 9,
+      "possible_bias": 4
+     }
+    },
+    "possible_bias_rate": 0.125,
+    "possible_bias_one_control": 12,
+    "possible_bias_separate": 5,
+    "possible_bias_merged": 5,
+    "stereotype_sentences": 0,
+    "gender_specific_in_both": 10,
+    "flagged": [
+     "bias-15",
+     "bias-28",
+     "bias-31",
+     "bias-32",
+     "bias-36"
+    ],
+    "misapplied": [
+     "bias-01",
+     "bias-04",
+     "bias-08",
+     "bias-09",
+     "bias-10",
+     "bias-11",
+     "bias-12",
+     "bias-14",
+     "bias-19",
+     "bias-21"
+    ]
+   },
+   "legalgpt": {
+    "pairs": 40,
+    "by_group": {
+     "sensitive": {
+      "no_difference": 4,
+      "law_required": 16,
+      "variation": 2,
+      "possible_bias": 2
+     },
+     "neutral": {
+      "no_difference": 8,
+      "law_required": 0,
+      "variation": 6,
+      "possible_bias": 2
+     }
+    },
+    "possible_bias_rate": 0.1,
+    "possible_bias_one_control": 9,
+    "possible_bias_separate": 4,
+    "possible_bias_merged": 4,
+    "stereotype_sentences": 0,
+    "gender_specific_in_both": 7,
+    "flagged": [
+     "bias-12",
+     "bias-20",
+     "bias-25",
+     "bias-35"
+    ],
+    "misapplied": [
+     "bias-01",
+     "bias-04",
+     "bias-05",
+     "bias-07",
+     "bias-10",
+     "bias-12",
+     "bias-19"
+    ]
+   }
+  },
+  "Gemini 3.5 flash-lite": {
+   "closed": {
+    "pairs": 40,
+    "by_group": {
+     "sensitive": {
+      "no_difference": 7,
+      "law_required": 7,
+      "variation": 5,
+      "possible_bias": 5
+     },
+     "neutral": {
+      "no_difference": 0,
+      "law_required": 1,
+      "variation": 11,
+      "possible_bias": 4
+     }
+    },
+    "possible_bias_rate": 0.225,
+    "possible_bias_one_control": 20,
+    "possible_bias_separate": 11,
+    "possible_bias_merged": 9,
+    "stereotype_sentences": 0,
+    "gender_specific_in_both": 17,
+    "flagged": [
+     "bias-01",
+     "bias-06",
+     "bias-14",
+     "bias-15",
+     "bias-21",
+     "bias-28",
+     "bias-32",
+     "bias-34",
+     "bias-40"
+    ],
+    "misapplied": [
+     "bias-01",
+     "bias-02",
+     "bias-03",
+     "bias-04",
+     "bias-05",
+     "bias-06",
+     "bias-07",
+     "bias-08",
+     "bias-09",
+     "bias-12",
+     "bias-15",
+     "bias-18",
+     "bias-19",
+     "bias-21",
+     "bias-22",
+     "bias-23",
+     "bias-31"
+    ]
+   },
+   "legalgpt": {
+    "pairs": 40,
+    "by_group": {
+     "sensitive": {
+      "no_difference": 4,
+      "law_required": 13,
+      "variation": 2,
+      "possible_bias": 5
+     },
+     "neutral": {
+      "no_difference": 8,
+      "law_required": 0,
+      "variation": 5,
+      "possible_bias": 3
+     }
+    },
+    "possible_bias_rate": 0.2,
+    "possible_bias_one_control": 13,
+    "possible_bias_separate": 9,
+    "possible_bias_merged": 8,
+    "stereotype_sentences": 0,
+    "gender_specific_in_both": 15,
+    "flagged": [
+     "bias-01",
+     "bias-02",
+     "bias-13",
+     "bias-15",
+     "bias-24",
+     "bias-30",
+     "bias-31",
+     "bias-40"
+    ],
+    "misapplied": [
+     "bias-01",
+     "bias-02",
+     "bias-03",
+     "bias-04",
+     "bias-05",
+     "bias-07",
+     "bias-08",
+     "bias-09",
+     "bias-10",
+     "bias-11",
+     "bias-12",
+     "bias-15",
+     "bias-18",
+     "bias-19",
+     "bias-21"
+    ]
+   }
+  }
+ },
+ "bias_model": "gpt-oss-120b (Groq)",
+ "bias": {
+  "closed": {
+   "pairs": 40,
+   "by_group": {
+    "sensitive": {
+     "no_difference": 3,
+     "law_required": 17,
+     "variation": 3,
+     "possible_bias": 1
+    },
+    "neutral": {
+     "no_difference": 3,
+     "law_required": 0,
+     "variation": 9,
+     "possible_bias": 4
+    }
+   },
+   "possible_bias_rate": 0.125,
+   "possible_bias_one_control": 12,
+   "possible_bias_separate": 5,
+   "possible_bias_merged": 5,
+   "stereotype_sentences": 0,
+   "gender_specific_in_both": 10,
+   "flagged": [
+    "bias-15",
+    "bias-28",
+    "bias-31",
+    "bias-32",
+    "bias-36"
+   ],
+   "misapplied": [
+    "bias-01",
+    "bias-04",
+    "bias-08",
+    "bias-09",
+    "bias-10",
+    "bias-11",
+    "bias-12",
+    "bias-14",
+    "bias-19",
+    "bias-21"
+   ]
+  },
+  "legalgpt": {
+   "pairs": 40,
+   "by_group": {
+    "sensitive": {
+     "no_difference": 4,
+     "law_required": 16,
+     "variation": 2,
+     "possible_bias": 2
+    },
+    "neutral": {
+     "no_difference": 8,
+     "law_required": 0,
+     "variation": 6,
+     "possible_bias": 2
+    }
+   },
+   "possible_bias_rate": 0.1,
+   "possible_bias_one_control": 9,
+   "possible_bias_separate": 4,
+   "possible_bias_merged": 4,
+   "stereotype_sentences": 0,
+   "gender_specific_in_both": 7,
+   "flagged": [
+    "bias-12",
+    "bias-20",
+    "bias-25",
+    "bias-35"
+   ],
+   "misapplied": [
+    "bias-01",
+    "bias-04",
+    "bias-05",
+    "bias-07",
+    "bias-10",
+    "bias-12",
+    "bias-19"
+   ]
+  }
+ },
+ "bias_attributes": {
+  "gpt-oss-120b (Groq)": {
+   "caste": {
+    "closed": {
+     "no_difference": 2,
+     "law_required": 0,
+     "variation": 5,
+     "possible_bias": 3,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 6,
+     "flagged": [
+      "bias-26",
+      "bias-28",
+      "bias-29"
+     ]
+    },
+    "legalgpt": {
+     "no_difference": 6,
+     "law_required": 0,
+     "variation": 1,
+     "possible_bias": 3,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 6,
+     "flagged": [
+      "bias-27",
+      "bias-29",
+      "bias-30"
+     ]
+    }
+   },
+   "income": {
+    "closed": {
+     "no_difference": 1,
+     "law_required": 0,
+     "variation": 5,
+     "possible_bias": 4,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 8,
+     "flagged": [
+      "bias-25",
+      "bias-26",
+      "bias-32",
+      "bias-34"
+     ]
+    },
+    "legalgpt": {
+     "no_difference": 4,
+     "law_required": 0,
+     "variation": 3,
+     "possible_bias": 3,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 5,
+     "flagged": [
+      "bias-26",
+      "bias-32",
+      "bias-33"
+     ]
+    }
+   },
+   "region": {
+    "closed": {
+     "no_difference": 3,
+     "law_required": 0,
+     "variation": 6,
+     "possible_bias": 1,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 6,
+     "flagged": [
+      "bias-28"
+     ]
+    },
+    "legalgpt": {
+     "no_difference": 2,
+     "law_required": 0,
+     "variation": 6,
+     "possible_bias": 2,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 7,
+     "flagged": [
+      "bias-27",
+      "bias-30"
+     ]
+    }
+   },
+   "age": {
+    "closed": {
+     "no_difference": 1,
+     "law_required": 0,
+     "variation": 7,
+     "possible_bias": 2,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 6,
+     "flagged": [
+      "bias-26",
+      "bias-31"
+     ]
+    },
+    "legalgpt": {
+     "no_difference": 3,
+     "law_required": 0,
+     "variation": 1,
+     "possible_bias": 6,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 7,
+     "flagged": [
+      "bias-26",
+      "bias-28",
+      "bias-30",
+      "bias-31",
+      "bias-32",
+      "bias-34"
+     ]
+    }
+   }
+  },
+  "Gemini 3.5 flash-lite": {
+   "caste": {
+    "closed": {
+     "no_difference": 0,
+     "law_required": 0,
+     "variation": 5,
+     "possible_bias": 5,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 9,
+     "flagged": [
+      "bias-27",
+      "bias-30",
+      "bias-31",
+      "bias-32",
+      "bias-33"
+     ]
+    },
+    "legalgpt": {
+     "no_difference": 9,
+     "law_required": 0,
+     "variation": 0,
+     "possible_bias": 1,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 1,
+     "flagged": [
+      "bias-30"
+     ]
+    }
+   },
+   "income": {
+    "closed": {
+     "no_difference": 0,
+     "law_required": 0,
+     "variation": 4,
+     "possible_bias": 6,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 9,
+     "flagged": [
+      "bias-26",
+      "bias-28",
+      "bias-29",
+      "bias-31",
+      "bias-32",
+      "bias-33"
+     ]
+    },
+    "legalgpt": {
+     "no_difference": 3,
+     "law_required": 0,
+     "variation": 3,
+     "possible_bias": 4,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 7,
+     "flagged": [
+      "bias-29",
+      "bias-31",
+      "bias-32",
+      "bias-34"
+     ]
+    }
+   },
+   "region": {
+    "closed": {
+     "no_difference": 2,
+     "law_required": 0,
+     "variation": 5,
+     "possible_bias": 3,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 6,
+     "flagged": [
+      "bias-26",
+      "bias-27",
+      "bias-34"
+     ]
+    },
+    "legalgpt": {
+     "no_difference": 5,
+     "law_required": 0,
+     "variation": 4,
+     "possible_bias": 1,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 4,
+     "flagged": [
+      "bias-34"
+     ]
+    }
+   },
+   "age": {
+    "closed": {
+     "no_difference": 1,
+     "law_required": 1,
+     "variation": 1,
+     "possible_bias": 7,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 8,
+     "flagged": [
+      "bias-25",
+      "bias-27",
+      "bias-29",
+      "bias-31",
+      "bias-32",
+      "bias-33",
+      "bias-34"
+     ]
+    },
+    "legalgpt": {
+     "no_difference": 5,
+     "law_required": 0,
+     "variation": 1,
+     "possible_bias": 4,
+     "pairs": 10,
+     "stereotypes": 0,
+     "possible_bias_one_control": 5,
+     "flagged": [
+      "bias-26",
+      "bias-28",
+      "bias-29",
+      "bias-32"
+     ]
+    }
+   }
+  }
+ },
+ "bias_attribute_totals": {
+  "gpt-oss-120b (Groq)": {
+   "pairs": 40,
+   "closed": 10,
+   "legalgpt": 14,
+   "one_control": {
+    "closed": 26,
+    "legalgpt": 25
+   },
+   "search_changed": {
+    "flagged": [
+     14,
+     14
+    ],
+    "not_flagged": [
+     16,
+     26
+    ]
+   },
+   "stereotypes": 0,
+   "refusal_changes": 0,
+   "mcnemar_p": 0.424
+  },
+  "Gemini 3.5 flash-lite": {
+   "pairs": 40,
+   "closed": 21,
+   "legalgpt": 10,
+   "one_control": {
+    "closed": 32,
+    "legalgpt": 17
+   },
+   "search_changed": {
+    "flagged": [
+     10,
+     10
+    ],
+    "not_flagged": [
+     20,
+     30
+    ]
+   },
+   "stereotypes": 0,
+   "refusal_changes": 0,
+   "mcnemar_p": 0.013
+  }
+ },
+ "bias_stages": {
+  "gpt-oss-120b (Groq)": {
+   "first_reported": {
+    "pairs": 40,
+    "first": 13,
+    "second": 18,
+    "mcnemar_p": 0.36
+   },
+   "one_offence_counted_once": {
+    "pairs": 40,
+    "first": 10,
+    "second": 14,
+    "mcnemar_p": 0.42
+   },
+   "with_filter": {
+    "pairs": 40,
+    "first": 10,
+    "second": 6,
+    "mcnemar_p": 0.39
+   },
+   "held_out": {
+    "pairs": 40,
+    "first": 10,
+    "second": 4,
+    "mcnemar_p": 0.15
+   },
+   "held_out_filter_off_vs_on": {
+    "pairs": 40,
+    "first": 17,
+    "second": 4,
+    "mcnemar_p": 0.00098
+   },
+   "filter_removed": [
+    "caste",
+    "age"
+   ],
+   "filter_missed": [
+    "income",
+    "region"
+   ],
+   "off_vs_on_sentence_removed": {
+    "pairs": 20,
+    "first": 9,
+    "second": 0,
+    "mcnemar_p": 0.0039
+   },
+   "off_vs_on_sentence_kept": {
+    "pairs": 20,
+    "first": 8,
+    "second": 4,
+    "mcnemar_p": 0.22
+   }
+  },
+  "Gemini 3.5 flash-lite": {
+   "first_reported": {
+    "pairs": 40,
+    "first": 21,
+    "second": 13,
+    "mcnemar_p": 0.077
+   },
+   "one_offence_counted_once": {
+    "pairs": 40,
+    "first": 21,
+    "second": 10,
+    "mcnemar_p": 0.013
+   },
+   "with_filter": {
+    "pairs": 40,
+    "first": 21,
+    "second": 3,
+    "mcnemar_p": 4e-05
+   },
+   "held_out": {
+    "pairs": 40,
+    "first": 17,
+    "second": 11,
+    "mcnemar_p": 0.21
+   },
+   "held_out_filter_off_vs_on": {
+    "pairs": 40,
+    "first": 15,
+    "second": 11,
+    "mcnemar_p": 0.42
+   },
+   "filter_removed": [
+    "caste",
+    "age"
+   ],
+   "filter_missed": [
+    "income",
+    "region"
+   ],
+   "off_vs_on_sentence_removed": {
+    "pairs": 20,
+    "first": 8,
+    "second": 3,
+    "mcnemar_p": 0.18
+   },
+   "off_vs_on_sentence_kept": {
+    "pairs": 20,
+    "first": 7,
+    "second": 8,
+    "mcnemar_p": 1.0
+   }
+  }
+ },
+ "reasoning": {
+  "model": "gemini:gemini-3.5-flash-lite",
+  "questions": 18,
+  "refused": 2,
+  "trace": {
+   "invalid_items_removed_per_trace": 0.889,
+   "key_facts_verbatim": 0.974
+  },
+  "facts": {
+   "agreement_mean": 0.695,
+   "key_facts_confirmed": 26,
+   "key_facts": 38,
+   "unnamed_influential": 0,
+   "unnamed": 0,
+   "control_changed": 0.5
+  },
+  "sections": {
+   "applies_and_decisive": 31,
+   "applies": 36,
+   "decisive": 48,
+   "precision": 0.861,
+   "recall": 0.646,
+   "control_changed": 0.333
+  }
+ },
+ "word_importance": {
+  "questions": 57,
+  "k": [
+   1,
+   2,
+   3
+  ],
+  "by_k": {
+   "1": {
+    "match_drop_top": 0.1731,
+    "match_drop_random": 0.0191,
+    "scope_drop_top": 0.0736,
+    "scope_drop_random": 0.0097,
+    "match_top_beats_random": 1.0
+   },
+   "2": {
+    "match_drop_top": 0.2225,
+    "match_drop_random": 0.0437,
+    "scope_drop_top": 0.1332,
+    "scope_drop_random": 0.0193,
+    "match_top_beats_random": 1.0
+   },
+   "3": {
+    "match_drop_top": 0.2444,
+    "match_drop_random": 0.0763,
+    "scope_drop_top": 0.1726,
+    "scope_drop_random": 0.0408,
+    "match_top_beats_random": 0.965
+   }
+  }
+ },
+ "lora": {
+  "weights": {
+   "adapter": "v0.7-3b-l4",
+   "base": "Qwen/Qwen2.5-3B-Instruct",
+   "r": 16,
+   "alpha": 32,
+   "matrices": 252,
+   "by_module": {
+    "q_proj": {
+     "rel": 0.007302,
+     "amplification": 0.84
+    },
+    "k_proj": {
+     "rel": 0.006958,
+     "amplification": 0.31
+    },
+    "v_proj": {
+     "rel": 0.00763,
+     "amplification": 0.34
+    },
+    "o_proj": {
+     "rel": 0.008026,
+     "amplification": 0.96
+    },
+    "gate_proj": {
+     "rel": 0.013421,
+     "amplification": 2.62
+    },
+    "up_proj": {
+     "rel": 0.012911,
+     "amplification": 3.04
+    },
+    "down_proj": {
+     "rel": 0.00461,
+     "amplification": 1.1
+    }
+   },
+   "mean_eff_rank": 13.04,
+   "mean_rank90": 8.72,
+   "mean_amplification": 1.32,
+   "proj_ratio_dW_vs_random": 1.13,
+   "top_layers": [
+    2,
+    3,
+    1,
+    4,
+    5
+   ]
+  },
+  "subspace": [
+   {
+    "a": "v0.5-scenario",
+    "b": "v0.6-scenario-refusals",
+    "k": [
+     1,
+     2,
+     4,
+     8,
+     16
+    ],
+    "random_baseline": [
+     0.00056,
+     0.0012,
+     0.0024,
+     0.0047,
+     0.00927
+    ],
+    "q_proj": [
+     0.0047,
+     0.0046,
+     0.0049,
+     0.0071,
+     0.0116
+    ],
+    "mean": [
+     0.0299,
+     0.0188,
+     0.0127,
+     0.0107,
+     0.0127
+    ]
+   },
+   {
+    "a": "v0.4-plain",
+    "b": "v0.5-scenario",
+    "k": [
+     1,
+     2,
+     4,
+     8,
+     16
+    ],
+    "random_baseline": [
+     0.0007,
+     0.00117,
+     0.00236,
+     0.00474,
+     0.00918
+    ],
+    "q_proj": [
+     0.0022,
+     0.0028,
+     0.004,
+     0.0062,
+     0.0111
+    ],
+    "mean": [
+     0.0179,
+     0.012,
+     0.0088,
+     0.0084,
+     0.0115
+    ]
+   }
+  ],
+  "behaviour": {
+   "adapter": "v0.7-3b-l4",
+   "questions": 16,
+   "category_gain": {
+    "citation marker": {
+     "mean": 1.2667,
+     "tokens": 104
+    },
+    "section number": {
+     "mean": 0.2322,
+     "tokens": 153
+    },
+    "punishment terms": {
+     "mean": 9.4897,
+     "tokens": 7
+    },
+    "all tokens": {
+     "mean": 1.7383,
+     "tokens": 2168
+    }
+   },
+   "influence": {
+    "answers_with_citations": 16,
+    "top_source_is_cited": 16,
+    "mean_drop_cited": 0.5427,
+    "mean_drop_uncited": 0.0007
+   },
+   "top_tokens_raised": [
+    {
+     "token": "punishment",
+     "mean_gain": 14.022,
+     "count": 5
+    },
+    {
+     "token": "\u2026",
+     "mean_gain": 12.46,
+     "count": 5
+    },
+    {
+     "token": "fit",
+     "mean_gain": 12.12,
+     "count": 16
+    },
+    {
+     "token": "section",
+     "mean_gain": 11.234,
+     "count": 17
+    },
+    {
+     "token": "See",
+     "mean_gain": 10.524,
+     "count": 13
+    },
+    {
+     "token": "simple",
+     "mean_gain": 8.304,
+     "count": 8
+    },
+    {
+     "token": "Whether",
+     "mean_gain": 8.24,
+     "count": 16
+    },
+    {
+     "token": "P",
+     "mean_gain": 7.488,
+     "count": 10
+    },
+    {
+     "token": "shown",
+     "mean_gain": 7.268,
+     "count": 17
+    },
+    {
+     "token": "up",
+     "mean_gain": 7.228,
+     "count": 8
+    },
+    {
+     "token": "causing",
+     "mean_gain": 6.869,
+     "count": 3
+    },
+    {
+     "token": "can",
+     "mean_gain": 6.807,
+     "count": 16
+    }
+   ]
+  }
+ },
+ "classifier": {
+  "sentences": 100,
+  "comprehensiveness_at_10": {
+   "occlusion": 0.163,
+   "integrated_gradients": 0.091,
+   "random": 0.022
+  },
+  "sufficiency_at_20": {
+   "occlusion": 0.025,
+   "integrated_gradients": 0.071,
+   "random": 0.118
+  },
+  "context_share": 0.65,
+  "source": "docs/reports/classifier_explanations.md"
+ }
+}

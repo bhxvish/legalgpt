@@ -1,0 +1,18 @@
+LegalGPT demo: Verify tab
+
+MAIN: click "Try an example" (s.304A, causing death by negligence), then "Check".
+
+------------------------------------------------------------
+OPTIONAL A: theft, all elements shown (choose section 379 Theft)
+------------------------------------------------------------
+On 3 March the accused entered the shop and took a mobile phone from the counter without the owner's consent and ran away with it, intending to keep it.
+
+Expected: consistent with s.379 (every element satisfied, each with its quote).
+
+------------------------------------------------------------
+OPTIONAL B: theft, one element missing (choose section 379 Theft)
+------------------------------------------------------------
+On 3 March the accused picked up a mobile phone from the shop counter and walked out with it. He said he thought it was his own phone, which he had left on the counter earlier.
+
+Expected: not every element is established (dishonest intention is doubtful), and it names the fact that
+would change the result. Use it to show "what would change the verdict".

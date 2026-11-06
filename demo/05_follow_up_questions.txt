@@ -1,0 +1,18 @@
+LegalGPT demo: follow-up questions (Case analysis, section 6 "Ask about this analysis")
+Ask these after the house-theft analysis has finished.
+
+1. Click the suggested question:
+Which facts still need to be proved?
+
+2. THE VERDICT TRAP (shows the guard):
+So is Mohan Lal guilty of theft? Just tell me the verdict.
+What to say: "The output guard removed the verdict sentences. It explains what the evidence must establish
+instead. Only a court decides guilt."
+
+3. A question that needs a new section (shows extra retrieval):
+Would this be house-breaking by night under section 457 instead of theft in a dwelling house?
+What to say: "It brings in the section it needs (for example s.446, house-breaking by night) and cites it."
+
+4. Optional:
+What evidence would establish dishonest intention here?
+How did the similar judgments treat facts like these?

@@ -1,0 +1,60 @@
+LegalGPT demo: chat questions
+Click "New chat" before each one. Mode: Legal. Law: Auto.
+
+------------------------------------------------------------
+1. EVERYDAY QUESTION (IPC, citations, judgment, "Why this answer?")
+------------------------------------------------------------
+Someone broke into my shed at night and stole my bicycle. Which offence is this and what is the punishment?
+
+What it shows: no legal words in the question, yet it finds theft / theft in a building and house-breaking
+by night (IPC 379, 380, 457 and related), cites each claim [n], shows the BNS number for each section,
+cites a Supreme Court judgment, and explains itself in "Why this answer?".
+
+------------------------------------------------------------
+2. NEW CODE (BNS), because the events are after 1 July 2024
+------------------------------------------------------------
+On 12 August 2024 a man snatched a gold chain from a woman's neck on the road. What offence is this?
+
+What it shows: answered under the Bharatiya Nyaya Sanhita. In our recorded run it cited BNS 303 (theft,
+was IPC 379), BNS 309 (robbery, was IPC 392) and BNS 134 (was IPC 356); the exact sections can vary a
+little between runs. Each BNS source shows the IPC section it replaced. Numbers come from the official
+BPRD table, not from the AI.
+
+------------------------------------------------------------
+3. HINDI (same as question 1, in Hindi)
+------------------------------------------------------------
+मेरे पड़ोसी ने रात में मेरे शेड में घुसकर मेरी साइकिल चुरा ली। यह कौन सा अपराध है?
+
+What it shows: the answer is in Hindi with the same IPC sections and citations. (Translation: "My neighbour
+broke into my shed at night and stole my bicycle. Which offence is this?")
+
+------------------------------------------------------------
+4. CIVIL QUESTION (should be declined)
+------------------------------------------------------------
+My landlord is refusing to return my security deposit after I moved out. What can I do?
+
+What it shows: "Out of scope", no IPC offence invented. Line to say: the same AI models answering alone
+treated 47 to 90% of such questions as crimes; inside LegalGPT, zero.
+
+------------------------------------------------------------
+5. EXPLAINABILITY AND BIAS (gender-sensitive: the bias check runs by itself)
+------------------------------------------------------------
+My husband Ramesh and his mother kept demanding more dowry and beat me, and I was found with burns six years after the marriage. What offences are these?
+
+What it shows: "Understand this answer" opens with the bias check done (husband -> wife, Ramesh -> Rekha...),
+the sections each version relied on, and each difference explained (required by law / variation /
+possible bias). Click Caste or Income and run the check again: one sentence about the accused is added
+and only that differs. Then How it decided -> Check the explanation, and Words that mattered. If Groq is slow, choose Gemini 3.5
+flash lite first: the bias check makes about 4 model calls.
+
+------------------------------------------------------------
+EXTRA (only if asked)
+------------------------------------------------------------
+Statute question:
+What is the punishment for causing death by negligence?
+(IPC 304A: up to two years, or fine, or both; BNS 106 shown.)
+
+Definition question:
+Explain Section 378 IPC with an example.
+
+Force the old code: set Law to IPC, or the new code: set Law to BNS, and ask question 1 again.
