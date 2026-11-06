@@ -33,7 +33,7 @@ function standing(msg) {
   if (ex.band === 'Low') return { tone: 'warn', text: 'Every legal statement has a source, but the sources only loosely match your question.' }
   if (!citedIn(msg).size) return { tone: 'warn', text: 'This answer cites no source, so it could not be checked. Do not rely on it.' }
   if (!claims.length) return { tone: 'none', text: 'Nothing here could be matched to a source word for word. Read it against the sections it cites.' }
-  return { tone: 'good', text: `All ${claims.length} legal statements are backed by a source.` }
+  return { tone: 'good', text: claims.length === 1 ? 'The legal statement is backed by a source.' : `All ${claims.length} legal statements are backed by a source.` }
 }
 
 const TONE = { good: 'border-emerald-500', warn: 'border-amber-500', none: 'border-slate-300' }

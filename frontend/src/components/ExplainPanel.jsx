@@ -601,7 +601,8 @@ export default function ExplainPanel({ msg, onUpdate, onCite, embedded = false, 
   useEffect(() => {
     if (sensitivityAsked.current || ex.sensitive !== undefined || !msg.question) return
     sensitivityAsked.current = true
-    const cited = (msg.sources || []).filter((s) => s.kind !== 'judgment').map((s) => s.section)
+    const marked = new Set([...(msg.content || '').matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])))
+    const cited = (msg.sources || []).filter((s) => s.kind !== 'judgment' && marked.has(s.marker)).map((s) => s.section)
     explainApi
       .sensitive({ text: msg.question, sections: cited, law: msg.retrieval?.law === 'bns' ? 'bns' : 'ipc' })
       .then((r) => {
