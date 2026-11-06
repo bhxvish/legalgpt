@@ -16,6 +16,7 @@ import json
 import logging
 import re
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
 from app.core.models import Message
@@ -84,9 +85,10 @@ def parse(reply: str, model_id: str = "") -> Rewrite | None:
 
 
 class QueryRewriter:
-    def __init__(self, cache_size: int = 512) -> None:
+    def __init__(self, cache_size: int = 512, budget_s: float | None = 15.0) -> None:
         self._cache: OrderedDict[tuple[str, str], Rewrite | None] = OrderedDict()
         self.cache_size = cache_size
+        self.budget_s = budget_s  # search goes on without a rewrite after this long; None: no limit
 
     def rewrite(self, question: str, llm, strict: bool = False) -> Rewrite | None:
         """None when there is no usable rewrite (a failed call, a rate limit, an unreadable reply);
@@ -100,7 +102,15 @@ class QueryRewriter:
             return self._cache[key]
         try:
             ask = getattr(llm, "generate_brief", llm.generate)  # little hidden reasoning where supported
-            reply = ask([Message("system", REWRITE_PROMPT), Message("user", question)])
+            messages = [Message("system", REWRITE_PROMPT), Message("user", question)]
+            if strict or self.budget_s is None:
+                reply = ask(messages)
+            else:
+                pool = ThreadPoolExecutor(1)  # an overloaded model can take minutes to fail
+                try:
+                    reply = pool.submit(ask, messages).result(timeout=self.budget_s)
+                finally:
+                    pool.shutdown(wait=False)
         except Exception as exc:  # retrieval works without it
             if strict:
                 raise

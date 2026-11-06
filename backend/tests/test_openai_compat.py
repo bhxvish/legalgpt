@@ -128,3 +128,66 @@ def test_brief_generation_lowers_reasoning_on_openai_reasoning_models() -> None:
     c.generate_brief(MSGS)
     c.generate(MSGS)
     assert seen[0]["reasoning_effort"] == "low" and "reasoning_effort" not in seen[1]
+
+
+def test_comma_separated_keys_rotate_on_a_daily_limit():
+    import httpx
+
+    from app.core.models import Message
+    from app.core.openai_compat import OpenAICompatClient
+
+    seen = []
+
+    def handler(request):
+        key = request.headers["Authorization"].split()[-1]
+        seen.append(key)
+        if key == "k1":
+            return httpx.Response(429, text='{"error": {"message": "Quota exceeded per day"}}')
+        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+
+    client = OpenAICompatClient("gemini", "m", api_key="k1, k2", transport=httpx.MockTransport(handler))
+    assert client.generate([Message("user", "hi")]) == "ok"
+    assert seen == ["k1", "k2"] and client.api_key == "k2"
+
+
+def test_a_key_out_for_the_day_is_skipped_after_a_per_minute_limit():
+    import httpx
+
+    from app.core.llm_client import LLMRateLimitError
+    from app.core.models import Message
+    from app.core.openai_compat import OpenAICompatClient
+
+    seen = []
+
+    def handler(request):
+        key = request.headers["Authorization"].split()[-1]
+        seen.append(key)
+        if key == "k1":
+            return httpx.Response(429, text='{"error": {"message": "Quota exceeded per day"}}')
+        return httpx.Response(429, text='{"error": {"message": "Too many requests per minute"}}')
+
+    client = OpenAICompatClient("gemini", "m", api_key="k1,k2", transport=httpx.MockTransport(handler))
+    import pytest
+
+    with pytest.raises(LLMRateLimitError):
+        client.generate([Message("user", "hi")])
+    assert seen == ["k1", "k2"] and client.api_key == "k2"  # k2's per-minute limit does not send it back to k1
+
+
+def test_a_provider_that_hangs_counts_as_down():
+    """Otherwise the raw network error passes every fallback by, and the user just waits."""
+    import httpx
+    import pytest
+
+    from app.core.llm_client import LLMClientError
+    from app.core.models import Message
+    from app.core.openai_compat import OpenAICompatClient
+
+    def hang(request):
+        raise httpx.ReadTimeout("no answer", request=request)
+
+    client = OpenAICompatClient("gemini", "m", api_key="k", transport=httpx.MockTransport(hang))
+    with pytest.raises(LLMClientError, match="did not answer"):
+        client.generate([Message("user", "q")])
+    with pytest.raises(LLMClientError, match="did not answer"):
+        list(client.stream([Message("user", "q")]))

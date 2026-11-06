@@ -51,6 +51,26 @@ def add_windows_dll_dirs() -> None:
 _LOADED: set = set()  # LlamaCppClients whose model is in memory
 
 
+class RoomyLocal:
+    """A local model with room for a long reply. The client's default budget suits a chat answer, but
+    a case file's facts are a long JSON object: cut off at that budget it cannot be parsed at all, and
+    the written analysis would stop mid-sentence. Chat and the benchmarks keep the default."""
+
+    def __init__(self, client: "LlamaCppClient", max_tokens: int = 1400) -> None:
+        self.client, self.max_tokens = client, max_tokens
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.client, name)
+
+    def generate(self, messages: list[Message]) -> str:
+        return self.client.generate(messages, self.max_tokens)
+
+    generate_brief = generate
+
+    def stream(self, messages: list[Message]) -> Iterator[str]:
+        return self.client.stream(messages, self.max_tokens)
+
+
 class LlamaCppClient(LLMClient):
     is_local = True  # chat_router: hands the query rewrite to a hosted model unless OFFLINE_MODE
 
@@ -106,15 +126,15 @@ class LlamaCppClient(LLMClient):
         model.reset()
         return model
 
-    def generate(self, messages: list[Message]) -> str:
+    def generate(self, messages: list[Message], max_tokens: int | None = None) -> str:
         with self._lock:
-            out = self._fresh().create_chat_completion(messages=self._messages(messages), max_tokens=self.max_tokens,
+            out = self._fresh().create_chat_completion(messages=self._messages(messages), max_tokens=max_tokens or self.max_tokens,
                                                        temperature=self.temperature)
         return out["choices"][0]["message"].get("content") or ""
 
-    def stream(self, messages: list[Message]) -> Iterator[str]:
+    def stream(self, messages: list[Message], max_tokens: int | None = None) -> Iterator[str]:
         with self._lock:
-            for chunk in self._fresh().create_chat_completion(messages=self._messages(messages), max_tokens=self.max_tokens,
+            for chunk in self._fresh().create_chat_completion(messages=self._messages(messages), max_tokens=max_tokens or self.max_tokens,
                                                               temperature=self.temperature, stream=True):
                 text = chunk["choices"][0].get("delta", {}).get("content")
                 if text:

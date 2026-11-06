@@ -1,6 +1,7 @@
 """FastAPI app: wires Modules 0-5 together. Every service is lazy, so building the app does not load
 models, open ChromaDB or call Groq; the embedding model warms up in the background at startup."""
 
+import importlib.util
 import logging
 import threading
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.annotation.collector import JudgmentCollector
@@ -67,7 +69,13 @@ def build_models(settings: Settings) -> tuple[dict[str, LLMClient], dict[str, st
     models: dict[str, LLMClient] = {"groq": GroqClient(api_key=settings.groq_api_key, model=settings.groq_model)}
     notes = {"groq": "hosted base model"}
     adapter = settings.adapter_path or latest_adapter(settings.lora_dir)
-    if settings.local_model_gguf:  # the local model through llama.cpp (fast on a small GPU)
+    # the GGUF models need llama-cpp-python, which only some environments have (.venv-gpu here):
+    # without it they are listed as unavailable with the reason, instead of failing when chosen
+    llama = importlib.util.find_spec("llama_cpp") is not None
+    no_llama = "needs llama-cpp-python: start the backend from the environment that has it (.venv-gpu)"
+    if settings.local_model_gguf and not llama:
+        notes["adapter"] = no_llama
+    elif settings.local_model_gguf:  # the local model through llama.cpp (fast on a small GPU)
         from app.core.llamacpp_client import LlamaCppClient
 
         models["adapter"] = LlamaCppClient(settings.local_model_gguf, settings.local_lora_gguf,
@@ -79,7 +87,9 @@ def build_models(settings: Settings) -> tuple[dict[str, LLMClient], dict[str, st
         notes["adapter"] = f"LoRA-tuned {base}, runs on this machine (GPU if available, otherwise slow on CPU)"
     else:
         notes["adapter"] = f"no LoRA adapter found in {settings.lora_dir} (train one with backend/scripts/train_lora.py)"
-    if settings.heavy_model_gguf:
+    if settings.heavy_model_gguf and not llama:
+        notes["local-heavy"] = no_llama
+    elif settings.heavy_model_gguf:
         from app.core.llamacpp_client import LlamaCppClient
 
         models["local-heavy"] = LlamaCppClient(settings.heavy_model_gguf, settings.heavy_lora_gguf,
@@ -239,6 +249,12 @@ def create_app(chat_router: ChatRouter | None = None, annotation_router: Annotat
         yield
 
     app = FastAPI(title="LegalGPT", version="1.0.0", lifespan=lifespan)
+
+    @app.exception_handler(LLMClientError)
+    def model_unavailable(_request, exc: LLMClientError) -> JSONResponse:
+        """A used-up free quota or an outage: a plain message for the page, not a 500."""
+        return JSONResponse({"detail": str(exc)}, status_code=503)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
@@ -261,18 +277,32 @@ def create_app(chat_router: ChatRouter | None = None, annotation_router: Annotat
         app.include_router(ZkRouter(zk).router)
         if zk.attestor is not None and zk.retriever is not None:
             chat_router.attest = zk.attest_answer
+    def local_verifier(llm):  # fact extraction by one chosen model alone, same rules
+        from app.verification.fact_extractor import FactExtractor
+        from app.verification.verification_service import VerificationService
+
+        if verifier is None:
+            return None
+        extractor = FactExtractor(llm, parallel=not getattr(llm, "is_local", False))  # one local model runs one at a time
+        return VerificationService(extractor, verifier.engine, reuse_facts=True)
+
     if verifier is not None:
-        app.include_router(VerifyRouter(verifier, zk).router)
+        def verifier_for(name: str):  # the model picked in the Verify tab
+            from app.core.llamacpp_client import LlamaCppClient, RoomyLocal
+
+            llm = getattr(chat_router, "models", {}).get(name)
+            if llm is None:
+                return None
+            return local_verifier(RoomyLocal(llm) if isinstance(llm, LlamaCppClient) else llm)
+
+        app.include_router(VerifyRouter(verifier, zk, verifier_for).router)
     if hasattr(chat_router, "retriever"):  # case analysis (app/case_analysis): needs the real chat router's parts
         from app.case_analysis.router import CaseRouter
 
-        def local_verifier(llm):  # local-only analyses: fact extraction by that model alone, same rules
-            from app.verification.fact_extractor import FactExtractor
-            from app.verification.verification_service import VerificationService
-
-            return VerificationService(FactExtractor(llm), verifier.engine) if verifier is not None else None
-
         app.include_router(CaseRouter(chat_router, local_verifier).router)
+        from app.explainability.router import ExplainRouter
+
+        app.include_router(ExplainRouter(chat_router).router)  # bias check, reasoning trace, influence checks
     from app.system_router import SystemRouter
 
     app.include_router(SystemRouter(settings, chat_router, verifier).router)  # the System overview page

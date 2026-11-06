@@ -100,6 +100,13 @@ class VectorStore:
         res = self._call(lambda col: col.get(where={"citation_path": citation_path}, include=["documents", "metadatas"]))
         return [self._to_chunk(cid, doc, meta) for cid, doc, meta in zip(res["ids"], res["documents"], res["metadatas"])]
 
+    def get_embeddings(self, ids: list[str]) -> dict[str, np.ndarray]:
+        """chunk id -> its stored embedding (the explanation layer compares questions with them)."""
+        if not ids:
+            return {}
+        res = self._call(lambda col: col.get(ids=list(ids), include=["embeddings"]))
+        return {cid: np.asarray(e, dtype=np.float32) for cid, e in zip(res["ids"], res["embeddings"])}
+
     def count(self) -> int:
         return int(self._call(lambda col: col.count()))
 

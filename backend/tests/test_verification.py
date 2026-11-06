@@ -271,6 +271,33 @@ def test_no_fact_leakage_between_sequential_verifications(service, engine) -> No
 
 
 @needs_prolog
+def test_a_chosen_model_is_used_alone_and_its_failure_is_reported(service) -> None:
+    import httpx
+
+    from app.core.llm_client import LLMClientError
+    from app.verification.router import VerifyRouter
+
+    class Broken:
+        def __init__(self, error):
+            self.error = error
+
+        def verify(self, *_):
+            raise self.error
+
+    chosen = {"down": Broken(LLMClientError("Groq is at its daily limit.")), "hung": Broken(httpx.ReadTimeout("slow"))}
+    service.extractor.llm.replies = [VALID]
+    app = FastAPI()
+    app.include_router(VerifyRouter(service, pick=chosen.get).router)
+    client = TestClient(app)
+    body = {"case_text": CASE, "cited_section": "304A"}
+    down = client.post("/api/verify", json=body | {"model": "down"})
+    assert down.status_code == 503 and "daily limit" in down.json()["detail"]  # not quietly answered by another model
+    assert client.post("/api/verify", json=body | {"model": "hung"}).status_code == 503
+    assert client.post("/api/verify", json=body | {"model": "nonsense"}).status_code == 422
+    assert client.post("/api/verify", json=body).status_code == 200  # no choice: the usual chain
+
+
+@needs_prolog
 def test_verify_api(service) -> None:
     from app.verification.router import VerifyRouter
 

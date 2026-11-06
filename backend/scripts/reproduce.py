@@ -65,6 +65,20 @@ STEPS = [
      [PY, "backend/scripts/eval_bns.py"], ["data/reports/bench/rewrites"]),
     ("blind-samples", "Label", "InLegalBERT on blind samples",
      [PY, "backend/scripts/eval_blind_samples.py"], []),
+    ("bias", "§10", "Bias check: gender swapped in 40 scenario pairs, model alone vs LegalGPT (cached runs)",
+     [PY, "backend/scripts/eval_bias.py"], ["data/reports/bias"]),
+    *[(f"bias-{a}", "§10", f"Bias check: {a} in 10 scenarios, model alone vs LegalGPT (cached runs)",
+       [PY, "backend/scripts/eval_bias.py", "--attribute", a], ["data/reports/bias"]) for a in ("caste", "income", "region", "age")],
+    *[(f"bias-{run}-{a}", "§10", f"Bias check: {a}, search filter ({run}) (cached runs)",
+       [PY, "backend/scripts/eval_bias.py", "--attribute", a, "--run", run, "--systems", *systems], ["data/reports/bias"])
+      for run, systems in (("fixed", ["legalgpt"]), ("heldout", ["closed", "legalgpt"]), ("heldout-off", ["legalgpt"]))
+      for a in ("caste", "income", "region", "age")],
+    ("reasoning", "§10", "Reasoning trace faithfulness: key facts and sections tested by perturbation (cached runs)",
+     [PY, "backend/scripts/eval_reasoning.py", "--n", "20", "--model", "gemini:gemini-3.5-flash-lite"], ["data/reports/explain"]),
+    ("word-importance", "§10", "Key-word explanations: deletion test (no model calls)",
+     [PY, "backend/scripts/eval_word_importance.py"], []),
+    ("lora", "§10", "LoRA: weight analysis and behaviour (saved report; the weights part needs the adapters)",
+     lambda: summary("docs/reports/lora_explainability.json")[:6000], ["docs/reports/lora_explainability.json"]),
 ]
 
 

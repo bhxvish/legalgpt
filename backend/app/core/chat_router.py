@@ -22,6 +22,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.core.citations import looks_cut_off
 from app.core.citations import normalize_stream  # noqa: F401  (re-exported for callers)
 from app.core.llm_client import LLMClient, LLMRateLimitError
 from app.core.models import Message
@@ -77,6 +78,8 @@ def sse(event: str, data: Any) -> str:
 
 
 class ChatRouter:
+    ignore_background = True  # app/core/background.py; off only to measure what it changes
+
     def __init__(
         self,
         retriever: Retriever,
@@ -224,12 +227,17 @@ class ChatRouter:
             yield sse("token", {"text": TRANSLATION_FAILED})
             return
         previous, _ = self._translate(previous, llm)
+        background: list[str] = []
+        if self.ignore_background:  # the law does not turn on who the people are; the model still reads it all
+            from app.core.background import strip_background
+
+            search, background = strip_background(search)
         from app.core.bns import choose_law
 
         law, law_why = choose_law(f"{question}\n{english or ''}", law_requested)
         if law == "bns" and self.bns_retriever is None:
             law, law_why = "ipc", "the BNS index is not built (backend/scripts/ingest_corpus.py ... --collection bns_bare_act)"
-        law_info = {"law": law, "law_reason": law_why}
+        law_info = {"law": law, "law_reason": law_why, **({"searched": search, "background_ignored": background} if background else {})}
         result = self._retrieve(search, previous, llm, law)
         sources = result.sources
         if not sources:
@@ -261,6 +269,8 @@ class ChatRouter:
         for text in normalize_stream(llm.stream(messages)):
             answer.append(text)
             yield sse("token", {"text": text})
+        if answer and looks_cut_off("".join(answer)):  # a stream can end early with no error
+            yield sse("cut_off", {"model": llm.model_id})
         yield from self._explanation(search, result, "".join(answer), False, llm.model_id)
         yield from self._attestation(question, messages, "".join(answer), sources, llm.model_id, False,
                                      result.used_context, self._used_rewrite(result))

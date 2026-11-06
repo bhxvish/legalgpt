@@ -19,10 +19,11 @@ whether anyone is guilty: that depends on evidence tested in court.
 import json
 import re
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.core.citations import normalize_stream
+from app.core.citations import looks_cut_off, normalize_stream
 from app.core.models import Message, SourceEvidence
 from app.core.prompt_builder import LEGAL_SYSTEM_PROMPT, PromptBuilder
 from app.core.query_rewriter import Rewrite
@@ -201,7 +202,7 @@ class CaseAnalyzer:
     def __init__(self, retriever: Any, explainer: Any = None, verifier: Any = None, judgments: Any = None,
                  verifier_factory: Any = None, valid_sections: dict[str, str] | None = None, harden: bool = True) -> None:
         """verifier: the app's VerificationService (hosted fact extraction with fallbacks);
-        verifier_factory(llm): one that uses only `llm`, for local-only analyses."""
+        verifier_factory(llm): one that uses only `llm`, the model chosen for the analysis."""
         self.retriever, self.explainer, self.verifier, self.judgments = retriever, explainer, verifier, judgments
         self.verifier_factory = verifier_factory
         self.valid_sections = valid_sections
@@ -238,23 +239,27 @@ class CaseAnalyzer:
                       "bns": {sec: bns_for(sec) for _, sec in facts.offences}}
 
         yield "step", {"id": "elements", "status": "running"}
-        checks = []
-        verifier = self.verifier_factory(llm) if (local_only and self.verifier_factory) else self.verifier
+        verifier = self.verifier_factory(llm) if self.verifier_factory else self.verifier  # the model the user chose
         encoded = {s.section for s in verifier.sections} if verifier is not None else set()
-        for name, sec in facts.offences:
+
+        def check(offence: tuple[str, str]) -> list[dict]:
+            name, sec = offence
+            out = []
             if sec in encoded:
                 try:
                     r = verifier.verify(text, sec).to_dict()
-                    checks.append({"section": sec, "title": r["title"], "method": "rules", "status": r["status"], "result": r})
-                    continue
+                    return [{"section": sec, "title": r["title"], "method": "rules", "status": r["status"], "result": r}]
                 except Exception as e:  # fall back to the model check below
-                    checks.append({"section": sec, "title": name, "method": "rules", "error": str(e)})
+                    out.append({"section": sec, "title": name, "method": "rules", "error": str(e)})
             sec_sources = [s for s in statute if s.section == sec]
             if not sec_sources:
-                checks.append({"section": sec, "title": name, "method": "model", "elements": [],
-                               "note": f"The text of section {sec} was not retrieved, so it was not checked."})
-                continue
-            checks.append(self._model_check(name, sec, sec_sources, facts, llm))
+                return out + [{"section": sec, "title": name, "method": "model", "elements": [],
+                               "note": f"The text of section {sec} was not retrieved, so it was not checked."}]
+            return out + [self._model_check(name, sec, sec_sources, facts, llm)]
+
+        # each offence is checked on its own and mostly waits for a model; a local model runs one at a time
+        with ThreadPoolExecutor(1 if local_only else MAX_SECTIONS) as pool:
+            checks = [c for found in pool.map(check, facts.offences) for c in found]
         yield "elements", {"checks": checks}
 
         yield "step", {"id": "similar", "status": "running"}
@@ -274,6 +279,8 @@ class CaseAnalyzer:
         for piece in normalize_stream(llm.stream(messages)):
             answer.append(piece)
             yield "token", {"text": piece}
+        if answer and looks_cut_off("".join(answer)):  # a stream can end early with no error
+            yield "cut_off", {"model": llm.model_id}
         if self.harden:
             cleaned, removed = self.guard_output("".join(answer), sources)
             if removed:

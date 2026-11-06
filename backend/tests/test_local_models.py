@@ -43,6 +43,27 @@ def test_llamacpp_client_generates_and_streams(tmp_path) -> None:
     assert c.is_local
 
 
+def test_roomy_local_gives_long_replies_room_and_leaves_the_default_alone(tmp_path) -> None:
+    from app.core.llamacpp_client import RoomyLocal
+
+    budgets = []
+
+    class Budget(_Llama):
+        def create_chat_completion(self, **kw):
+            budgets.append(kw["max_tokens"])
+            return super().create_chat_completion(**kw)
+
+    c = LlamaCppClient(tmp_path / "m.gguf", llama=Budget())
+    msgs = [Message("user", "q")]
+    roomy = RoomyLocal(c, max_tokens=1400)
+    roomy.generate(msgs)
+    roomy.generate_brief(msgs)
+    "".join(roomy.stream(msgs))
+    c.generate(msgs)  # chat and the benchmarks keep the default
+    assert budgets == [1400, 1400, 1400, c.max_tokens]
+    assert roomy.model_id == c.model_id and roomy.is_local
+
+
 def test_split_gguf_model_id_names_the_model(tmp_path) -> None:
     c = LlamaCppClient(tmp_path / "qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf", tmp_path / "v0.7-7b-l4.gguf", llama=_Llama())
     assert c.model_id == "qwen2.5-7b-instruct-q4_k_m+gguf-adapter:v0.7-7b-l4"
@@ -100,12 +121,26 @@ def test_local_gguf_setting_runs_the_local_model_through_llamacpp(tmp_path, monk
     from app.main import build_models
 
     monkeypatch.setattr("app.config.REPO_ROOT", tmp_path)
+    monkeypatch.setattr("importlib.util.find_spec", lambda name: object() if name == "llama_cpp" else None)
     s = Settings(_env_file=None, LOCAL_MODEL_GGUF=str(tmp_path / "qwen2.5-3b-instruct-q4_k_m.gguf"),
                  LOCAL_LORA_GGUF=str(tmp_path / "v0.7-3b-l4.gguf"), LORA_DIR=str(tmp_path))
     models, notes, _ = build_models(s)
     assert isinstance(models["adapter"], LlamaCppClient)  # nothing is loaded until the first question
     assert models["adapter"].model_id == "qwen2.5-3b-instruct-q4_k_m+gguf-adapter:v0.7-3b-l4"
     assert "llama.cpp" in notes["adapter"]
+
+
+def test_gguf_models_are_not_offered_without_llama_cpp(tmp_path, monkeypatch) -> None:
+    """Without the library they could only fail when chosen: they are listed as unavailable, with the reason."""
+    from app.config import Settings
+    from app.main import build_models
+
+    monkeypatch.setattr("app.config.REPO_ROOT", tmp_path)
+    monkeypatch.setattr("importlib.util.find_spec", lambda name: None)
+    s = Settings(_env_file=None, LOCAL_MODEL_GGUF=str(tmp_path / "a.gguf"), HEAVY_MODEL_GGUF=str(tmp_path / "b.gguf"), LORA_DIR=str(tmp_path))
+    models, notes, _ = build_models(s)
+    assert "adapter" not in models and "local-heavy" not in models
+    assert "llama-cpp-python" in notes["adapter"] and "llama-cpp-python" in notes["local-heavy"]
 
 
 def test_zk_record_fingerprints_a_published_gguf_adapter() -> None:

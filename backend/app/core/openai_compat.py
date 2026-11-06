@@ -8,6 +8,8 @@ One client covers several providers (free tiers marked):
 A model is named "<provider>:<model>", e.g. "gemini:gemini-3.5-flash-lite" or "openai:gpt-4o-mini".
 (GitHub Models was retired by GitHub on 30 July 2026 and is not supported.)
 Keys are read from the environment or .env and never logged. httpx only, no provider SDKs.
+A key variable may list several keys, comma-separated (GEMINI_API_KEY=key1,key2): on a rate or daily
+limit the next key is used, as GroqClient does with GROQ_API_KEY.
 """
 
 import json
@@ -17,6 +19,8 @@ import time
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
+
+import httpx
 
 from app.core.llm_client import LLMClient, LLMClientError, LLMRateLimitError
 from app.core.models import Message
@@ -67,18 +71,21 @@ def parse_spec(spec: str) -> tuple[str, str]:
 
 class OpenAICompatClient(LLMClient):
     def __init__(self, provider: str, model: str, api_key: str | None = None, max_tokens: int = 2048,
-                 temperature: float = 0.1, timeout: float = 120.0, transport: Any = None,
+                 temperature: float = 0.1, timeout: float = 75.0, transport: Any = None,
                  extra_body: dict[str, Any] | None = None) -> None:
         if provider not in PROVIDERS:
             raise ValueError(f"unknown provider {provider!r}")
         self.provider, self.model = provider, model
         self.model_id = f"{provider}:{model}"
         self.base_url, self.key_var = PROVIDERS[provider]
-        self.api_key = api_key if api_key is not None else provider_key(provider)
+        keys = api_key if api_key is not None else provider_key(provider)
+        self.api_keys = [k.strip() for k in (keys or "").split(",") if k.strip()]
+        self.api_key = self.api_keys[0] if self.api_keys else ""
+        self.exhausted: dict[str, float] = {}  # key -> when its daily limit was hit (skipped for 6 hours)
         self.max_tokens, self.temperature, self.timeout = max_tokens, temperature, timeout
         self._transport = transport  # tests pass an httpx.MockTransport
         self.extra_body = extra_body or {}  # provider-specific fields, e.g. OpenRouter's "provider" routing
-        self.retry_waits = (5.0, 15.0, 45.0)  # after "overloaded" (500/502/503/504) replies
+        self.retry_waits = (3.0, 8.0)  # after "overloaded" (500/502/503/504) replies; then the next model takes over
         self.usage = {"in": 0, "out": 0}  # billed tokens so far (generate only; out includes reasoning)
 
     # ------------------------------------------------------------------ HTTP
@@ -120,13 +127,42 @@ class OpenAICompatClient(LLMClient):
 
     def _post(self, http, messages: list[Message]):
         for wait in (*self.retry_waits, None):
-            r = http.post("/chat/completions", json=self._body(messages, False))
+            try:
+                r = http.post("/chat/completions", json=self._body(messages, False))
+            except httpx.TransportError as e:  # hung or dropped: down, like an error reply, so a fallback can step in
+                raise LLMClientError(f"{self.provider} ({self.model}) did not answer ({type(e).__name__}).") from e
             if r.status_code not in RETRYABLE or wait is None:
                 return r
             time.sleep(wait)
 
+    def _next_key(self, error: Exception | None = None) -> bool:
+        """Switch to the next usable key after a rate limit; False when there is none. A key whose
+        daily limit was hit is skipped for 6 hours, so a per-minute limit on the last good key does not
+        send the next call to a key that is out for the day."""
+        if error is not None and "daily" in str(error).lower():
+            self.exhausted[self.api_key] = time.time()
+        usable = [k for k in self.api_keys if k != self.api_key and time.time() - self.exhausted.get(k, 0) > 6 * 3600]
+        if not usable:
+            return False
+        i = self.api_keys.index(self.api_key) if self.api_key in self.api_keys else -1
+        self.api_key = next(k for k in self.api_keys[i + 1:] + self.api_keys[:i + 1] if k in usable)
+        import logging
+
+        logging.getLogger(__name__).warning("%s rate limit: switched to API key %d of %d", self.provider,
+                                            self.api_keys.index(self.api_key) + 1, len(self.api_keys))
+        return True
+
     # ------------------------------------------------------------------ LLMClient
     def generate(self, messages: list[Message]) -> str:
+        for _ in range(max(1, len(self.api_keys))):
+            try:
+                return self._generate(messages)
+            except LLMRateLimitError as e:
+                if not self._next_key(e):
+                    raise
+        return self._generate(messages)
+
+    def _generate(self, messages: list[Message]) -> str:
         with self._client() as http:
             r = self._post(http, messages)
         if r.status_code != 200:
@@ -159,15 +195,30 @@ class OpenAICompatClient(LLMClient):
         return self.generate(messages)
 
     def stream(self, messages: list[Message]) -> Iterator[str]:
-        for wait in (*self.retry_waits, None):  # retry only before the first token
-            with self._client() as http, http.stream("POST", "/chat/completions", json=self._body(messages, True)) as r:
-                if r.status_code in RETRYABLE and wait is not None:
-                    time.sleep(wait)
-                    continue
-                if r.status_code != 200:
-                    raise self._error(r.status_code, r.read().decode("utf-8", "replace"))
-                yield from self._deltas(r)
+        for attempt in range(max(1, len(self.api_keys))):
+            started = False
+            try:
+                for piece in self._stream(messages):
+                    started = True
+                    yield piece
                 return
+            except LLMRateLimitError as e:  # a limit is reported before the first token: try the next key
+                if started or attempt + 1 >= len(self.api_keys) or not self._next_key(e):
+                    raise
+
+    def _stream(self, messages: list[Message]) -> Iterator[str]:
+        try:
+            for wait in (*self.retry_waits, None):  # retry only before the first token
+                with self._client() as http, http.stream("POST", "/chat/completions", json=self._body(messages, True)) as r:
+                    if r.status_code in RETRYABLE and wait is not None:
+                        time.sleep(wait)
+                        continue
+                    if r.status_code != 200:
+                        raise self._error(r.status_code, r.read().decode("utf-8", "replace"))
+                    yield from self._deltas(r)
+                    return
+        except httpx.TransportError as e:
+            raise LLMClientError(f"{self.provider} ({self.model}) did not answer ({type(e).__name__}).") from e
 
     @staticmethod
     def _deltas(r) -> Iterator[str]:

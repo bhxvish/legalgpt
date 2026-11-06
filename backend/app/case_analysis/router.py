@@ -54,6 +54,14 @@ class AskRequest(BaseModel):
     local_only: bool = False
 
 
+class CaseBiasRequest(AnalyzeRequest):
+    """The same file or text as the analysis, plus what the analysis found (offences, element checks)."""
+
+    attribute: Literal["gender", "religion", "caste", "income", "region", "age"] = "gender"
+    original: dict[str, Any] | None = None
+    control: bool = True
+
+
 def ipc_sections() -> dict[str, str] | None:
     """IPC section -> title, from the corpus (offences outside it are dropped from an analysis)."""
     try:
@@ -130,6 +138,7 @@ class CaseRouter:
         self.router = APIRouter(prefix="/api/case", tags=["case analysis"])
         self.router.add_api_route("/analyze", self.analyze, methods=["POST"])
         self.router.add_api_route("/ask", self.ask, methods=["POST"])
+        self.router.add_api_route("/bias", self.bias, methods=["POST"])
         self.router.add_api_route("/info", self.info, methods=["GET"])
 
     def info(self) -> dict[str, Any]:
@@ -139,6 +148,73 @@ class CaseRouter:
                 "judgments": bool(self.analyzer.judgments and self.analyzer.judgments.available())}
 
     async def analyze(self, req: AnalyzeRequest) -> StreamingResponse:
+        text = self._case_text(req)
+        llm = self._pick_llm(req.model, req.local_only)
+        return StreamingResponse(self._stream(self.analyzer.analyze(text, llm, local_only=req.local_only)),
+                                 media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    def bias(self, req: CaseBiasRequest) -> dict:
+        """The case file with one attribute (gender, caste, age...) changed, through facts, offences and element checks;
+        compared with the original analysis (from the browser) and, with `control`, with both versions
+        analysed again. See app/explainability/bias.py."""
+        from app.explainability import bias as bias_mod
+
+        text = self._case_text(req)
+        cf = bias_mod.counterfactual(text, req.attribute)
+        if cf.mode == "none":
+            return {"verdict": "not_applicable", "swaps": [],
+                    "summary": f"The file names no {req.attribute} (no words or names to swap), so there is nothing to compare."}
+        llm = self._pick_llm(req.model, req.local_only)
+        o = req.original or {}
+        original = bias_mod.Run(text=text, answer=o.get("analysis", ""),
+                                cited=[str(x.get("section")) for x in o.get("offences", [])],
+                                elements={f"s.{c.get('section')}": str(c.get("status") or "") for c in o.get("checks", [])
+                                          if c.get("status")})
+        first = lambda: self._assess(cf.first, llm, req.local_only)
+        second = lambda: self._assess(cf.second, llm, req.local_only)
+        if not original.cited or cf.mode == "added":  # with an added sentence, the first version is new too
+            original, swapped = bias_mod.both(first, second)
+        else:
+            swapped = second()
+        titles = dict(self.analyzer.valid_sections or {})
+        offences = bias_mod.same_offence(titles)
+
+        def judge(control=None, repeat=None):
+            return bias_mod.compare(req.attribute, original, swapped, cf.swaps, "ipc", control, titles, cf.mode, repeat, offences)
+
+        report = judge()
+        if req.control and report.verdict == "possible_bias":  # only a difference needs the second runs
+            report = judge(*bias_mod.both(first, second))
+        report.sensitive_because = bias_mod.sensitivity(text, original.cited + swapped.cited)
+        return report.to_dict()
+
+    def _assess(self, text: str, llm: Any, local_only: bool, tries: int = 3) -> Any:
+        """Steps 1-3 of an analysis (facts, offences, element checks) as a bias_mod.Run; the similar
+        judgments and the written analysis are not needed to compare two versions. A reading that found
+        no offences is usually a failed model call, and would look like a difference the swap did not
+        cause, so it is tried again."""
+        for _ in range(tries):
+            run = self._assess_once(text, llm, local_only)
+            if run.cited:
+                break
+        return run
+
+    def _assess_once(self, text: str, llm: Any, local_only: bool) -> Any:
+        from app.explainability import bias as bias_mod
+
+        run = bias_mod.Run(text=text)
+        for event, data in self.analyzer.analyze(text, llm, local_only=local_only):
+            if event == "facts":
+                run.cited = [str(o["section"]) for o in data.get("offences", [])]
+            elif event == "elements":
+                run.elements = {f"s.{c['section']}": str(c.get("status") or "") for c in data["checks"] if c.get("status")}
+                break
+            elif event in ("similar", "error"):
+                break
+        run.model = getattr(llm, "model_id", "")
+        return run
+
+    def _case_text(self, req: Any) -> str:
         text = req.text
         if req.file_base64:
             try:
@@ -162,9 +238,7 @@ class CaseRouter:
         text = (text or "").strip()
         if len(text) < MIN_CHARS:
             raise HTTPException(422, f"the case text is too short (at least {MIN_CHARS} characters)")
-        llm = self._pick_llm(req.model, req.local_only)
-        return StreamingResponse(self._stream(self.analyzer.analyze(text, llm, local_only=req.local_only)),
-                                 media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        return text
 
     async def ask(self, req: AskRequest) -> StreamingResponse:
         if not req.context.get("sources"):
@@ -194,7 +268,9 @@ class CaseRouter:
             backups = [m for k, m in self.chat.models.items() if m is not llm and not getattr(m, "is_local", False)
                        and (k == "groq" or str(getattr(m, "model_id", "")).startswith("gemini:"))]
             llm = StickyFallback([llm] + backups)
-        return llm
+        from app.core.llamacpp_client import LlamaCppClient, RoomyLocal
+
+        return RoomyLocal(llm) if isinstance(llm, LlamaCppClient) else llm
 
     def _stream(self, events: Iterator[tuple[str, Any]]) -> Iterator[str]:
         try:

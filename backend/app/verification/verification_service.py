@@ -5,6 +5,7 @@ whether the facts *as extracted by the model* satisfy the encoded elements of a 
 whether the accused is guilty. Every finding carries the evidence quote it rests on.
 """
 
+import threading
 import re
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -65,9 +66,14 @@ _ORDER = {"CONSISTENT": 0, "INSUFFICIENT": 1, "INCONSISTENT": 2}
 
 
 class VerificationService:
-    def __init__(self, extractor: FactExtractor, engine: PrologEngine, mapper: PredicateMapper | None = None, extraction_runs: int = 2) -> None:
+    def __init__(self, extractor: FactExtractor, engine: PrologEngine, mapper: PredicateMapper | None = None, extraction_runs: int = 2, reuse_facts: bool = False) -> None:
         self.extractor = extractor
         self.extraction_runs = extraction_runs  # values must agree across runs (FactExtractor.extract_consistent)
+        # one case against several sections: the facts do not depend on the section, so they are read
+        # once. Only for a service made for one case file (the shared one must not keep case text).
+        self.reuse_facts = reuse_facts
+        self._read: tuple[str, Any] | None = None
+        self._read_lock = threading.Lock()
         self.engine = engine
         self.mapper = mapper or PredicateMapper()
         by_number = sorted(engine.sections(), key=lambda s: (int(re.match(r"\d+", s.section).group()), s.section))  # type: ignore[union-attr]
@@ -88,11 +94,19 @@ class VerificationService:
              for e in section.elements],
         )
 
+    def _facts(self, case_text: str) -> Any:
+        if not self.reuse_facts:
+            return self.extractor.extract_consistent(case_text, self.extraction_runs)
+        with self._read_lock:  # checks of other sections wait for the first reading, then share it
+            if self._read is None or self._read[0] != case_text:
+                self._read = (case_text, self.extractor.extract_consistent(case_text, self.extraction_runs))
+            return self._read[1]
+
     def verify(self, case_text: str, cited_section: str) -> VerificationResult:
         section = self._sections.get(cited_section.strip().upper())
         if section is None:
             raise ValueError(f"section {cited_section!r} is not encoded; available: {sorted(self._sections)}")
-        extraction = self.extractor.extract_consistent(case_text, self.extraction_runs)
+        extraction = self._facts(case_text)
         case_id = f"v_{uuid.uuid4().hex[:12]}"
         clauses = self.mapper.to_prolog_facts(case_id, extraction.facts)
         with self.engine.session(case_id, clauses):  # facts are retracted even if a query raises

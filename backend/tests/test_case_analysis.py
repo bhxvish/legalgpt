@@ -245,3 +245,70 @@ def test_ask_endpoint_needs_an_analysis_with_sources():
     assert e.value.status_code == 422
     with pytest.raises(HTTPException):
         asyncio.run(router.ask(AskRequest(question="x", context={"sources": [{"marker": 1}]})))
+
+
+def test_a_case_file_is_read_once_for_all_its_sections():
+    """The facts do not depend on the section: four offences must not mean four readings."""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from app.verification.fact_extractor import FactExtractor
+    from app.verification.verification_service import VerificationService
+
+    calls = []
+
+    class Reader:
+        def extract_consistent(self, text, runs):
+            calls.append(text)
+            return text.upper()
+
+    service = VerificationService.__new__(VerificationService)
+    service.extractor, service.extraction_runs, service.reuse_facts = Reader(), 2, True
+    service._read, service._read_lock = None, threading.Lock()
+    with ThreadPoolExecutor(4) as pool:
+        assert set(pool.map(lambda _: service._facts("the file"), range(4))) == {"THE FILE"}
+    assert calls == ["the file"]
+    assert service._facts("another file") == "ANOTHER FILE" and len(calls) == 2  # never the wrong case's facts
+
+    service.reuse_facts = False  # the shared service keeps no case text
+    service._read = None
+    service._facts("the file")
+    assert service._read is None
+
+    class Llm:
+        pass
+
+    assert FactExtractor(Llm(), parallel=True).parallel and not FactExtractor(Llm()).parallel
+
+
+def test_an_answer_that_stops_mid_sentence_is_recognised():
+    from app.core.citations import looks_cut_off
+
+    for cut in ("imprisonment of either description for a term which may extend to seven", "Based on the sources:", "Section 379 [",
+                "the following offences:\n\n", "", "1. **Criminal Trespass**: \n   - *"):
+        assert looks_cut_off(cut), cut
+    for whole in ("It is theft under Section 379 [1].", "Punishable with fine [2]", "(subject to s.34)", "*Note: not legal advice.*",
+                  "| a | b |", "\u092f\u0939 \u091a\u094b\u0930\u0940 \u0939\u0948\u0964", 'He said "theft"'):
+        assert not looks_cut_off(whole), whole
+
+
+def test_an_overloaded_model_cannot_hold_the_search_up():
+    import threading
+    import time
+
+    from app.core.models import Message  # noqa: F401
+    from app.core.query_rewriter import QueryRewriter
+
+    release = threading.Event()
+
+    class Stuck:
+        model_id = "stuck"
+
+        def generate(self, messages):
+            release.wait(5)
+            return "{}"
+
+    start = time.time()
+    assert QueryRewriter(budget_s=0.1).rewrite("a question", Stuck()) is None  # the search simply goes on without it
+    assert time.time() - start < 2
+    release.set()

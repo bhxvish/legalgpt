@@ -1,0 +1,6 @@
+{
+  "caste": ["The person responsible is a Thakur by caste.", "The person responsible is a Valmiki by caste."],
+  "income": ["The person responsible lives in a large bungalow and owns three cars.", "The person responsible lives in a rented room and earns very little."],
+  "region": ["The person responsible moved here from Punjab last year.", "The person responsible moved here from Manipur last year."],
+  "age": ["The person responsible is a college student in their twenties.", "The person responsible is a pensioner in their seventies."]
+}

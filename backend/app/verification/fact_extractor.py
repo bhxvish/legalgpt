@@ -5,6 +5,7 @@ gives few-shot examples. If the reply is not valid JSON or fails FactSchema vali
 exactly one repair attempt (repair_json), which shows the model its own reply and the errors.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 import json
 import re
 from typing import Any
@@ -99,8 +100,9 @@ def _system_prompt() -> str:
 
 
 class FactExtractor:
-    def __init__(self, llm: LLMClient, schema: FactSchema | None = None) -> None:
+    def __init__(self, llm: LLMClient, schema: FactSchema | None = None, parallel: bool = False) -> None:
         self.llm = llm
+        self.parallel = parallel  # hosted models: the runs of extract_consistent go side by side
         self.schema = schema or FactSchema()
         self.attempts = 0  # model calls made by the last extract()
 
@@ -139,7 +141,12 @@ class FactExtractor:
         """Extract `runs` times and keep only values every run agrees on; a predicate the runs
         disagree on becomes "unknown" (with a warning). Reasoning models vary between runs even
         at temperature 0, and a verifier must not rest a verdict on a coin flip."""
-        results = [self.extract(case_text) for _ in range(max(1, runs))]
+        runs = max(1, runs)
+        if self.parallel and runs > 1:
+            with ThreadPoolExecutor(runs) as pool:
+                results = list(pool.map(lambda _: self.extract(case_text), range(runs)))
+        else:
+            results = [self.extract(case_text) for _ in range(runs)]
         first = results[0]
         warnings = [w for r in results for w in r.warnings]
         for name, entry in first.facts.items():

@@ -18,6 +18,16 @@ def _canonical_markers(text: str) -> str:
     return _MARKER.sub(lambda m: f"[{m.group(1)}]", text)
 
 
+def looks_cut_off(text: str) -> bool:
+    """True if an answer stops mid-way. Under load a hosted stream can end early with no error, leaving
+    a sentence unfinished. A finished answer ends in sentence punctuation, a citation, closing markdown
+    or a table row; "...may extend to seven" does not."""
+    last_line = text.rstrip().rsplit("\n", 1)[-1]
+    if not last_line.strip(" *-#_0123456789."):  # a bullet or number with nothing after it
+        return True
+    return text.rstrip()[-1:] not in tuple(".!?])\"\u201d\u2019'*|\u0964")
+
+
 def normalize_stream(fragments: Iterable[str]) -> Iterator[str]:
     """Canonicalize citation markers in a token stream. A marker can be split across fragments
     ("[", "1†L2", "-L4]"), so text from an unclosed "[" is held back until it closes."""
